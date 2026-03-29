@@ -67,7 +67,9 @@ LEARN_PROMPT = """\
    • 三者两两不完全相同时用完整形：
      {"raw_text":"…","llm_text":"…","final_text":"…","accepted_suggestions":[]}
 
-请提取「对今后纠错有参考价值」的观察，返回**严格 JSON 一份**（仅此对象，不要其它说明）：
+请提取「对今后纠错有参考价值」的观察，返回**严格 JSON 一份**（仅此对象，不要其它说明）。
+**顶层必须包含**键名 `notes`、`candidate_pairs`、`domain_terms`（均可为空数组）；**禁止**把用户消息里的 `{"items":[...]}` 再抄一遍当作你的输出（那是输入格式，不是答案）。
+
 {
   "notes": ["..."],
   "candidate_pairs": [{"wrong": "...", "correct": "..."}],
@@ -118,6 +120,108 @@ def build_compact_learn_item(
         out["llm_text"] = llm
         out["final_text"] = fin
     return out
+
+
+def _flatten_openai_message_content(content) -> str:
+    """部分网关把 message.content 做成字符串或 [{type,text}] 片段列表。"""
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        parts: list[str] = []
+        for p in content:
+            if isinstance(p, dict):
+                if (p.get("type") or "") == "text" or "text" in p:
+                    parts.append(str(p.get("text") or ""))
+            elif isinstance(p, str):
+                parts.append(p)
+        return "".join(parts).strip()
+    return str(content).strip()
+
+
+def _extract_balanced_json_object(s: str, start: int) -> str | None:
+    """从 s[start]=='{' 起截取第一个花括号平衡的子串。"""
+    depth = 0
+    for i in range(start, len(s)):
+        if s[i] == "{":
+            depth += 1
+        elif s[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return s[start : i + 1]
+    return None
+
+
+def _learn_output_shape_ok(d: dict) -> bool:
+    """
+    学习模型应返回含 notes / domain_terms / candidate_pairs 的对象。
+    勿把用户消息里的 {\"items\":[...]} 请求体回显当成结果（会导致术语库零增量）。
+    """
+    return any(k in d for k in ("notes", "domain_terms", "candidate_pairs"))
+
+
+def parse_learn_model_json(raw: str, log) -> dict:
+    """
+    将学习模型返回的正文解析为 JSON 对象（容忍 markdown 代码块、前后说明、推理前缀）。
+    若正文中出现多段 JSON，优先采用「含 notes/domain_terms/candidate_pairs」的段落，通常取最后一段（模型常在回显输入后再写答案）。
+    """
+    s = (raw or "").replace("\ufeff", "").strip()
+    if not s:
+        raise LearnJsonError("empty learn model content")
+
+    def try_load(candidate: str) -> dict | None:
+        c = (candidate or "").strip()
+        if not c:
+            return None
+        try:
+            v = json.loads(c)
+            return v if isinstance(v, dict) else None
+        except json.JSONDecodeError:
+            return None
+
+    def accept(d: dict | None) -> dict | None:
+        if d and _learn_output_shape_ok(d):
+            return d
+        return None
+
+    if r := accept(try_load(s)):
+        return r
+
+    for m in re.finditer(r"```(?:json)?\s*([\s\S]*?)```", s, flags=re.IGNORECASE):
+        if r := accept(try_load(m.group(1))):
+            return r
+
+    found: list[dict] = []
+    for i, ch in enumerate(s):
+        if ch != "{":
+            continue
+        blob = _extract_balanced_json_object(s, i)
+        if not blob:
+            continue
+        d = try_load(blob)
+        if accept(d):
+            found.append(d)
+    if found:
+        chosen = found[-1]
+        if len(found) > 1:
+            log(
+                f"[learn] 从回复中解析出 {len(found)} 段「学习结果形」JSON，采用最后一段（避免误用 items 回显）"
+            )
+        return chosen
+
+    sloppy = try_load(s)
+    if sloppy is not None and not _learn_output_shape_ok(sloppy):
+        log(
+            "[learn] 顶层 JSON 缺少 notes/domain_terms/candidate_pairs "
+            "（常见：模型回显了用户消息里的 items）；已扫描全文仍无合法学习结果"
+        )
+
+    preview = s[:160].replace("\n", " ")
+    if len(s) > 160:
+        preview += "…"
+    log(f"[learn] JSON 无法解析为学习结果，正文预览: {preview!r}")
+    raise LearnJsonError("invalid json: could not extract learn result object")
 
 
 @dataclass
@@ -606,16 +710,22 @@ class TextPolisher:
         return (result or text), elapsed_ms, resp.status_code
 
     @staticmethod
-    def _learn_assistant_text(data: dict) -> str:
-        """OpenAI 形响应；部分智谱推理模型 content 为空时回退 reasoning_content。"""
+    def _learn_response_candidates(data: dict) -> list[str]:
+        """OpenAI 形响应：content（含片段列表）与 reasoning_content 分别尝试解析。"""
         choices = data.get("choices") or []
         if not choices:
-            return ""
+            return []
         msg = choices[0].get("message") or {}
-        c = (msg.get("content") or "").strip()
+        c = _flatten_openai_message_content(msg.get("content"))
+        r = (msg.get("reasoning_content") or "").strip()
+        out: list[str] = []
         if c:
-            return c
-        return (msg.get("reasoning_content") or "").strip()
+            out.append(c)
+        if r:
+            out.append(r)
+        if c and r and c != r:
+            out.append(f"{c}\n{r}")
+        return out
 
     async def learn_from_review(
         self,
@@ -696,26 +806,26 @@ class TextPolisher:
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         resp.raise_for_status()
         data = resp.json()
-        content = self._learn_assistant_text(data)
-        if not content:
+        candidates = self._learn_response_candidates(data)
+        parsed: dict | None = None
+        last_learn_err: LearnJsonError | None = None
+        for text in candidates:
+            if not (text or "").strip():
+                continue
+            try:
+                parsed = parse_learn_model_json(text, self._log)
+                break
+            except LearnJsonError as e:
+                last_learn_err = e
+        if parsed is None:
+            if last_learn_err:
+                self._log(
+                    "[learn] JSON 解析失败，不写入样本、不标记已处理 "
+                    f"elapsed_ms={elapsed_ms} err={last_learn_err}"
+                )
+                raise last_learn_err
             self._log("[learn] 模型返回空 content，不写入样本、不标记已处理")
             raise LearnJsonError("empty learn model content")
-
-        try:
-            parsed = json.loads(content)
-        except json.JSONDecodeError as e:
-            self._log(
-                "[learn] JSON 解析失败，不写入样本、不标记已处理 "
-                f"elapsed_ms={elapsed_ms} err={e}"
-            )
-            raise LearnJsonError(f"invalid json: {e}") from e
-
-        if not isinstance(parsed, dict):
-            self._log(
-                "[learn] 返回非 JSON 对象，不写入样本、不标记已处理 "
-                f"type={type(parsed).__name__}"
-            )
-            raise LearnJsonError("learn response is not a JSON object")
 
         ts = datetime.now().isoformat(timespec="seconds")
         if n_items == 1:

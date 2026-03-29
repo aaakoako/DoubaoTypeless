@@ -66,30 +66,6 @@ python main.py
 
 PowerShell：`$env:DT_VERBOSE_LOG=1; python main.py`
 
-## 发布与 GitHub Release
-
-### 源码发布
-
-1. 在本地配置好 Git 远程与身份验证（HTTPS + PAT 或 SSH），执行 `git push`。**本仓库的自动化助手无法代替你使用 GitHub 账号推送**；若已安装 [GitHub CLI](https://cli.github.com/)，可用 `gh auth login` 完成登录。
-2. 打 tag 并推送，例如：`git tag v0.1.0 && git push origin v0.1.0`。
-3. GitHub 对每次 Release 会提供 **Source code (zip / tar.gz)**。
-
-### 自动创建 Release 并上传 exe
-
-推送 **以 `v` 开头的 tag** 时，**`.github/workflows/release.yml`** 会在 **windows-latest** 上安装依赖、执行 PyInstaller，并用 `softprops/action-gh-release` 创建 Release，附带 **`dist/DoubaoTypeless.exe`** 与自动生成的 Release Notes。若与手动发布重复操作，请避免对同一 tag 重复建 Release。
-
-### Windows `.exe`（本地构建）
-
-- **产物**：单文件 **`dist/DoubaoTypeless.exe`**（**无控制台窗口**；地址与排错见 `debug.log` 或设置/托盘中的调试日志窗口）。
-- **构建**：在项目根目录执行 `powershell -ExecutionPolicy Bypass -File tools/build_windows_exe.ps1`（需已安装 Python 与依赖；脚本会安装 PyInstaller 并在缺少图标时生成 `assets/icon.ico`）。
-- **运行**：`config.json`、`debug.log`、`data/` 会写在 **exe 同目录**（`paths.py` + 打包后 `chdir`）；只读资源来自打包内置。
-- **范围**：仅 **Windows**；Linux / macOS 未适配托盘、热键与粘贴链路。
-- 若 spec 缺依赖导致运行报错，可在 `DoubaoTypeless.spec` 的 `hiddenimports` 中补模块后重打。
-
-### CI
-
-推送至 `main` / `master` 或 PR 时，**`.github/workflows/ci.yml`** 会做 Python 语法编译检查（不安装 Windows 专用依赖，与 `pywin32` 无关）。
-
 ## 第三方依赖与许可证（简述）
 
 本项目 **应用层代码** 以 **MIT** 发布（见仓库根目录 **`LICENSE`**）。运行依赖包括但不限于（以 `requirements.txt` 为准）：
