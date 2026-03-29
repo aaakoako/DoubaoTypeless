@@ -2,9 +2,10 @@
 GitHub Releases 检查与 Windows 单文件 exe 就地替换（下载完成后退出，由批处理覆盖并重启）。
 源码运行时不替换自身，仅提示前往 Release。
 
-国内网络：默认通过前缀式镜像访问 api.github.com 与 release 附件下载地址。
-- 环境变量 DT_GITHUB_MIRROR：自定义镜像前缀，例如 https://ghproxy.com 或 https://mirror.ghproxy.com
-- 设为 0 / false / off / direct / none 则直连 GitHub（不走镜像）。
+访问策略：**优先直连 GitHub**；失败时再按序尝试国内前缀镜像（ghproxy 等）。
+- 环境变量 DT_GITHUB_MIRROR 未设置：直连 → 内置 FALLBACK_MIRROR_PREFIXES。
+- 设为 0 / false / off / direct / none：**仅直连**，不回退镜像。
+- 设为自定义 URL（如 https://mirror.ghproxy.com）：直连 → 仅该镜像（不再试其它内置镜像）。
 """
 
 from __future__ import annotations
@@ -29,8 +30,11 @@ GITHUB_RELEASES_PAGE = (
     f"https://github.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/releases/latest"
 )
 
-# 常见 ghproxy 类前缀；不可用时可改此常量或设 DT_GITHUB_MIRROR。
-DEFAULT_GITHUB_MIRROR_PREFIX = "https://ghproxy.com"
+# 直连失败时按序尝试的前缀（与 ghproxy 类「前缀/完整 URL」兼容）。
+FALLBACK_MIRROR_PREFIXES: tuple[str, ...] = (
+    "https://ghproxy.com",
+    "https://mirror.ghproxy.com",
+)
 
 _GH_HEADERS = {
     "Accept": "application/vnd.github+json",
@@ -42,27 +46,55 @@ def _mirror_disabled_token(s: str) -> bool:
     return s.strip().lower() in ("0", "false", "no", "off", "none", "direct", "-")
 
 
-def effective_github_mirror_prefix() -> str | None:
-    """返回镜像前缀（无尾部斜杠），无镜像时返回 None。"""
+def mirror_fallback_prefixes() -> list[str]:
+    """直连失败时使用的镜像前缀列表（不含尾部斜杠）。"""
     raw = os.environ.get("DT_GITHUB_MIRROR")
-    if raw is None:
-        p = (DEFAULT_GITHUB_MIRROR_PREFIX or "").strip().rstrip("/")
-        return p or None
-    s = raw.strip()
-    if not s or _mirror_disabled_token(s):
-        return None
-    return s.rstrip("/")
+    if raw is not None:
+        s = raw.strip()
+        if not s or _mirror_disabled_token(s):
+            return []
+        return [s.rstrip("/")]
+    return [p.strip().rstrip("/") for p in FALLBACK_MIRROR_PREFIXES if p.strip()]
 
 
-def mirror_github_url(url: str) -> str:
-    """将官方 GitHub URL 转为 前缀/完整URL 形式（与 ghproxy 类服务兼容）。"""
-    prefix = effective_github_mirror_prefix()
-    if not prefix or not (url or "").strip():
-        return url
-    u = url.strip()
-    if u.startswith(prefix + "/"):
+def apply_mirror_prefix(url: str, prefix: str) -> str:
+    """prefix + '/' + 原始 URL（ghproxy 类）。"""
+    p = prefix.rstrip("/")
+    u = (url or "").strip()
+    if not p or not u:
         return u
-    return f"{prefix}/{u}"
+    if u.startswith(p + "/"):
+        return u
+    return f"{p}/{u}"
+
+
+def _api_try_plan() -> list[tuple[str, str, str | None]]:
+    """(请求 URL, 日志标签, 成功后用于用户链接/下载的镜像前缀或 None 表示直连)."""
+    plan: list[tuple[str, str, str | None]] = [
+        (GITHUB_API_LATEST, "直连 api.github.com", None),
+    ]
+    seen = {GITHUB_API_LATEST}
+    for prefix in mirror_fallback_prefixes():
+        u = apply_mirror_prefix(GITHUB_API_LATEST, prefix)
+        if u not in seen:
+            seen.add(u)
+            plan.append((u, f"镜像 {prefix}", prefix))
+    return plan
+
+
+def _download_url_plan(original: str) -> list[str]:
+    """下载：先官方 URL，再各镜像前缀（去重）。"""
+    o = (original or "").strip()
+    if not o:
+        return []
+    out: list[str] = [o]
+    seen = {o}
+    for prefix in mirror_fallback_prefixes():
+        u = apply_mirror_prefix(o, prefix)
+        if u not in seen:
+            seen.add(u)
+            out.append(u)
+    return out
 
 
 def normalize_version_tuple(s: str) -> tuple[int, ...]:
@@ -80,14 +112,25 @@ def remote_is_newer(remote_tag: str, current: str = APP_VERSION) -> bool:
     return normalize_version_tuple(remote_tag) > normalize_version_tuple(current)
 
 
-async def fetch_latest_release() -> dict[str, Any] | None:
-    api_url = mirror_github_url(GITHUB_API_LATEST)
+async def fetch_latest_release(*, log) -> tuple[dict[str, Any] | None, str | None]:
+    """
+    拉取 latest release JSON。
+    返回 (data, releases_link_mirror_prefix)：后者为 None 表示元数据来自直连，否则为 winning 镜像前缀。
+    """
     async with httpx.AsyncClient(timeout=20.0, headers=_GH_HEADERS) as client:
-        r = await client.get(api_url)
-        if r.status_code != 200:
-            return None
-        data = r.json()
-        return data if isinstance(data, dict) else None
+        for url, label, win_prefix in _api_try_plan():
+            try:
+                log(f"[update] 请求 Release: {label}")
+                r = await client.get(url)
+                if r.status_code != 200:
+                    log(f"[update] {label} HTTP {r.status_code}，换下一源")
+                    continue
+                data = r.json()
+                if isinstance(data, dict):
+                    return data, win_prefix
+            except Exception as e:
+                log(f"[update] {label} 失败: {e}")
+    return None, None
 
 
 def pick_exe_asset(assets: list[Any]) -> dict[str, Any] | None:
@@ -192,10 +235,13 @@ async def run_update_flow(*, log) -> str:
     执行检查与可选下载。返回给人看的摘要（也可用于日志）。
     若已启动更新批处理，返回字符串含 [EXIT] 供调用方退出进程。
     """
-    mp = effective_github_mirror_prefix()
-    log(f"[update] GitHub: {'镜像 ' + mp if mp else '直连官方'}")
+    fb = mirror_fallback_prefixes()
+    log(
+        "[update] 策略: 优先直连 GitHub"
+        + (f"，失败则试镜像 {fb}" if fb else "（不回退镜像，已禁用）")
+    )
 
-    data = await fetch_latest_release()
+    data, meta_via_prefix = await fetch_latest_release(log=log)
     if not data:
         return "无法连接 GitHub 或未找到最新 Release，请稍后重试。"
 
@@ -206,7 +252,11 @@ async def run_update_flow(*, log) -> str:
     if not remote_is_newer(tag, APP_VERSION):
         return f"当前已是最新（本机 v{APP_VERSION}，远端 {tag}）。"
 
-    releases_page = mirror_github_url(GITHUB_RELEASES_PAGE)
+    releases_page = (
+        GITHUB_RELEASES_PAGE
+        if meta_via_prefix is None
+        else apply_mirror_prefix(GITHUB_RELEASES_PAGE, meta_via_prefix)
+    )
     assets = data.get("assets") or []
     asset = pick_exe_asset(assets)
     if not asset:
@@ -226,12 +276,20 @@ async def run_update_flow(*, log) -> str:
 
     current = Path(sys.executable).resolve()
     dest = current.parent / f"{current.stem}.new{current.suffix}"
-    dl = mirror_github_url(str(url))
-    log(f"[update] 下载 {tag} -> {dest.name}")
-    try:
-        await download_to_path(dl, dest)
-    except Exception as e:
-        return f"下载失败：{e}"
+    dl_urls = _download_url_plan(str(url))
+    log(f"[update] 下载 {tag} -> {dest.name}（{len(dl_urls)} 个 URL 依次尝试）")
+    last_err: Exception | None = None
+    for i, du in enumerate(dl_urls):
+        try:
+            log(f"[update] 下载尝试 {i + 1}/{len(dl_urls)}")
+            await download_to_path(du, dest)
+            last_err = None
+            break
+        except Exception as e:
+            last_err = e
+            log(f"[update] 下载失败: {e}")
+    if last_err is not None:
+        return f"下载失败：{last_err}"
 
     if not dest.is_file() or dest.stat().st_size < 64 * 1024:
         try:
