@@ -259,11 +259,18 @@ function connect() {
       const data = JSON.parse(e.data);
       if (data.type === "pong") { /* keepalive */ }
       if (data.type === "cleared") {
+        if (stableTimer) { clearTimeout(stableTimer); stableTimer = null; }
+        if (autoSendTimer) { clearTimeout(autoSendTimer); autoSendTimer = null; }
         textInput.value = "";
         charCount.textContent = "0";
+        btnSend.disabled = true;
         lastSentText = "";
         setSyncState("idle");
         showToast("电脑已插入，输入框已清空");
+        if (ws && ws.readyState === 1) {
+          ws.send(JSON.stringify({ type: "update", text: "", meta: buildMeta() }));
+        }
+        textInput.focus();
       }
     } catch (_) {}
   };

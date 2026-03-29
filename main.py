@@ -530,6 +530,12 @@ class App:
                 "accepted_suggestions": accepted,
             }
         )
+        # 先通知手机清空，勿等后台学习（学习可能数十秒，否则用户以为未同步）
+        try:
+            await self.bridge.notify_cleared()
+        except Exception as e:
+            _log(f"[bridge] 清空手机页面失败: {e}")
+
         learn_gate = not skip_llm and bool(
             (raw or "").strip() and (learn_llm or "").strip() and self.config.learn_enabled
         )
@@ -602,10 +608,6 @@ class App:
         self._pending_suggestions = []
         self._preview_text = ""
         self._last_suggest_source_text = ""
-        try:
-            await self.bridge.notify_cleared()
-        except Exception as e:
-            _log(f"[bridge] 清空手机页面失败: {e}")
 
     async def _restart_bridge(self):
         try:
