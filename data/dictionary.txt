@@ -10,11 +10,6 @@ web coding=vibe coding
 芥末奶=Gemini
 芥末里=Gemini
 质谱=智谱
-扣底=Claude
-扣的=Claude
 Cloud code=Claude Code
-椒盐=GLM
-cursor=Cursor
 mini max=MiniMax
-明盘=MiniMax
 
