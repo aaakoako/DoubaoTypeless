@@ -399,6 +399,8 @@ class SuggestionBatch:
     # 是否实际发起了 chat 请求；api_ok 仅在 api_called 时有效
     api_called: bool = False
     api_ok: bool = False
+    # api_ok 为 False 时给界面用的短说明（如超时调大「前台超时」）
+    api_fail_hint: str = ""
 
 
 class Dictionary:
@@ -654,6 +656,11 @@ class TextPolisher:
             )
         except Exception as e:
             self._log(f"[suggest.error] {type(e).__name__}: {e}")
+            hint = ""
+            if isinstance(e, httpx.TimeoutException):
+                hint = (
+                    "纠错请求超时（慢模型常见）。请到「设置 → 高级」调大「前台超时(s)」后再试。"
+                )
             return SuggestionBatch(
                 raw_text=raw_text,
                 llm_text=raw_text,
@@ -661,6 +668,7 @@ class TextPolisher:
                 api_llm_text="",
                 api_called=True,
                 api_ok=False,
+                api_fail_hint=hint,
             )
 
     def _is_style_only_change(self, raw_text: str, llm_text: str) -> bool:

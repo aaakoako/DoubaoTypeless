@@ -456,12 +456,16 @@ class App:
                 f"llm_changed={'yes' if batch.llm_text != text else 'no'} len={len(text)}"
             )
         if self.config.llm_enabled and batch.api_called:
-            self.gui.set_model_health(
-                "suggest",
-                batch.api_ok,
-                "纠错 API 失败" if not batch.api_ok else "纠错调用成功",
+            s_msg = "纠错调用成功"
+            if not batch.api_ok:
+                s_msg = (batch.api_fail_hint or "").strip() or "纠错 API 失败"
+            self.gui.set_model_health("suggest", batch.api_ok, s_msg)
+        suggest_note = ""
+        if batch.api_called and not batch.api_ok:
+            suggest_note = (batch.api_fail_hint or "").strip() or (
+                "纠错请求失败，请查看设置里「模型状态」或 debug.log；可直接编辑终稿后插入。"
             )
-        self.gui.show_final(text, batch.suggestions, batch.llm_text)
+        self.gui.show_final(text, batch.suggestions, batch.llm_text, suggest_note)
         self.tray.set_state(STATE_READY)
 
     def _on_batch_learn(self, records: list[dict]):

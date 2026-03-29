@@ -354,17 +354,27 @@ class ReviewWindow:
         self._status_label.configure(text="正在纠错...", text_color="#FF7D00")
         self._skip_llm_btn.configure(state="normal")
 
-    def show_final(self, raw_text: str, suggestions: list[Suggestion], llm_text: str):
+    def show_final(
+        self,
+        raw_text: str,
+        suggestions: list[Suggestion],
+        llm_text: str,
+        suggest_api_note: str = "",
+    ):
         if not self._final_box or not self._window or not self._window.winfo_exists():
             return
         self._raw_text = raw_text
         self._llm_text = llm_text
         self._suggestions = suggestions
         self._accepted_ids.clear()
-        self._status_label.configure(
-            text=f"已同步到电脑 — {len(suggestions)} 条替换建议",
-            text_color="#00B578",
-        )
+        note = (suggest_api_note or "").strip()
+        if note:
+            self._status_label.configure(text=note, text_color="#F57C00")
+        else:
+            self._status_label.configure(
+                text=f"已同步到电脑 — {len(suggestions)} 条替换建议",
+                text_color="#00B578",
+            )
         self._set_box_text(self._final_box, raw_text, editable=True)
         self._render_suggestions()
         self._apply_suggestion_tags()
@@ -2110,8 +2120,20 @@ class GUIManager:
     def show_processing(self):
         self._schedule(self._review.show_processing)
 
-    def show_final(self, raw_text: str, suggestions: list[Suggestion], llm_text: str):
-        self._schedule(self._review.show_final, raw_text, suggestions, llm_text)
+    def show_final(
+        self,
+        raw_text: str,
+        suggestions: list[Suggestion],
+        llm_text: str,
+        suggest_api_note: str = "",
+    ):
+        self._schedule(
+            self._review.show_final,
+            raw_text,
+            suggestions,
+            llm_text,
+            suggest_api_note,
+        )
 
     def hide(self):
         self._schedule(self._review.hide)
