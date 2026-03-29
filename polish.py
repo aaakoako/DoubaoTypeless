@@ -49,6 +49,8 @@ USER_CORRECT_PREFIX = (
 )
 
 LEARN_PROMPT = """\
+【输出纪律】不要写「用户希望」「输入分析」「记录详情」等思考或说明；不要 markdown、不要 ``` 代码围栏。你的整条回复有且仅有一个 JSON 对象（以 { 开头、以 } 结束），且顶层必须含 notes、candidate_pairs、domain_terms。
+
 输入为 JSON 对象，格式：{"items":[ 记录1, 记录2, ... ]}。可能只有一条。
 
 每条记录为下列之一（优先紧凑形以省 token）：
@@ -83,7 +85,13 @@ LEARN_PROMPT = """\
 4. mode=no_diff 时：candidate_pairs 一般为空；仅当有明确误听↔纠正对时可写，禁止臆造
 """
 
-LEARN_SYSTEM_DEFAULT = "你是语音纠错学习分析器。输出严格 JSON。"
+LEARN_SYSTEM_DEFAULT = "你是语音纠错学习分析器。禁止输出思考过程或自然语言说明，只输出一个 JSON 对象。"
+
+# 追加在自定义 learn_system_prompt 之后，强化对推理模型的约束
+LEARN_SYSTEM_SUFFIX = (
+    "输出纪律：回复中不得出现「用户希望」「我需要」「输入分析」等字样；不得使用 markdown。"
+    "只输出一个 JSON 对象，顶层必须包含键 notes、candidate_pairs、domain_terms（值均为 JSON 数组）。"
+)
 
 
 def build_compact_learn_item(
@@ -209,6 +217,20 @@ def parse_learn_model_json(raw: str, log) -> dict:
                 f"[learn] 从回复中解析出 {len(found)} 段「学习结果形」JSON，采用最后一段（避免误用 items 回显）"
             )
         return chosen
+
+    # 模型先写长分析再在文末写 JSON（或被截断）：从最后一个 "notes" 锚点向前找 {
+    search_end = len(s)
+    while search_end > 0:
+        ni = s.rfind('"notes"', 0, search_end)
+        if ni < 0:
+            break
+        brace = s.rfind("{", 0, ni)
+        if brace >= 0:
+            blob = _extract_balanced_json_object(s, brace)
+            if blob and (d := accept(try_load(blob))):
+                log("[learn] 已通过 \"notes\" 锚点从长文中提取学习结果 JSON")
+                return d
+        search_end = ni
 
     sloppy = try_load(s)
     if sloppy is not None and not _learn_output_shape_ok(sloppy):
@@ -338,7 +360,8 @@ class TextPolisher:
 
     def _effective_learn_system(self) -> str:
         s = (self.config.learn_system_prompt or "").strip()
-        return s if s else LEARN_SYSTEM_DEFAULT
+        base = s if s else LEARN_SYSTEM_DEFAULT
+        return f"{base.rstrip()}\n\n{LEARN_SYSTEM_SUFFIX}"
 
     def _effective_learn_user_task(self) -> str:
         s = (self.config.learn_user_prompt or "").strip()
@@ -718,12 +741,14 @@ class TextPolisher:
         msg = choices[0].get("message") or {}
         c = _flatten_openai_message_content(msg.get("content"))
         r = (msg.get("reasoning_content") or "").strip()
+        # 智谱等推理模型常把最终 JSON 放在 reasoning_content，content 反而是分析文字
         out: list[str] = []
-        if c:
-            out.append(c)
         if r:
             out.append(r)
-        if c and r and c != r:
+        if c:
+            out.append(c)
+        if r and c and r != c:
+            out.append(f"{r}\n{c}")
             out.append(f"{c}\n{r}")
         return out
 
@@ -777,7 +802,8 @@ class TextPolisher:
         user_body = {"items": compact_items}
         user_json = json.dumps(user_body, ensure_ascii=False)
         n_items = len(norm)
-        max_tokens = min(8192, 512 + 384 * n_items)
+        # 推理模型会先写长分析再写 JSON，过小易截断导致无法解析
+        max_tokens = min(8192, max(2500, 900 + 700 * n_items))
 
         client = self._ensure_client(learning=True)
         payload = {
@@ -806,6 +832,9 @@ class TextPolisher:
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         resp.raise_for_status()
         data = resp.json()
+        ch0 = (data.get("choices") or [{}])[0]
+        finish_reason = (ch0.get("finish_reason") or "").strip()
+        usage = data.get("usage")
         candidates = self._learn_response_candidates(data)
         parsed: dict | None = None
         last_learn_err: LearnJsonError | None = None
@@ -818,6 +847,11 @@ class TextPolisher:
             except LearnJsonError as e:
                 last_learn_err = e
         if parsed is None:
+            if finish_reason == "length":
+                self._log(
+                    f"[learn] finish_reason=length（可能截断） usage={usage} "
+                    f"max_tokens={max_tokens}；可换非推理模型或稍后重试"
+                )
             if last_learn_err:
                 self._log(
                     "[learn] JSON 解析失败，不写入样本、不标记已处理 "
