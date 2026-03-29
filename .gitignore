@@ -34,6 +34,7 @@ debug.log
 # PyInstaller / 杂项
 opus.dll
 *.spec.bak
+_DoubaoTypeless_update.bat
 
 # 根目录遗留路径（旧版；当前默认见 config.json.example 的 data/）
 /review_history.json
