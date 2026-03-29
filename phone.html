@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>DoubaoTypeless</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3a;
+    --accent: #4f8cff;
+    --accent-hover: #3a73e0;
+    --text: #e4e6ed;
+    --text-dim: #8b8fa3;
+    --success: #34d399;
+    --danger: #f87171;
+    --radius: 12px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+  }
+  .status {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+  .status.connected { background: rgba(52,211,153,0.15); color: var(--success); }
+  .status.disconnected { background: rgba(248,113,113,0.15); color: var(--danger); }
+
+  .input-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  #text-input {
+    flex: 1;
+    width: 100%;
+    min-height: 200px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 17px;
+    line-height: 1.6;
+    padding: 14px;
+    resize: none;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  #text-input:focus { border-color: var(--accent); }
+  #text-input::placeholder { color: var(--text-dim); }
+
+  .char-count {
+    text-align: right;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .btn {
+    flex: 1;
+    padding: 14px;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-send {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-send:hover { background: var(--accent-hover); }
+  .btn-send:disabled { background: var(--border); color: var(--text-dim); }
+  .btn-clear {
+    flex: 0 0 auto;
+    width: 80px;
+    background: var(--surface);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+
+  .sync-hint {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    transition: color 0.3s;
+  }
+  .sync-hint.syncing { color: var(--accent); }
+  .sync-hint.synced { color: var(--success); }
+
+  .toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>DoubaoTypeless</h1>
+  <span id="status" class="status disconnected">未连接</span>
+</div>
+
+<div class="input-area">
+  <textarea id="text-input" placeholder="点击这里，切换到豆包输入法，用语音输入..."></textarea>
+  <div class="char-count"><span id="char-count">0</span> 字</div>
+</div>
+
+<div class="sync-hint" id="sync-hint">输入后自动同步到电脑</div>
+
+<div class="actions">
+  <button class="btn btn-clear" id="btn-clear">清空</button>
+  <button class="btn btn-send" id="btn-send" disabled>立即发送</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const WS_URL = "{{WS_URL}}";
+const CLIENT_VERSION = "meta-v2";
+
+const textInput = document.getElementById("text-input");
+const btnSend = document.getElementById("btn-send");
+const btnClear = document.getElementById("btn-clear");
+const statusEl = document.getElementById("status");
+const charCount = document.getElementById("char-count");
+const syncHint = document.getElementById("sync-hint");
+const toastEl = document.getElementById("toast");
+
+let ws = null;
+let reconnectTimer = null;
+let autoSendTimer = null;
+let stableTimer = null;
+let lastSentText = "";
+let isComposing = false;
+let lastCompositionEndAt = 0;
+
+function buildMeta(extra = {}) {
+  return {
+    clientVersion: CLIENT_VERSION,
+    metaEnabled: true,
+    isComposing: isComposing,
+    sinceCompositionEndMs: lastCompositionEndAt ? Date.now() - lastCompositionEndAt : null,
+    ...extra,
+  };
+}
+
+function showToast(msg, duration = 1500) {
+  toastEl.textContent = msg;
+  toastEl.classList.add("show");
+  setTimeout(() => toastEl.classList.remove("show"), duration);
+}
+
+function setSyncState(state) {
+  syncHint.className = "sync-hint";
+  if (state === "syncing") {
+    syncHint.textContent = "正在同步...";
+    syncHint.classList.add("syncing");
+  } else if (state === "synced") {
+    syncHint.textContent = "已同步到电脑";
+    syncHint.classList.add("synced");
+  } else {
+    syncHint.textContent = "输入后自动同步到电脑";
+  }
+}
+
+function setConnected(connected) {
+  if (connected) {
+    statusEl.textContent = "已连接";
+    statusEl.className = "status connected";
+    btnSend.disabled = !textInput.value.trim();
+  } else {
+    statusEl.textContent = "未连接";
+    statusEl.className = "status disconnected";
+    btnSend.disabled = true;
+  }
+}
+
+function connect() {
+  if (ws && ws.readyState <= 1) return;
+  try {
+    ws = new WebSocket(WS_URL);
+  } catch (e) {
+    scheduleReconnect();
+    return;
+  }
+
+  ws.onopen = () => {
+    setConnected(true);
+    showToast("已连接到电脑");
+    ws.send(JSON.stringify({
+      type: "hello",
+      meta: buildMeta({
+        compositionSupport: typeof CompositionEvent !== "undefined",
+        userAgent: navigator.userAgent,
+      }),
+    }));
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  };
+
+  ws.onclose = () => {
+    setConnected(false);
+    scheduleReconnect();
+  };
+
+  ws.onerror = () => setConnected(false);
+
+  ws.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.type === "pong") { /* keepalive */ }
+      if (data.type === "cleared") {
+        textInput.value = "";
+        charCount.textContent = "0";
+        lastSentText = "";
+        setSyncState("idle");
+        showToast("电脑已插入，输入框已清空");
+      }
+    } catch (_) {}
+  };
+}
+
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connect();
+  }, 3000);
+}
+
+function autoSync() {
+  const text = textInput.value;
+  if (!ws || ws.readyState !== 1) return;
+  if (text === lastSentText) return;
+
+  lastSentText = text;
+  setSyncState("syncing");
+  ws.send(JSON.stringify({ type: "update", text: text, meta: buildMeta() }));
+
+  if (stableTimer) clearTimeout(stableTimer);
+  if (isComposing) return;
+
+  const now = Date.now();
+  const settleDelay = now - lastCompositionEndAt < 800 ? 1200 : 2000;
+  stableTimer = setTimeout(() => {
+    if (!isComposing && text.trim() && ws && ws.readyState === 1) {
+      ws.send(JSON.stringify({
+        type: "stable",
+        text: text.trim(),
+        meta: buildMeta({ stableReason: "timer" }),
+      }));
+      setSyncState("synced");
+    }
+  }, settleDelay);
+}
+
+function sendNow() {
+  const text = textInput.value.trim();
+  if (!text || !ws || ws.readyState !== 1) return;
+  if (stableTimer) clearTimeout(stableTimer);
+  ws.send(JSON.stringify({
+    type: "stable",
+    text: text,
+    meta: buildMeta({ stableReason: "manual_send" }),
+  }));
+  setSyncState("synced");
+  showToast("已发送");
+}
+
+textInput.addEventListener("compositionstart", () => {
+  isComposing = true;
+  setSyncState("syncing");
+  if (stableTimer) clearTimeout(stableTimer);
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({
+      type: "composition",
+      text: textInput.value,
+      meta: buildMeta({ phase: "start" }),
+    }));
+  }
+});
+
+textInput.addEventListener("compositionend", () => {
+  isComposing = false;
+  lastCompositionEndAt = Date.now();
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({
+      type: "composition",
+      text: textInput.value,
+      meta: buildMeta({ phase: "end" }),
+    }));
+  }
+  if (autoSendTimer) clearTimeout(autoSendTimer);
+  autoSendTimer = setTimeout(autoSync, 250);
+});
+
+textInput.addEventListener("input", (e) => {
+  const len = textInput.value.length;
+  charCount.textContent = len;
+  btnSend.disabled = !textInput.value.trim() || !ws || ws.readyState !== 1;
+
+  if (e.isComposing || isComposing) {
+    if (autoSendTimer) clearTimeout(autoSendTimer);
+    if (ws && ws.readyState === 1) {
+      ws.send(JSON.stringify({
+        type: "update",
+        text: textInput.value,
+        meta: buildMeta({
+          inputType: e.inputType || null,
+          eventIsComposing: !!e.isComposing,
+        }),
+      }));
+    }
+    autoSendTimer = setTimeout(autoSync, 180);
+    return;
+  }
+
+  if (autoSendTimer) clearTimeout(autoSendTimer);
+  autoSendTimer = setTimeout(autoSync, 450);
+});
+
+btnSend.addEventListener("click", sendNow);
+btnClear.addEventListener("click", () => {
+  textInput.value = "";
+  charCount.textContent = "0";
+  btnSend.disabled = true;
+  lastSentText = "";
+  setSyncState("idle");
+  textInput.focus();
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: "update", text: "" }));
+  }
+});
+
+setInterval(() => {
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: "ping" }));
+  }
+}, 15000);
+
+connect();
+</script>
+</body>
+</html>

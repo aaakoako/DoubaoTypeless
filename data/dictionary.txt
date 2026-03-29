@@ -1,0 +1,20 @@
+# 纠错对照表 = 误听/误写 → 正确写法（不是「纯名词表」）
+# - 学习流水 learning_samples.jsonl 里，后台模型输出的 candidate_pairs 经规则筛选后可自动追加到本文件（若开启「学习后写对照表」）
+# - 前台纠错时整表作为提示参考，不做运行时硬替换
+# 格式：误识形式=正确形式（每行一条）；# 为注释
+
+# --- 示例：常见 ASR 误听 ---
+by coding=vibe coding
+web coding=vibe coding
+歪头顶=vibe coding
+芥末奶=Gemini
+芥末里=Gemini
+质谱=智谱
+扣底=Claude
+扣的=Claude
+Cloud code=Claude Code
+椒盐=GLM
+cursor=Cursor
+mini max=MiniMax
+明盘=MiniMax
+

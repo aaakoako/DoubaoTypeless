@@ -1,0 +1,8 @@
+pywin32
+pystray
+Pillow
+customtkinter
+httpx
+aiohttp
+pynput
+qrcode[pil]

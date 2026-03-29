@@ -1,0 +1,51 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+.venv/
+venv/
+.env
+.env.*
+
+# 工具与 IDE（个人环境不上传）
+.vscode/
+.idea/
+.cursor/
+
+# 系统垃圾文件
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# 本地配置与密钥（务必勿提交）
+config.json
+credentials.json
+
+# 日志
+debug.log
+*.log
+
+# PyInstaller / 杂项
+opus.dll
+*.spec.bak
+
+# 根目录遗留路径（旧版；当前默认见 config.json.example 的 data/）
+/review_history.json
+/learn_pending.json
+/learning_samples.jsonl
+
+# data/ 下运行时生成（词典样例 data/dictionary.txt 仍保留在仓库）
+data/review_history.json
+data/learn_pending.json
+data/learning_samples.jsonl
+data/domain_terms.json
+
+# 本地归档：二进制与凭据备份（默认不上传）
+archive/legacy_pc_asr/
+archive/scratch/

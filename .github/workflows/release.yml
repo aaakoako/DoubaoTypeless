@@ -1,0 +1,45 @@
+# 推送以 v 开头的 tag（如 v0.1.0）时：在 Windows 上打单文件 exe，并创建带附件与自动生成 Release Notes 的 GitHub Release。
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Ensure icon assets
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "assets\icon.ico")) { python tools/gen_app_icon.py }
+
+      - name: Build exe
+        run: pyinstaller --noconfirm DoubaoTypeless.spec
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: dist/DoubaoTypeless.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
