@@ -407,11 +407,11 @@ class App:
         def ui_done():
             if should_exit:
                 _log(f"[update] {body}")
-                # 不阻塞在 messagebox：尽快退出进程，更新脚本才能 del/move 并 start 拉起新版本
+                # 不阻塞在 messagebox；略延迟再退出，便于托盘/GUI 收尾，减轻与更新脚本竞态
                 root = self.gui._root
                 if root is not None:
                     try:
-                        root.after(450, self._quit)
+                        root.after(1200, self._quit)
                     except Exception:
                         self._quit()
                 else:

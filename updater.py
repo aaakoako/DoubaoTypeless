@@ -220,8 +220,10 @@ async def download_to_path(
 def write_update_bat(current_exe: Path, downloaded_exe: Path) -> Path:
     """当前进程退出后：删旧 exe，把新文件 move 成同名并启动。
 
-    首段等待略长，便于单文件 exe 释放 _MEI 临时目录中的运行库，减少偶发「python dll」类弹窗。
-    move 后先 `cd /d` 到 exe 目录再用 `start` 启动文件名，避免部分环境下仅全路径 `start` 不拉起界面进程。
+    PyInstaller 单文件退出后仍会短暂占用/清理 %TEMP%\\_MEI*；若立刻 start 新版本，bootloader
+    可能在不完整环境下加载 python*.dll，出现「Failed to load Python DLL / 找不到指定的模块」。
+    因此在 tasklist 不再列出本 exe 后**再额外等待数秒**，并用 PowerShell Start-Process 拉起进程
+   （失败时回退到 cmd start）。
     """
     bat = app_root() / "_DoubaoTypeless_update.bat"
     exe_name = current_exe.name
@@ -232,28 +234,42 @@ def write_update_bat(current_exe: Path, downloaded_exe: Path) -> Path:
     cur_esc = cur.replace("%", "%%")
     new_esc = newf.replace("%", "%%")
     dir_esc = exe_dir.replace("%", "%%")
-    name_esc = exe_name.replace("%", "%%")
+    # set "VAR=..." 中的路径同样需转义 %
+    cur_set = cur.replace("%", "%%")
+    dir_set = exe_dir.replace("%", "%%")
     bat.write_text(
         "\n".join(
             [
                 "@echo off",
                 "chcp 65001 >nul",
                 "setlocal",
-                "timeout /t 5 /nobreak >nul",
+                "timeout /t 6 /nobreak >nul",
                 ":wait",
                 f'tasklist /FI "IMAGENAME eq {exe_name}" 2>nul | find /I "{exe_name}" >nul',
                 "if %errorlevel%==0 (",
                 "  timeout /t 1 /nobreak >nul",
                 "  goto wait",
                 ")",
+                "rem 进程已结束，再等一会让 _MEI 临时目录释放完毕，避免新进程 DLL 加载失败",
+                "timeout /t 8 /nobreak >nul",
                 f'del /f /q "{cur_esc}" 2>nul',
                 f'move /y "{new_esc}" "{cur_esc}"',
                 "if errorlevel 1 exit /b 1",
                 f'if not exist "{cur_esc}" exit /b 1',
-                "timeout /t 2 /nobreak >nul",
-                f'cd /d "{dir_esc}"',
-                "if errorlevel 1 exit /b 1",
-                f'start "" "{name_esc}"',
+                "rem move 后稍等，避免杀软/索引短暂锁文件",
+                "timeout /t 4 /nobreak >nul",
+                f'set "DT_RESTART_EXE={cur_set}"',
+                f'set "DT_RESTART_DIR={dir_set}"',
+                "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \""
+                "try { "
+                "Start-Process -LiteralPath $env:DT_RESTART_EXE -WorkingDirectory $env:DT_RESTART_DIR; "
+                "exit 0 "
+                "} catch { exit 1 }\"",
+                "if errorlevel 1 (",
+                f'  cd /d "{dir_esc}"',
+                "  if errorlevel 1 exit /b 1",
+                f'  start "" "{cur_esc}"',
+                ")",
                 "endlocal",
                 "del \"%~f0\"",
                 "",
