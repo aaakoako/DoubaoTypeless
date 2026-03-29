@@ -221,19 +221,24 @@ def write_update_bat(current_exe: Path, downloaded_exe: Path) -> Path:
     """当前进程退出后：删旧 exe，把新文件 move 成同名并启动。
 
     首段等待略长，便于单文件 exe 释放 _MEI 临时目录中的运行库，减少偶发「python dll」类弹窗。
+    move 后先 `cd /d` 到 exe 目录再用 `start` 启动文件名，避免部分环境下仅全路径 `start` 不拉起界面进程。
     """
     bat = app_root() / "_DoubaoTypeless_update.bat"
     exe_name = current_exe.name
     cur = str(current_exe.resolve())
     newf = str(downloaded_exe.resolve())
+    exe_dir = str(current_exe.parent.resolve())
     # 批处理里路径用引号；% 在 bat 中有含义，替换为 %%
     cur_esc = cur.replace("%", "%%")
     new_esc = newf.replace("%", "%%")
+    dir_esc = exe_dir.replace("%", "%%")
+    name_esc = exe_name.replace("%", "%%")
     bat.write_text(
         "\n".join(
             [
                 "@echo off",
                 "chcp 65001 >nul",
+                "setlocal",
                 "timeout /t 5 /nobreak >nul",
                 ":wait",
                 f'tasklist /FI "IMAGENAME eq {exe_name}" 2>nul | find /I "{exe_name}" >nul',
@@ -243,7 +248,13 @@ def write_update_bat(current_exe: Path, downloaded_exe: Path) -> Path:
                 ")",
                 f'del /f /q "{cur_esc}" 2>nul',
                 f'move /y "{new_esc}" "{cur_esc}"',
-                f'start "" "{cur_esc}"',
+                "if errorlevel 1 exit /b 1",
+                f'if not exist "{cur_esc}" exit /b 1',
+                "timeout /t 2 /nobreak >nul",
+                f'cd /d "{dir_esc}"',
+                "if errorlevel 1 exit /b 1",
+                f'start "" "{name_esc}"',
+                "endlocal",
                 "del \"%~f0\"",
                 "",
             ]

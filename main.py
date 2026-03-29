@@ -405,13 +405,21 @@ class App:
         body = msg[len("[EXIT]") :].strip() if should_exit else msg
 
         def ui_done():
+            if should_exit:
+                _log(f"[update] {body}")
+                # 不阻塞在 messagebox：尽快退出进程，更新脚本才能 del/move 并 start 拉起新版本
+                root = self.gui._root
+                if root is not None:
+                    try:
+                        root.after(450, self._quit)
+                    except Exception:
+                        self._quit()
+                else:
+                    self._quit()
+                return
             if self.gui._root is None:
                 return
-            if should_exit:
-                mb.showinfo("正在更新", body)
-                self._quit()
-            else:
-                mb.showinfo("检查更新", msg)
+            mb.showinfo("检查更新", msg)
 
         self.gui._schedule(ui_done)
 
