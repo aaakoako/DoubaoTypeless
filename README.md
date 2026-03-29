@@ -38,7 +38,9 @@ Windows 可双击 **`scripts/启动.bat`**（等价于在项目根目录启动 `
 
 默认数据在 **`data/`**（已带示例 **`data/dictionary.txt`**；审阅历史、学习样本等路径可在设置里改，与 **`config.json.example`** 字段说明一致）。**前台纠错 / 后台学习**需在设置里填写 Base URL、Key、Model 后开启；**不配 API 也能完成桥接与插入**。
 
-**MiniMax（OpenAI 兼容）**：Base URL 填 **`https://api.minimaxi.com/v1`**（见 [官方说明](https://platform.minimaxi.com/docs/api-reference/text-openai-api)）。若只填到 `https://api.minimaxi.com`，程序会自动补上 **`/v1`**。该兼容层要求 **`temperature` 在 (0, 1] 内**（程序已用 `0.01`），且会按需开启 **`reasoning_split`** 以便正确读取正文。
+**多厂商 OpenAI 兼容**：设置里 **Provider** 下拉与仓库内 **`providers.json`**（url / models / 推荐 **temperature**）对齐常见写法，与 [Open WebUI](https://github.com/open-webui/open-webui) 等工具的「厂商预设」同类。需要**一条网关统一多模型**时，可自建 [LiteLLM Proxy](https://github.com/BerriAI/litellm)，把 Base URL 指到代理即可，无需改本程序代码。
+
+**MiniMax**：Base **`https://api.minimaxi.com/v1`**（[文档](https://platform.minimaxi.com/docs/api-reference/text-openai-api)）；漏写 **`/v1`** 时会自动补全。兼容层要求 **temperature ∈ (0, 1]**；配置留空时程序按网关自动选（MiniMax 默认 `0.01`），也可在 **设置 → 高级** 里分别填前台/后台 **temperature**。会按需加 **`reasoning_split`** 以便读正文。
 
 若曾使用旧版、在仓库**根目录**还留有 `review_history.json` / `learn_pending.json`，而配置已指向 `data/`，可删除根目录这两份以免混淆（见 `.gitignore`）。
 

@@ -19,7 +19,7 @@ from config import Config
 from paths import app_root
 from gui import GUIManager
 from hotkeys import GlobalHotkeyService, build_bindings
-from polish import PolishConfig, TextPolisher
+from polish import PolishConfig, TextPolisher, effective_chat_temperature, openai_compat_base_url
 from tray import STATE_PROCESSING, STATE_READY, STATE_RECORDING, SystemTray
 from typer import Typer
 
@@ -196,6 +196,7 @@ class App:
                 api_key=self.config.llm_api_key,
                 model=self.config.llm_model,
                 timeout=self.config.llm_timeout,
+                llm_temperature=self.config.llm_temperature,
                 dictionary_path=self.config.dictionary_path,
                 llm_system_prompt=self.config.llm_system_prompt,
                 suggest_domain_terms=self.config.suggest_domain_terms,
@@ -209,6 +210,7 @@ class App:
                 learn_api_key=self.config.learn_api_key,
                 learn_model=self.config.learn_model,
                 learn_timeout=self.config.learn_timeout,
+                learn_temperature=self.config.learn_temperature,
                 learning_samples_path=self.config.learning_samples_path,
                 learn_system_prompt=self.config.learn_system_prompt,
                 learn_user_prompt=self.config.learn_user_prompt,
@@ -253,13 +255,29 @@ class App:
         if not url or not key or not model:
             self.gui.set_model_health(target, False, "请填写 Base URL、Key、Model")
             return
-        base = url.rstrip("/") + "/"
+        norm = openai_compat_base_url(url)
+        base_root = norm or url.strip()
+        base = base_root.rstrip("/") + "/"
+        def _probe_temp_override() -> float | None:
+            v = cfg.get("temperature")
+            if v is None:
+                return None
+            if isinstance(v, (int, float)):
+                return float(v)
+            if isinstance(v, str) and v.strip():
+                try:
+                    return float(v.strip())
+                except ValueError:
+                    return None
+            return None
+
+        temp = effective_chat_temperature(url, _probe_temp_override())
         try:
             payload = {
                 "model": model,
                 "messages": [{"role": "user", "content": "ok"}],
                 "max_tokens": 2,
-                "temperature": 0,
+                "temperature": temp,
             }
             # 与 polish 学习请求一致：ASCII 转义 JSON + UTF-8 字节体，避免部分环境下非 ASCII 触发 ascii codec
             body = json.dumps(payload, ensure_ascii=True).encode("utf-8")

@@ -28,6 +28,8 @@ class Config:
     llm_api_key: str = ""
     llm_model: str = ""
     llm_timeout: float = 8.0
+    # None = 按 Base URL 自动（见 polish.effective_chat_temperature）
+    llm_temperature: float | None = None
     # Empty = use built-in default in polish.py
     llm_system_prompt: str = ""
     # 近窗审阅话题中的专业术语注入前台纠错（词库由后台学习写入，与 dictionary 错题集分离）
@@ -43,6 +45,7 @@ class Config:
     learn_api_key: str = ""
     learn_model: str = ""
     learn_timeout: float = 45.0
+    learn_temperature: float | None = None
     learn_system_prompt: str = ""
     learn_user_prompt: str = ""
 

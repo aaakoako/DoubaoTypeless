@@ -682,14 +682,44 @@ class ReviewWindow:
 
 _PROVIDERS_PATH = resource_dir() / "providers.json"
 
+# 与仓库内 providers.json 同类：厂商预设（url / models / 推荐 temperature）。
+# 多厂商统一路由可参考 LiteLLM Proxy，本程序只直连 OpenAI 兼容 HTTP。
 _DEFAULT_PROVIDERS: dict[str, dict] = {
-    "DeepSeek": {"url": "https://api.deepseek.com/v1", "models": ["deepseek-chat"]},
-    "智谱 (GLM)": {"url": "https://open.bigmodel.cn/api/paas/v4", "models": ["glm-4-flash", "glm-4-flash-250414", "glm-4-air", "glm-5", "glm-5-turbo"]},
-    "MiniMax": {"url": "https://api.minimax.io/v1", "models": ["MiniMax-M2.7-highspeed", "MiniMax-M2.7", "MiniMax-M2"]},
-    "Qwen (阿里云)": {"url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "models": ["qwen-turbo", "qwen-flash", "qwen-plus"]},
-    "豆包 (火山引擎)": {"url": "https://ark.cn-beijing.volces.com/api/v3", "models": []},
-    "Moonshot (Kimi)": {"url": "https://api.moonshot.cn/v1", "models": ["kimi-k2-turbo-preview", "moonshot-v1-8k"]},
-    "OpenAI": {"url": "https://api.openai.com/v1", "models": ["gpt-4o-mini", "gpt-4o"]},
+    "DeepSeek": {
+        "url": "https://api.deepseek.com/v1",
+        "temperature": 0,
+        "models": ["deepseek-chat"],
+    },
+    "智谱 (GLM)": {
+        "url": "https://open.bigmodel.cn/api/paas/v4",
+        "temperature": 0,
+        "models": ["glm-4-flash", "glm-4-flash-250414", "glm-4-air", "glm-5", "glm-5-turbo"],
+    },
+    "MiniMax": {
+        "url": "https://api.minimaxi.com/v1",
+        "temperature": 0.01,
+        "models": ["MiniMax-M2.7-highspeed", "MiniMax-M2.7", "MiniMax-M2"],
+    },
+    "Qwen (阿里云)": {
+        "url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "temperature": 0,
+        "models": ["qwen-turbo", "qwen-flash", "qwen-plus"],
+    },
+    "豆包 (火山引擎)": {
+        "url": "https://ark.cn-beijing.volces.com/api/v3",
+        "temperature": 0,
+        "models": [],
+    },
+    "Moonshot (Kimi)": {
+        "url": "https://api.moonshot.cn/v1",
+        "temperature": 0,
+        "models": ["kimi-k2-turbo-preview", "moonshot-v1-8k"],
+    },
+    "OpenAI": {
+        "url": "https://api.openai.com/v1",
+        "temperature": 0,
+        "models": ["gpt-4o-mini", "gpt-4o"],
+    },
 }
 
 
@@ -1377,6 +1407,39 @@ class SettingsWindow:
         self._learn_timeout_var = ctk.StringVar(value=str(self._config.learn_timeout))
         ctk.CTkEntry(to_frame, textvariable=self._learn_timeout_var, width=72).pack(side="left", padx=4)
 
+        temp_frame = ctk.CTkFrame(self._adv_frame)
+        temp_frame.pack(fill="x", padx=6, pady=4)
+        ctk.CTkLabel(temp_frame, text="前台 temperature：").pack(side="left", padx=8)
+        self._llm_temperature_var = tk.StringVar(
+            value=""
+            if getattr(self._config, "llm_temperature", None) is None
+            else str(self._config.llm_temperature)
+        )
+        ctk.CTkEntry(
+            temp_frame,
+            textvariable=self._llm_temperature_var,
+            width=72,
+            placeholder_text="空=自动",
+        ).pack(side="left", padx=4)
+        ctk.CTkLabel(temp_frame, text="后台 temperature：").pack(side="left", padx=(16, 0))
+        self._learn_temperature_var = tk.StringVar(
+            value=""
+            if getattr(self._config, "learn_temperature", None) is None
+            else str(self._config.learn_temperature)
+        )
+        ctk.CTkEntry(
+            temp_frame,
+            textvariable=self._learn_temperature_var,
+            width=72,
+            placeholder_text="空=自动",
+        ).pack(side="left", padx=4)
+        ctk.CTkLabel(
+            temp_frame,
+            text="留空按 Base URL 自动；MiniMax 须 (0,1]",
+            text_color="#888888",
+            font=ctk.CTkFont(size=11),
+        ).pack(side="left", padx=(12, 8))
+
         sp_frame = ctk.CTkFrame(self._adv_frame)
         sp_frame.pack(fill="x", padx=6, pady=4)
         ctk.CTkLabel(sp_frame, text="学习样本 JSONL：").pack(side="left", padx=8)
@@ -1518,6 +1581,14 @@ class SettingsWindow:
             url_var.set(url)
         if model_var:
             model_var.set(models[0] if models else "")
+        if "temperature" in info and choice != "自定义":
+            tv = (
+                self._llm_temperature_var
+                if target == "suggest"
+                else self._learn_temperature_var
+            )
+            t = info.get("temperature")
+            tv.set("" if t is None else str(t))
         self._build_model_widget(target)
 
     def _get_var(self, target: str, kind: str):
@@ -1635,10 +1706,18 @@ class SettingsWindow:
                 pass
         if dv is not None:
             dv.set("正在探测…")
-        self._on_model_probe(
-            target,
-            {"base_url": url, "api_key": key, "model": model},
+        cfg = {"base_url": url, "api_key": key, "model": model}
+        raw_t = (
+            (self._llm_temperature_var.get() or "").strip()
+            if target == "suggest"
+            else (self._learn_temperature_var.get() or "").strip()
         )
+        if raw_t:
+            try:
+                cfg["temperature"] = float(raw_t)
+            except ValueError:
+                pass
+        self._on_model_probe(target, cfg)
 
     def _update_group_state(self, target: str):
         if not hasattr(self, "_llm_control_frames") or not hasattr(self, "_learn_control_frames"):
@@ -1770,6 +1849,26 @@ class SettingsWindow:
             return
         self._config.llm_timeout = llm_to
         self._config.learn_timeout = learn_to
+
+        def _parse_opt_temperature(label: str, raw: str):
+            s = (raw or "").strip()
+            if not s:
+                return None
+            try:
+                return float(s)
+            except ValueError:
+                raise ValueError(label)
+
+        try:
+            self._config.llm_temperature = _parse_opt_temperature(
+                "前台 temperature", self._llm_temperature_var.get()
+            )
+            self._config.learn_temperature = _parse_opt_temperature(
+                "后台 temperature", self._learn_temperature_var.get()
+            )
+        except ValueError as e:
+            self._status_label.configure(text=str(e) + " 须为数字或留空", text_color="#F44336")
+            return
 
         samples_path = self._learn_samples_var.get().strip()
         self._config.learning_samples_path = samples_path or "./learning_samples.jsonl"

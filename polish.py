@@ -19,13 +19,26 @@ import httpx
 from term_bank import TermBank, load_recent_final_texts
 
 
-# OpenAI 官方允许 temperature=0；MiniMax OpenAI 兼容要求 (0, 1]，0 会报错。
-# 见 https://platform.minimaxi.com/docs/api-reference/text-openai-api
-CHAT_COMPLETION_TEMPERATURE = 0.01
-
-
 def _is_minimax_openai_base(url: str) -> bool:
-    return "minimaxi.com" in (url or "").lower()
+    u = (url or "").lower()
+    return "minimaxi.com" in u or "minimax.io" in u
+
+
+def effective_chat_temperature(base_url: str, configured: float | None) -> float:
+    """
+    解析 chat/completions 使用的 temperature。
+    configured 为 None 时按网关默认：MiniMax (0,1] 用 0.01，其余常用 0。
+    显式配置在 MiniMax 上若 <=0 会抬到 0.01；>1 则压到 1（其文档要求 (0,1]）。
+    见 https://platform.minimaxi.com/docs/api-reference/text-openai-api
+    """
+    if configured is not None:
+        t = float(configured)
+        if _is_minimax_openai_base(base_url):
+            if t <= 0:
+                return 0.01
+            return min(t, 1.0)
+        return t
+    return 0.01 if _is_minimax_openai_base(base_url) else 0.0
 
 
 def _normalize_openai_base_url(url: str) -> str:
@@ -36,6 +49,11 @@ def _normalize_openai_base_url(url: str) -> str:
     if _is_minimax_openai_base(u) and not u.lower().endswith("/v1"):
         return u + "/v1"
     return u
+
+
+def openai_compat_base_url(url: str) -> str:
+    """与 TextPolisher 一致的 OpenAI 兼容 Base（含 MiniMax 补 /v1）。"""
+    return _normalize_openai_base_url((url or "").strip())
 
 
 def _reasoning_details_text(msg: dict) -> str:
@@ -335,6 +353,9 @@ class PolishConfig:
     learning_samples_path: str = "./data/learning_samples.jsonl"
     learn_system_prompt: str = ""
     learn_user_prompt: str = ""
+    # None = 由 effective_chat_temperature(base_url, None) 按网关决定
+    llm_temperature: float | None = None
+    learn_temperature: float | None = None
 
     dict_write_mode: str = "off"
     dict_auto_min_confidence: float = 0.0
@@ -797,7 +818,9 @@ class TextPolisher:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_content},
             ],
-            "temperature": CHAT_COMPLETION_TEMPERATURE,
+            "temperature": effective_chat_temperature(
+                self.config.base_url, self.config.llm_temperature
+            ),
             "max_tokens": max(len(text) * 3, 256),
         }
         payload.update(_minimax_openai_extra_fields(self.config.base_url))
@@ -908,7 +931,9 @@ class TextPolisher:
                 {"role": "system", "content": self._effective_learn_system()},
                 {"role": "user", "content": user_content},
             ],
-            "temperature": CHAT_COMPLETION_TEMPERATURE,
+            "temperature": effective_chat_temperature(
+                self.config.learn_base_url, self.config.learn_temperature
+            ),
             "max_tokens": max_tokens,
         }
         payload.update(_minimax_openai_extra_fields(self.config.learn_base_url))
