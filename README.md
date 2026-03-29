@@ -1,9 +1,8 @@
 # DoubaoTypeless
 
 同 WiFi 下用手机页语音输入，文本同步到 Windows，审阅后插入当前光标。可选 **OpenAI 兼容** API 做前台纠错与后台学习（BYOK）。**非官方**社区工具，与字节跳动及「豆包」产品无关联。
-<img width="844" height="617" alt="image" src="https://github.com/user-attachments/assets/d5156926-680d-4bb4-8460-558bbdca60d0" />
 
-<img width="899" height="1199" alt="image" src="https://github.com/user-attachments/assets/370eb079-7229-4b51-8b0f-e3bc7d6ce90f" />
+<img width="844" height="617" alt="image" src="https://github.com/user-attachments/assets/d5156926-680d-4bb4-8460-558bbdca60d0" />
 
 ## 为什么做这个
 
@@ -23,7 +22,7 @@
 - 默认数据在 **`data/`**，字段示例见 **`config.json.example`**。不配 API 也能完成桥接与插入；纠错/学习在设置里填 Base URL、Key、Model。
 - 厂商预设见 **`providers.json`**（含推荐 **temperature**，留空时默认 **0.3**）。统一多模型可走 [LiteLLM](https://github.com/BerriAI/litellm) 等代理，把 Base URL 指过去即可。
 - **勿**提交含真实密钥的 `config.json`（见 `.gitignore`）。
-
+<img width="899" height="1199" alt="image" src="https://github.com/user-attachments/assets/370eb079-7229-4b51-8b0f-e3bc7d6ce90f" />
 ## Windows 说明
 
 - 可选开机自启（注册表 Run）；打包 exe 无控制台时日志在 **`debug.log`**（与配置同目录），设置或托盘可开日志窗口。
