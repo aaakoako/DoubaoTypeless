@@ -695,8 +695,8 @@ class TextPolisher:
             )
         return items
 
-    async def _llm_correct(self, text: str) -> tuple[str, int, int]:
-        client = self._ensure_client()
+    def build_foreground_system(self) -> str:
+        """前台纠错请求里的 system 全文（词典 + 近窗术语）；不调 API，供排查上下文。"""
         system = self._effective_llm_system()
         dict_hint = self.dictionary.as_prompt_hint()
         if dict_hint:
@@ -712,6 +712,11 @@ class TextPolisher:
             )
             if term_hint:
                 system += "\n\n" + term_hint
+        return system
+
+    async def _llm_correct(self, text: str) -> tuple[str, int, int]:
+        client = self._ensure_client()
+        system = self.build_foreground_system()
 
         user_content = USER_CORRECT_PREFIX + text
         payload = {

@@ -98,6 +98,9 @@ class TermBank:
         self._log = log
         self._by_key: dict[str, TermEntry] = {}
 
+    def __len__(self) -> int:
+        return len(self._by_key)
+
     def load(self):
         self._by_key.clear()
         if not self.path.exists():
