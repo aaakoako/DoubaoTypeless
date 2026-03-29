@@ -16,6 +16,7 @@ from config import DICT_WRITE_MODES, Config
 from paths import app_root, resource_dir
 from hotkeys import validate_all_for_save
 from polish import LEARN_PROMPT, LEARN_SYSTEM_DEFAULT, SYSTEM_PROMPT, Suggestion
+from providers_registry import LLM_PROVIDERS, detect_provider_name
 
 _external_logger: Optional[Callable[[str], None]] = None
 
@@ -690,84 +691,6 @@ class ReviewWindow:
         self._render_suggestions()
 
 
-_PROVIDERS_PATH = resource_dir() / "providers.json"
-
-# 与仓库内 providers.json 同类：厂商预设（url / models / 推荐 temperature）。
-# 多厂商统一路由可参考 LiteLLM Proxy，本程序只直连 OpenAI 兼容 HTTP。
-_DEFAULT_PROVIDERS: dict[str, dict] = {
-    "DeepSeek": {
-        "url": "https://api.deepseek.com/v1",
-        "temperature": 0.3,
-        "models": ["deepseek-chat"],
-    },
-    # Anthropic 官方 OpenAI 兼容层：https://docs.anthropic.com/en/api/openai-sdk
-    "Claude (Anthropic)": {
-        "url": "https://api.anthropic.com/v1",
-        "temperature": 0.3,
-        "models": [
-            "claude-sonnet-4-5",
-            "claude-haiku-4-5",
-            "claude-opus-4-5",
-            "claude-3-5-sonnet-20241022",
-        ],
-    },
-    "智谱 (GLM)": {
-        "url": "https://open.bigmodel.cn/api/paas/v4",
-        "temperature": 0.3,
-        "models": ["glm-4-flash", "glm-4-flash-250414", "glm-4-air", "glm-5", "glm-5-turbo"],
-    },
-    "MiniMax": {
-        "url": "https://api.minimaxi.com/v1",
-        "temperature": 0.3,
-        "models": ["MiniMax-M2.7-highspeed", "MiniMax-M2.7", "MiniMax-M2"],
-    },
-    "Qwen (阿里云)": {
-        "url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "temperature": 0.3,
-        "models": ["qwen-turbo", "qwen-flash", "qwen-plus"],
-    },
-    "豆包 (火山引擎)": {
-        "url": "https://ark.cn-beijing.volces.com/api/v3",
-        "temperature": 0.3,
-        "models": [],
-    },
-    "Moonshot (Kimi)": {
-        "url": "https://api.moonshot.cn/v1",
-        "temperature": 0.3,
-        "models": ["kimi-k2-turbo-preview", "moonshot-v1-8k"],
-    },
-    "OpenAI": {
-        "url": "https://api.openai.com/v1",
-        "temperature": 0.3,
-        "models": ["gpt-4o-mini", "gpt-4o"],
-    },
-}
-
-
-def _load_providers() -> dict[str, dict]:
-    import json
-    providers = {name: dict(info) for name, info in _DEFAULT_PROVIDERS.items()}
-    if _PROVIDERS_PATH.exists():
-        try:
-            with open(_PROVIDERS_PATH, "r", encoding="utf-8") as f:
-                user_providers = json.load(f)
-            for name, info in user_providers.items():
-                base = dict(providers.get(name, {}))
-                if isinstance(info, dict):
-                    base.update(info)
-                providers[name] = base
-        except Exception:
-            pass
-    else:
-        with open(_PROVIDERS_PATH, "w", encoding="utf-8") as f:
-            json.dump(_DEFAULT_PROVIDERS, f, indent=2, ensure_ascii=False)
-    providers["自定义"] = {"url": "", "models": []}
-    return providers
-
-
-LLM_PROVIDERS = _load_providers()
-
-
 class SettingsWindow:
     """设置对话框（CustomTkinter）。"""
 
@@ -1160,10 +1083,26 @@ class SettingsWindow:
         self._llm_enabled_var = ctk.BooleanVar(value=self._config.llm_enabled)
         ctk.CTkSwitch(llm_toggle_frame, variable=self._llm_enabled_var, text="").pack(side="left", padx=5)
 
+        raw_suggest_map = getattr(self._config, "llm_api_keys_by_provider", None)
+        self._suggest_keys_by_provider = (
+            dict(raw_suggest_map) if isinstance(raw_suggest_map, dict) else {}
+        )
+        suggest_pv = detect_provider_name(self._config.llm_base_url)
+        if (
+            suggest_pv not in self._suggest_keys_by_provider
+            and (self._config.llm_api_key or "").strip()
+        ):
+            self._suggest_keys_by_provider[suggest_pv] = self._config.llm_api_key.strip()
+        initial_suggest_key = self._suggest_keys_by_provider.get(suggest_pv, "")
+        if not initial_suggest_key and (self._config.llm_api_key or "").strip():
+            initial_suggest_key = self._config.llm_api_key.strip()
+            self._suggest_keys_by_provider[suggest_pv] = initial_suggest_key
+        self._prev_suggest_provider = suggest_pv
+
         provider_frame = ctk.CTkFrame(container)
         provider_frame.pack(fill="x", padx=10, pady=4)
         ctk.CTkLabel(provider_frame, text="Provider：").pack(side="left", padx=10)
-        self._provider_var = ctk.StringVar(value=self._detect_provider(self._config.llm_base_url))
+        self._provider_var = ctk.StringVar(value=suggest_pv)
         self._provider_menu = ctk.CTkOptionMenu(
             provider_frame,
             variable=self._provider_var,
@@ -1176,7 +1115,7 @@ class SettingsWindow:
         key_frame = ctk.CTkFrame(container)
         key_frame.pack(fill="x", padx=10, pady=4)
         ctk.CTkLabel(key_frame, text="API Key：").pack(side="left", padx=10)
-        self._key_var = ctk.StringVar(value=self._config.llm_api_key)
+        self._key_var = ctk.StringVar(value=initial_suggest_key)
         self._key_entry = ctk.CTkEntry(key_frame, textvariable=self._key_var, width=252, show="•")
         self._key_entry.pack(side="left", padx=5)
         self._suggest_key_toggle_btn = ctk.CTkButton(
@@ -1266,12 +1205,27 @@ class SettingsWindow:
         self._learn_enabled_var = ctk.BooleanVar(value=self._config.learn_enabled)
         ctk.CTkSwitch(learn_toggle_frame, variable=self._learn_enabled_var, text="").pack(side="left", padx=5)
 
+        raw_learn_map = getattr(self._config, "learn_api_keys_by_provider", None)
+        self._learn_keys_by_provider = (
+            dict(raw_learn_map) if isinstance(raw_learn_map, dict) else {}
+        )
+        learn_url0 = self._fallback(self._config.learn_base_url, self._config.llm_base_url)
+        learn_pv = detect_provider_name(learn_url0)
+        if (
+            learn_pv not in self._learn_keys_by_provider
+            and (self._config.learn_api_key or "").strip()
+        ):
+            self._learn_keys_by_provider[learn_pv] = self._config.learn_api_key.strip()
+        initial_learn_key = self._learn_keys_by_provider.get(learn_pv, "")
+        if not initial_learn_key and (self._config.learn_api_key or "").strip():
+            initial_learn_key = self._config.learn_api_key.strip()
+            self._learn_keys_by_provider[learn_pv] = initial_learn_key
+        self._prev_learn_provider = learn_pv
+
         learn_provider_frame = ctk.CTkFrame(container)
         learn_provider_frame.pack(fill="x", padx=10, pady=4)
         ctk.CTkLabel(learn_provider_frame, text="Provider：").pack(side="left", padx=10)
-        self._learn_provider_var = ctk.StringVar(
-            value=self._detect_provider(self._fallback(self._config.learn_base_url, self._config.llm_base_url))
-        )
+        self._learn_provider_var = ctk.StringVar(value=learn_pv)
         ctk.CTkOptionMenu(
             learn_provider_frame,
             variable=self._learn_provider_var,
@@ -1283,7 +1237,7 @@ class SettingsWindow:
         learn_key_frame = ctk.CTkFrame(container)
         learn_key_frame.pack(fill="x", padx=10, pady=4)
         ctk.CTkLabel(learn_key_frame, text="API Key：").pack(side="left", padx=10)
-        self._learn_key_var = ctk.StringVar(value=self._config.learn_api_key)
+        self._learn_key_var = ctk.StringVar(value=initial_learn_key)
         self._learn_key_entry = ctk.CTkEntry(
             learn_key_frame, textvariable=self._learn_key_var, width=252, show="•"
         )
@@ -1607,13 +1561,18 @@ class SettingsWindow:
         self._learn_enabled_var.trace_add("write", lambda *_: self._update_group_state("learn"))
 
     def _detect_provider(self, url: str) -> str:
-        for name, info in LLM_PROVIDERS.items():
-            preset_url = info.get("url", "")
-            if preset_url and url and preset_url.rstrip("/") == url.rstrip("/"):
-                return name
-        return "自定义" if url else "DeepSeek"
+        return detect_provider_name(url)
 
     def _on_provider_changed(self, choice: str, target: str):
+        if target == "suggest":
+            self._suggest_keys_by_provider[self._prev_suggest_provider] = (
+                self._key_var.get().strip()
+            )
+        else:
+            self._learn_keys_by_provider[self._prev_learn_provider] = (
+                self._learn_key_var.get().strip()
+            )
+
         info = LLM_PROVIDERS.get(choice, {})
         url = info.get("url", "")
         models = self._get_provider_models(choice)
@@ -1632,6 +1591,23 @@ class SettingsWindow:
             t = info.get("temperature")
             tv.set("" if t is None else str(t))
         self._build_model_widget(target)
+
+        if target == "suggest":
+            nk = self._suggest_keys_by_provider.get(choice, "")
+            self._key_var.set(nk)
+            self._prev_suggest_provider = choice
+            if not nk.strip():
+                self._flash_settings_status(
+                    "该厂商尚未保存过 API Key，请填写", "#FF9800"
+                )
+        else:
+            nk = self._learn_keys_by_provider.get(choice, "")
+            self._learn_key_var.set(nk)
+            self._prev_learn_provider = choice
+            if not nk.strip():
+                self._flash_settings_status(
+                    "该厂商尚未保存过 API Key，请填写", "#FF9800"
+                )
 
     def _get_var(self, target: str, kind: str):
         attr_map = {
@@ -1839,6 +1815,11 @@ class SettingsWindow:
         self._config.hotkey_toggle_review = self._hotkey_toggle_var.get().strip()
         self._config.hotkey_insert = self._hotkey_insert_var.get().strip()
 
+        self._suggest_keys_by_provider[self._provider_var.get()] = self._key_var.get().strip()
+        self._learn_keys_by_provider[self._learn_provider_var.get()] = (
+            self._learn_key_var.get().strip()
+        )
+
         if self._llm_enabled_var.get():
             if not self._url_var.get().strip():
                 self._status_label.configure(text="前台建议 Base URL 不能为空", text_color="#F44336")
@@ -1852,6 +1833,7 @@ class SettingsWindow:
         self._config.llm_enabled = self._llm_enabled_var.get()
         self._config.suggest_domain_terms = self._suggest_domain_terms_var.get()
         self._config.llm_base_url = self._url_var.get().strip()
+        self._config.llm_api_keys_by_provider = dict(self._suggest_keys_by_provider)
         self._config.llm_api_key = self._key_var.get().strip()
         self._config.llm_model = self._model_var.get().strip()
         if self._learn_enabled_var.get():
@@ -1866,6 +1848,7 @@ class SettingsWindow:
                 return
         self._config.learn_enabled = self._learn_enabled_var.get()
         self._config.learn_base_url = self._learn_url_var.get().strip()
+        self._config.learn_api_keys_by_provider = dict(self._learn_keys_by_provider)
         self._config.learn_api_key = self._learn_key_var.get().strip()
         self._config.learn_model = self._learn_model_var.get().strip()
 

@@ -265,10 +265,11 @@ def _learn_output_shape_ok(d: dict) -> bool:
     return any(k in d for k in ("notes", "domain_terms", "candidate_pairs"))
 
 
-def parse_learn_model_json(raw: str, log) -> dict:
+def parse_learn_model_json(raw: str, log, *, quiet_failure: bool = False) -> dict:
     """
     将学习模型返回的正文解析为 JSON 对象（容忍 markdown 代码块、前后说明、推理前缀）。
     若正文中出现多段 JSON，优先采用「含 notes/domain_terms/candidate_pairs」的段落，通常取最后一段（模型常在回显输入后再写答案）。
+    quiet_failure：为 True 时不打「无法解析」类日志（供多段候选依次尝试时避免误报；仅最后一次尝试应传 False）。
     """
     s = (raw or "").replace("\ufeff", "").strip()
     if not s:
@@ -329,16 +330,21 @@ def parse_learn_model_json(raw: str, log) -> dict:
         search_end = ni
 
     sloppy = try_load(s)
-    if sloppy is not None and not _learn_output_shape_ok(sloppy):
+    if (
+        sloppy is not None
+        and not _learn_output_shape_ok(sloppy)
+        and not quiet_failure
+    ):
         log(
             "[learn] 顶层 JSON 缺少 notes/domain_terms/candidate_pairs "
             "（常见：模型回显了用户消息里的 items）；已扫描全文仍无合法学习结果"
         )
 
-    preview = s[:160].replace("\n", " ")
-    if len(s) > 160:
-        preview += "…"
-    log(f"[learn] JSON 无法解析为学习结果，正文预览: {preview!r}")
+    if not quiet_failure:
+        preview = s[:160].replace("\n", " ")
+        if len(s) > 160:
+            preview += "…"
+        log(f"[learn] JSON 无法解析为学习结果，正文预览: {preview!r}")
     raise LearnJsonError("invalid json: could not extract learn result object")
 
 
@@ -976,11 +982,20 @@ class TextPolisher:
         )
         parsed: dict | None = None
         last_learn_err: LearnJsonError | None = None
-        for text in candidates:
-            if not (text or "").strip():
-                continue
+        usable = [t for t in candidates if (t or "").strip()]
+        n_u = len(usable)
+        for idx, text in enumerate(usable):
             try:
-                parsed = parse_learn_model_json(text, self._log)
+                parsed = parse_learn_model_json(
+                    text,
+                    self._log,
+                    quiet_failure=n_u > 1 and idx < n_u - 1,
+                )
+                if n_u > 1 and idx > 0:
+                    self._log(
+                        f"[learn] 第 {idx + 1}/{n_u} 段候选解析成功"
+                        f"（前几段多为推理过程，非学习结果 JSON）"
+                    )
                 break
             except LearnJsonError as e:
                 last_learn_err = e

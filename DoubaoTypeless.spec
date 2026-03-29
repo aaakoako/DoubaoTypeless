@@ -38,6 +38,7 @@ a = Analysis(
         "term_bank",
         "app_version",
         "updater",
+        "providers_registry",
     ],
     hookspath=[],
     hooksconfig={},

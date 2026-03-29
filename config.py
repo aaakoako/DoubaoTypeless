@@ -1,8 +1,9 @@
 import json
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from dataclasses import dataclass, asdict
 
 from paths import app_root
+from providers_registry import detect_provider_name
 
 CONFIG_DIR = app_root()
 CONFIG_PATH = CONFIG_DIR / "config.json"
@@ -26,6 +27,8 @@ class Config:
     llm_enabled: bool = False
     llm_base_url: str = ""
     llm_api_key: str = ""
+    # Provider 下拉名 -> Key；与 llm_api_key 同步保存当前选中项快照供 polish 读取
+    llm_api_keys_by_provider: dict[str, str] = field(default_factory=dict)
     llm_model: str = ""
     llm_timeout: float = 8.0
     # None = 自动（默认 0.3，见 polish.DEFAULT_CHAT_TEMPERATURE）
@@ -43,6 +46,7 @@ class Config:
     learn_enabled: bool = False
     learn_base_url: str = ""
     learn_api_key: str = ""
+    learn_api_keys_by_provider: dict[str, str] = field(default_factory=dict)
     learn_model: str = ""
     learn_timeout: float = 45.0
     learn_temperature: float | None = None
@@ -73,10 +77,37 @@ class Config:
             with open(CONFIG_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
             known = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
-            return cls(**known)
+            for _bk in ("llm_api_keys_by_provider", "learn_api_keys_by_provider"):
+                _v = known.get(_bk)
+                if not isinstance(_v, dict):
+                    known[_bk] = {}
+                else:
+                    known[_bk] = {str(a): str(b) for a, b in _v.items()}
+            cfg = cls(**known)
+            cls._migrate_legacy_provider_api_keys(cfg)
+            return cfg
         config = cls()
         config.save()
         return config
+
+    @staticmethod
+    def _migrate_legacy_provider_api_keys(cfg: "Config") -> None:
+        """旧版仅 llm_api_key/learn_api_key 时，按 Base URL 推断 Provider 灌入分桶（不覆盖已有槽位）。"""
+        url = (cfg.llm_base_url or "").strip()
+        key = (cfg.llm_api_key or "").strip()
+        if key and url:
+            p = detect_provider_name(url)
+            mp = dict(cfg.llm_api_keys_by_provider)
+            mp.setdefault(p, key)
+            cfg.llm_api_keys_by_provider = mp
+
+        lurl = (cfg.learn_base_url or cfg.llm_base_url or "").strip()
+        lkey = (cfg.learn_api_key or "").strip()
+        if lkey and lurl:
+            lp = detect_provider_name(lurl)
+            lm = dict(cfg.learn_api_keys_by_provider)
+            lm.setdefault(lp, lkey)
+            cfg.learn_api_keys_by_provider = lm
 
     def save(self):
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
