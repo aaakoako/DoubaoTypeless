@@ -687,13 +687,13 @@ _PROVIDERS_PATH = resource_dir() / "providers.json"
 _DEFAULT_PROVIDERS: dict[str, dict] = {
     "DeepSeek": {
         "url": "https://api.deepseek.com/v1",
-        "temperature": 0,
+        "temperature": 0.3,
         "models": ["deepseek-chat"],
     },
     # Anthropic 官方 OpenAI 兼容层：https://docs.anthropic.com/en/api/openai-sdk
     "Claude (Anthropic)": {
         "url": "https://api.anthropic.com/v1",
-        "temperature": 0,
+        "temperature": 0.3,
         "models": [
             "claude-sonnet-4-5",
             "claude-haiku-4-5",
@@ -703,32 +703,32 @@ _DEFAULT_PROVIDERS: dict[str, dict] = {
     },
     "智谱 (GLM)": {
         "url": "https://open.bigmodel.cn/api/paas/v4",
-        "temperature": 0,
+        "temperature": 0.3,
         "models": ["glm-4-flash", "glm-4-flash-250414", "glm-4-air", "glm-5", "glm-5-turbo"],
     },
     "MiniMax": {
         "url": "https://api.minimaxi.com/v1",
-        "temperature": 0.01,
+        "temperature": 0.3,
         "models": ["MiniMax-M2.7-highspeed", "MiniMax-M2.7", "MiniMax-M2"],
     },
     "Qwen (阿里云)": {
         "url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "temperature": 0,
+        "temperature": 0.3,
         "models": ["qwen-turbo", "qwen-flash", "qwen-plus"],
     },
     "豆包 (火山引擎)": {
         "url": "https://ark.cn-beijing.volces.com/api/v3",
-        "temperature": 0,
+        "temperature": 0.3,
         "models": [],
     },
     "Moonshot (Kimi)": {
         "url": "https://api.moonshot.cn/v1",
-        "temperature": 0,
+        "temperature": 0.3,
         "models": ["kimi-k2-turbo-preview", "moonshot-v1-8k"],
     },
     "OpenAI": {
         "url": "https://api.openai.com/v1",
-        "temperature": 0,
+        "temperature": 0.3,
         "models": ["gpt-4o-mini", "gpt-4o"],
     },
 }
@@ -1446,7 +1446,7 @@ class SettingsWindow:
         ).pack(side="left", padx=4)
         ctk.CTkLabel(
             temp_frame,
-            text="留空按 Base URL 自动；MiniMax 须 (0,1]",
+            text="留空=默认 0.3；MiniMax 须 (0,1]，>1 会压到 1",
             text_color="#888888",
             font=ctk.CTkFont(size=11),
         ).pack(side="left", padx=(12, 8))

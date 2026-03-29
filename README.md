@@ -38,11 +38,11 @@ Windows 可双击 **`scripts/启动.bat`**（等价于在项目根目录启动 `
 
 默认数据在 **`data/`**（已带示例 **`data/dictionary.txt`**；审阅历史、学习样本等路径可在设置里改，与 **`config.json.example`** 字段说明一致）。**前台纠错 / 后台学习**需在设置里填写 Base URL、Key、Model 后开启；**不配 API 也能完成桥接与插入**。
 
-**多厂商 OpenAI 兼容**：设置里 **Provider** 下拉与仓库内 **`providers.json`**（url / models / 推荐 **temperature**）对齐常见写法，与 [Open WebUI](https://github.com/open-webui/open-webui) 等工具的「厂商预设」同类。需要**一条网关统一多模型**时，可自建 [LiteLLM Proxy](https://github.com/BerriAI/litellm)，把 Base URL 指到代理即可，无需改本程序代码。
+**多厂商 OpenAI 兼容**：设置里 **Provider** 下拉与仓库内 **`providers.json`**（url / models / 推荐 **temperature**，当前默认 **0.3**）对齐常见写法，与 [Open WebUI](https://github.com/open-webui/open-webui) 等工具的「厂商预设」同类。`config` 里 **temperature 留空**时程序也用 **0.3**（略增多样性，避免过僵）。需要**一条网关统一多模型**时，可自建 [LiteLLM Proxy](https://github.com/BerriAI/litellm)，把 Base URL 指到代理即可，无需改本程序代码。
 
 **Claude**：Anthropic 提供官方 **OpenAI SDK / Chat Completions 兼容层**（说明见 [OpenAI SDK compatibility](https://docs.anthropic.com/en/api/openai-sdk)）：Base URL **`https://api.anthropic.com/v1`**，Key 为控制台 **Anthropic API Key**，与本程序使用的 **`Authorization: Bearer`** 一致；模型 ID 以 [Models 文档](https://docs.anthropic.com/en/docs/about-claude/models) 为准（预设里列了常用 Sonnet/Haiku/Opus 别名，若报错请改为你账号可用的 ID）。该兼容层部分能力与原生 **Messages API** 不等价，生产环境也可继续用 LiteLLM 等网关。
 
-**MiniMax**：Base **`https://api.minimaxi.com/v1`**（[文档](https://platform.minimaxi.com/docs/api-reference/text-openai-api)）；`temperature` 须在 **(0, 1]**，可在设置「高级」留空走自动，或见 `providers.json` 推荐值。
+**MiniMax**：Base **`https://api.minimaxi.com/v1`**（[文档](https://platform.minimaxi.com/docs/api-reference/text-openai-api)）；`temperature` 须在 **(0, 1]**（留空时自动用 **0.3**；若你手动填 **>1** 程序会压到 **1**）。
 
 **勿**将含真实密钥的 `config.json` 提交公开仓库（见 `.gitignore`）。
 

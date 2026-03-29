@@ -19,6 +19,10 @@ import httpx
 from term_bank import TermBank, load_recent_final_texts
 
 
+# 配置留空（自动）时使用的温度：略大于 0，避免过僵；MiniMax 仍须 ≤1
+DEFAULT_CHAT_TEMPERATURE = 0.3
+
+
 def _is_minimax_openai_base(url: str) -> bool:
     u = (url or "").lower()
     return "minimaxi.com" in u or "minimax.io" in u
@@ -27,8 +31,8 @@ def _is_minimax_openai_base(url: str) -> bool:
 def effective_chat_temperature(base_url: str, configured: float | None) -> float:
     """
     解析 chat/completions 使用的 temperature。
-    configured 为 None 时按网关默认：MiniMax (0,1] 用 0.01，其余常用 0。
-    显式配置在 MiniMax 上若 <=0 会抬到 0.01；>1 则压到 1（其文档要求 (0,1]）。
+    configured 为 None 时用 DEFAULT_CHAT_TEMPERATURE（当前 0.3）；MiniMax 上 >1 压到 1。
+    显式配置在 MiniMax 上若 <=0 会抬到 0.01（接口要求 (0,1]）。
     见 https://platform.minimaxi.com/docs/api-reference/text-openai-api
     """
     if configured is not None:
@@ -38,7 +42,10 @@ def effective_chat_temperature(base_url: str, configured: float | None) -> float
                 return 0.01
             return min(t, 1.0)
         return t
-    return 0.01 if _is_minimax_openai_base(base_url) else 0.0
+    t = DEFAULT_CHAT_TEMPERATURE
+    if _is_minimax_openai_base(base_url):
+        return min(t, 1.0)
+    return t
 
 
 def _normalize_openai_base_url(url: str) -> str:
@@ -353,7 +360,7 @@ class PolishConfig:
     learning_samples_path: str = "./data/learning_samples.jsonl"
     learn_system_prompt: str = ""
     learn_user_prompt: str = ""
-    # None = 由 effective_chat_temperature(base_url, None) 按网关决定
+    # None = 由 effective_chat_temperature 使用 DEFAULT_CHAT_TEMPERATURE（0.3）
     llm_temperature: float | None = None
     learn_temperature: float | None = None
 

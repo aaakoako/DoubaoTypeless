@@ -28,7 +28,7 @@ class Config:
     llm_api_key: str = ""
     llm_model: str = ""
     llm_timeout: float = 8.0
-    # None = 按 Base URL 自动（见 polish.effective_chat_temperature）
+    # None = 自动（默认 0.3，见 polish.DEFAULT_CHAT_TEMPERATURE）
     llm_temperature: float | None = None
     # Empty = use built-in default in polish.py
     llm_system_prompt: str = ""
