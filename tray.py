@@ -69,10 +69,14 @@ class SystemTray:
         on_settings: Optional[Callable] = None,
         on_quit: Optional[Callable] = None,
         on_debug_log: Optional[Callable] = None,
+        on_check_update: Optional[Callable] = None,
+        app_version: str = "",
     ):
         self._on_settings = on_settings
         self._on_quit = on_quit
         self._on_debug_log = on_debug_log
+        self._on_check_update = on_check_update
+        self._app_version = (app_version or "").strip()
         self._state = STATE_READY
         self._icon: Optional[pystray.Icon] = None
         self._thread: Optional[threading.Thread] = None
@@ -81,6 +85,8 @@ class SystemTray:
         items = []
         if self._on_settings:
             items.append(pystray.MenuItem("设置", lambda: self._on_settings()))
+        if self._on_check_update:
+            items.append(pystray.MenuItem("检查更新", lambda: self._on_check_update()))
         if self._on_debug_log:
             items.append(pystray.MenuItem("调试日志", lambda: self._on_debug_log()))
         items.append(pystray.MenuItem("退出", self._handle_quit))
@@ -92,22 +98,27 @@ class SystemTray:
         if self._on_quit:
             self._on_quit()
 
+    def _title_for_state(self, state: str) -> str:
+        ver = self._app_version
+        prefix = f"DoubaoTypeless v{ver}" if ver else "DoubaoTypeless"
+        tails = {
+            STATE_READY: "就绪",
+            STATE_RECORDING: "录音中...",
+            STATE_PROCESSING: "识别中...",
+        }
+        return f"{prefix} - {tails.get(state, '就绪')}"
+
     def set_state(self, state: str):
         self._state = state
         if self._icon:
             self._icon.icon = _create_icon_image(state)
-            titles = {
-                STATE_READY: "DoubaoTypeless - 就绪",
-                STATE_RECORDING: "DoubaoTypeless - 录音中...",
-                STATE_PROCESSING: "DoubaoTypeless - 识别中...",
-            }
-            self._icon.title = titles.get(state, "DoubaoTypeless")
+            self._icon.title = self._title_for_state(state)
 
     def start(self):
         self._icon = pystray.Icon(
             "DoubaoTypeless",
             icon=_create_icon_image(self._state),
-            title="DoubaoTypeless - 就绪",
+            title=self._title_for_state(self._state),
             menu=self._build_menu(),
         )
         self._thread = threading.Thread(target=self._icon.run, daemon=True)

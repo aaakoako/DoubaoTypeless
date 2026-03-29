@@ -14,6 +14,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from app_version import APP_VERSION
 from bridge import PhoneBridge
 from config import Config
 from paths import app_root
@@ -101,6 +102,8 @@ class App:
             on_settings=self._open_settings,
             on_quit=self._quit,
             on_debug_log=self._open_debug_log,
+            on_check_update=self._on_check_update,
+            app_version=APP_VERSION,
         )
         if sys.platform == "win32":
             from windows_startup import apply_start_with_windows
@@ -306,7 +309,41 @@ class App:
             on_save=self._on_config_saved,
             get_runtime_bridge_port=lambda: self.config.bridge_port,
             on_bridge_rebind=self._on_bridge_port_rebind,
+            app_version=APP_VERSION,
+            on_check_update=self._on_check_update,
         )
+
+    def _on_check_update(self):
+        if not self._loop:
+            def _early():
+                import tkinter.messagebox as mb
+
+                if self.gui._root:
+                    mb.showwarning("检查更新", "程序尚未完成启动，请稍后再试。")
+
+            self.gui._schedule(_early)
+            return
+        asyncio.run_coroutine_threadsafe(self._run_update_check(), self._loop)
+
+    async def _run_update_check(self):
+        from updater import run_update_flow
+
+        msg = await run_update_flow(log=_log)
+        should_exit = msg.startswith("[EXIT]")
+        body = msg[len("[EXIT]") :].strip() if should_exit else msg
+
+        def ui():
+            import tkinter.messagebox as mb
+
+            if self.gui._root is None:
+                return
+            if should_exit:
+                mb.showinfo("正在更新", body)
+                self._quit()
+            else:
+                mb.showinfo("检查更新", body)
+
+        self.gui._schedule(ui)
 
     def _open_debug_log(self):
         self.gui.show_debug_log()
@@ -671,7 +708,7 @@ class App:
         os._exit(0)
 
     def run(self):
-        _log("DoubaoTypeless 启动中...")
+        _log(f"DoubaoTypeless 启动中… v{APP_VERSION}")
         _log(f"  手机桥接端口: {self.config.bridge_port}")
         _hk_n = sum(
             1

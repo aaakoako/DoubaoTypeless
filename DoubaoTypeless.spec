@@ -36,6 +36,8 @@ a = Analysis(
         "qrcode",
         "qrcode.image.pil",
         "term_bank",
+        "app_version",
+        "updater",
     ],
     hookspath=[],
     hooksconfig={},

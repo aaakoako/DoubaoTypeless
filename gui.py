@@ -784,6 +784,8 @@ class SettingsWindow:
             Callable[[], Tuple[Optional[bool], str, Optional[bool], str]]
         ] = None,
         on_model_probe: Optional[Callable[[str, dict], None]] = None,
+        app_version: str = "",
+        on_check_update: Optional[Callable[[], None]] = None,
     ):
         self._config = config
         self._on_save = on_save
@@ -792,6 +794,8 @@ class SettingsWindow:
         self._on_toggle_debug_log = on_toggle_debug_log
         self._get_model_health = get_model_health
         self._on_model_probe = on_model_probe
+        self._app_version = (app_version or "").strip()
+        self._on_check_update = on_check_update
         self._probe_status_bullets: dict[str, ctk.CTkLabel] = {}
         self._probe_detail_vars: dict[str, tk.StringVar] = {}
         self._suggest_key_visible = False
@@ -1053,6 +1057,23 @@ class SettingsWindow:
             text_color="#9aa0aa",
             anchor="w",
         ).pack(fill="x", padx=10, pady=(0, 8))
+
+        ver_row = ctk.CTkFrame(container, fg_color="transparent")
+        ver_row.pack(fill="x", padx=10, pady=(0, 6))
+        if self._app_version:
+            ctk.CTkLabel(
+                ver_row,
+                text=f"版本 v{self._app_version}",
+                text_color="#888888",
+                font=ctk.CTkFont(size=12),
+            ).pack(side="left", padx=(0, 8))
+        if self._on_check_update:
+            ctk.CTkButton(
+                ver_row,
+                text="检查更新",
+                width=96,
+                command=self._on_check_update,
+            ).pack(side="left", padx=4)
 
         # --- 桥接设置 ---
         ctk.CTkLabel(container, text="桥接设置", font=ctk.CTkFont(size=13, weight="bold"),
@@ -2160,6 +2181,8 @@ class GUIManager:
         *,
         get_runtime_bridge_port: Optional[Callable[[], int]] = None,
         on_bridge_rebind: Optional[Callable[[int], None]] = None,
+        app_version: str = "",
+        on_check_update: Optional[Callable[[], None]] = None,
     ):
         self._schedule(
             self._open_settings_impl,
@@ -2167,6 +2190,8 @@ class GUIManager:
             on_save,
             get_runtime_bridge_port,
             on_bridge_rebind,
+            app_version,
+            on_check_update,
         )
 
     def _open_settings_impl(
@@ -2175,6 +2200,8 @@ class GUIManager:
         on_save: Optional[Callable] = None,
         get_runtime_bridge_port: Optional[Callable[[], int]] = None,
         on_bridge_rebind: Optional[Callable[[int], None]] = None,
+        app_version: str = "",
+        on_check_update: Optional[Callable[[], None]] = None,
     ):
         if self._settings and self._settings._win and self._settings._win.winfo_exists():
             self._settings._win.lift()
@@ -2190,6 +2217,8 @@ class GUIManager:
             on_toggle_debug_log=self._toggle_debug_log_impl,
             get_model_health=self._model_health_tuple,
             on_model_probe=self._forward_model_probe,
+            app_version=app_version,
+            on_check_update=on_check_update,
         )
         self._settings.show()
 
