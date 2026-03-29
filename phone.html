@@ -166,7 +166,7 @@
 
 <script>
 const WS_URL = "{{WS_URL}}";
-const CLIENT_VERSION = "meta-v2";
+const CLIENT_VERSION = "meta-v3";
 
 const textInput = document.getElementById("text-input");
 const btnSend = document.getElementById("btn-send");
@@ -183,6 +183,7 @@ let stableTimer = null;
 let lastSentText = "";
 let isComposing = false;
 let lastCompositionEndAt = 0;
+let stableComposeRetries = 0;
 
 function buildMeta(extra = {}) {
   return {
@@ -261,6 +262,7 @@ function connect() {
       if (data.type === "cleared") {
         if (stableTimer) { clearTimeout(stableTimer); stableTimer = null; }
         if (autoSendTimer) { clearTimeout(autoSendTimer); autoSendTimer = null; }
+        stableComposeRetries = 0;
         textInput.value = "";
         charCount.textContent = "0";
         btnSend.disabled = true;
@@ -284,36 +286,69 @@ function scheduleReconnect() {
   }, 3000);
 }
 
+function armStableTimer() {
+  if (stableTimer) clearTimeout(stableTimer);
+  const t = textInput.value.trim();
+  if (!t || !ws || ws.readyState !== 1) return;
+
+  const now = Date.now();
+  const afterComp = now - lastCompositionEndAt < 800 ? 1200 : 2000;
+  const delay = isComposing ? 2800 : afterComp;
+
+  stableTimer = setTimeout(() => {
+    stableTimer = null;
+    const fresh = textInput.value.trim();
+    if (!fresh || !ws || ws.readyState !== 1) return;
+    if (isComposing) {
+      if (stableComposeRetries < 40) {
+        stableComposeRetries += 1;
+        armStableTimer();
+        return;
+      }
+      stableComposeRetries = 0;
+    } else {
+      stableComposeRetries = 0;
+    }
+    ws.send(JSON.stringify({
+      type: "stable",
+      text: fresh,
+      meta: buildMeta({
+        stableReason: isComposing ? "timer_forced_composing" : "timer",
+      }),
+    }));
+    setSyncState("synced");
+  }, delay);
+}
+
 function autoSync() {
   const text = textInput.value;
   if (!ws || ws.readyState !== 1) return;
-  if (text === lastSentText) return;
 
-  lastSentText = text;
-  setSyncState("syncing");
-  ws.send(JSON.stringify({ type: "update", text: text, meta: buildMeta() }));
+  // 仅正文变化时发 update，避免刷屏；但 lastSentText 与 stable 定时器不能绑在一起：
+  // 组字过程中已把 lastSentText 推到全文时，compositionend 后文本不变，仍必须 arm stable。
+  if (text !== lastSentText) {
+    lastSentText = text;
+    setSyncState("syncing");
+    ws.send(JSON.stringify({ type: "update", text: text, meta: buildMeta() }));
+  }
 
-  if (stableTimer) clearTimeout(stableTimer);
-  if (isComposing) return;
-
-  const now = Date.now();
-  const settleDelay = now - lastCompositionEndAt < 800 ? 1200 : 2000;
-  stableTimer = setTimeout(() => {
-    if (!isComposing && text.trim() && ws && ws.readyState === 1) {
-      ws.send(JSON.stringify({
-        type: "stable",
-        text: text.trim(),
-        meta: buildMeta({ stableReason: "timer" }),
-      }));
-      setSyncState("synced");
+  if (!text.trim()) {
+    if (stableTimer) {
+      clearTimeout(stableTimer);
+      stableTimer = null;
     }
-  }, settleDelay);
+    stableComposeRetries = 0;
+    return;
+  }
+
+  armStableTimer();
 }
 
 function sendNow() {
   const text = textInput.value.trim();
   if (!text || !ws || ws.readyState !== 1) return;
   if (stableTimer) clearTimeout(stableTimer);
+  stableComposeRetries = 0;
   ws.send(JSON.stringify({
     type: "stable",
     text: text,
@@ -377,6 +412,11 @@ textInput.addEventListener("input", (e) => {
 
 btnSend.addEventListener("click", sendNow);
 btnClear.addEventListener("click", () => {
+  if (stableTimer) {
+    clearTimeout(stableTimer);
+    stableTimer = null;
+  }
+  stableComposeRetries = 0;
   textInput.value = "";
   charCount.textContent = "0";
   btnSend.disabled = true;
