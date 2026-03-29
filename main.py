@@ -25,8 +25,13 @@ from typer import Typer
 
 if sys.platform == "win32":
     os.system("chcp 65001 >nul 2>&1")
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    # 单文件 exe + console=False 时 stdout/stderr 可能为 None
+    for _s in (sys.stdout, sys.stderr):
+        if _s is not None and hasattr(_s, "reconfigure"):
+            try:
+                _s.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
 
 if getattr(sys, "frozen", False):
     os.chdir(app_root())
@@ -39,7 +44,11 @@ def _log(msg: str):
     global _log_file
     ts = datetime.now().strftime("%H:%M:%S.%f")[:-3]
     line = f"[{ts}] {msg}"
-    print(line)
+    if sys.stdout is not None:
+        try:
+            print(line)
+        except Exception:
+            pass
     try:
         if _log_file is None:
             _log_file = open(_LOG_PATH, "a", encoding="utf-8")
