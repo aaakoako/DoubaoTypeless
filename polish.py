@@ -19,6 +19,74 @@ import httpx
 from term_bank import TermBank, load_recent_final_texts
 
 
+# OpenAI 官方允许 temperature=0；MiniMax OpenAI 兼容要求 (0, 1]，0 会报错。
+# 见 https://platform.minimaxi.com/docs/api-reference/text-openai-api
+CHAT_COMPLETION_TEMPERATURE = 0.01
+
+
+def _is_minimax_openai_base(url: str) -> bool:
+    return "minimaxi.com" in (url or "").lower()
+
+
+def _normalize_openai_base_url(url: str) -> str:
+    """MiniMax 文档要求 Base 为 https://api.minimaxi.com/v1（常漏写 /v1）。"""
+    u = (url or "").strip().rstrip("/")
+    if not u:
+        return ""
+    if _is_minimax_openai_base(u) and not u.lower().endswith("/v1"):
+        return u + "/v1"
+    return u
+
+
+def _reasoning_details_text(msg: dict) -> str:
+    """MiniMax reasoning_split=True 时，思考在 message.reasoning_details[].text。"""
+    rd = msg.get("reasoning_details")
+    if not rd or not isinstance(rd, list):
+        return ""
+    parts: list[str] = []
+    for item in rd:
+        if isinstance(item, dict):
+            parts.append(str(item.get("text") or ""))
+    return "".join(parts).strip()
+
+
+def _strip_minimax_think_suffix(content: str) -> str:
+    """未开 reasoning_split 时，M2 系可能在 content 内嵌思考块再跟正文；取最后一个闭合标记之后。"""
+    s = (content or "").strip()
+    if not s:
+        return s
+    for marker in ("`/think`",):
+        if marker in s:
+            s = s.split(marker)[-1].strip()
+    return s
+
+
+def _minimax_openai_extra_fields(base_url: str) -> dict:
+    """MiniMax 文档：reasoning_split 将思考与正文分离，便于只取 content。"""
+    if _is_minimax_openai_base(base_url):
+        return {"reasoning_split": True}
+    return {}
+
+
+def _assistant_reply_text(data: dict, *, openai_base_url: str) -> str:
+    """从 chat/completions 首条 choice 取助手可见正文（兼容 MiniMax / 智谱等）。"""
+    choices = data.get("choices") or []
+    if not choices:
+        return ""
+    msg = choices[0].get("message") or {}
+    mm = _is_minimax_openai_base(openai_base_url)
+    c_raw = _flatten_openai_message_content(msg.get("content"))
+    if mm:
+        c_raw = _strip_minimax_think_suffix(c_raw)
+    r = (msg.get("reasoning_content") or "").strip()
+    rd = _reasoning_details_text(msg)
+    for part in (c_raw, r, rd):
+        t = (part or "").strip()
+        if t:
+            return t
+    return ""
+
+
 class LearnJsonError(ValueError):
     """后台学习模型返回内容无法解析为合法 JSON 对象（不写入样本、不标记已处理）。"""
 
@@ -485,7 +553,9 @@ class TextPolisher:
     def _ensure_client(self, *, learning: bool = False) -> httpx.AsyncClient:
         if learning:
             if self._learn_client is None or self._learn_client.is_closed:
-                base_url = self.config.learn_base_url.rstrip("/") + "/"
+                raw = (self.config.learn_base_url or "").strip()
+                norm = _normalize_openai_base_url(raw)
+                base_url = norm.rstrip("/") + "/" if norm else ""
                 self._learn_client = httpx.AsyncClient(
                     base_url=base_url,
                     headers={
@@ -497,7 +567,9 @@ class TextPolisher:
             return self._learn_client
 
         if self._client is None or self._client.is_closed:
-            base_url = self.config.base_url.rstrip("/") + "/"
+            raw = (self.config.base_url or "").strip()
+            norm = _normalize_openai_base_url(raw)
+            base_url = norm.rstrip("/") + "/" if norm else ""
             self._client = httpx.AsyncClient(
                 base_url=base_url,
                 headers={
@@ -725,9 +797,10 @@ class TextPolisher:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_content},
             ],
-            "temperature": 0.0,
+            "temperature": CHAT_COMPLETION_TEMPERATURE,
             "max_tokens": max(len(text) * 3, 256),
         }
+        payload.update(_minimax_openai_extra_fields(self.config.base_url))
         started = time.perf_counter()
         resp = await client.post(
             "chat/completions",
@@ -737,27 +810,33 @@ class TextPolisher:
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         resp.raise_for_status()
         data = resp.json()
-        result = data["choices"][0]["message"]["content"].strip()
+        result = _assistant_reply_text(data, openai_base_url=self.config.base_url).strip()
         return (result or text), elapsed_ms, resp.status_code
 
     @staticmethod
-    def _learn_response_candidates(data: dict) -> list[str]:
-        """OpenAI 形响应：content（含片段列表）与 reasoning_content 分别尝试解析。"""
+    def _learn_response_candidates(data: dict, *, openai_base_url: str = "") -> list[str]:
+        """OpenAI 形响应：reasoning_details / reasoning_content / content 等分别尝试解析。"""
         choices = data.get("choices") or []
         if not choices:
             return []
         msg = choices[0].get("message") or {}
         c = _flatten_openai_message_content(msg.get("content"))
+        if _is_minimax_openai_base(openai_base_url):
+            c = _strip_minimax_think_suffix(c)
         r = (msg.get("reasoning_content") or "").strip()
-        # 智谱等推理模型常把最终 JSON 放在 reasoning_content，content 反而是分析文字
+        rd = _reasoning_details_text(msg)
+        # 智谱等推理模型常把最终 JSON 放在 reasoning_content；MiniMax 可能在 reasoning_details
         out: list[str] = []
+        if rd:
+            out.append(rd)
         if r:
             out.append(r)
         if c:
             out.append(c)
-        if r and c and r != c:
-            out.append(f"{r}\n{c}")
-            out.append(f"{c}\n{r}")
+        for a, b in ((rd, r), (rd, c), (r, c)):
+            if a and b and a != b:
+                out.append(f"{a}\n{b}")
+                out.append(f"{b}\n{a}")
         return out
 
     async def learn_from_review(
@@ -829,10 +908,13 @@ class TextPolisher:
                 {"role": "system", "content": self._effective_learn_system()},
                 {"role": "user", "content": user_content},
             ],
-            "temperature": 0.0,
+            "temperature": CHAT_COMPLETION_TEMPERATURE,
             "max_tokens": max_tokens,
-            "response_format": {"type": "json_object"},
         }
+        payload.update(_minimax_openai_extra_fields(self.config.learn_base_url))
+        # MiniMax 兼容层未必支持 OpenAI 的 json_object；其它网关仍尽量约束 JSON
+        if not _is_minimax_openai_base(self.config.learn_base_url):
+            payload["response_format"] = {"type": "json_object"}
         started = time.perf_counter()
         body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
         resp = await asyncio.wait_for(
@@ -849,7 +931,9 @@ class TextPolisher:
         ch0 = (data.get("choices") or [{}])[0]
         finish_reason = (ch0.get("finish_reason") or "").strip()
         usage = data.get("usage")
-        candidates = self._learn_response_candidates(data)
+        candidates = self._learn_response_candidates(
+            data, openai_base_url=self.config.learn_base_url
+        )
         parsed: dict | None = None
         last_learn_err: LearnJsonError | None = None
         for text in candidates:
