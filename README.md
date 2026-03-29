@@ -1,6 +1,9 @@
 # DoubaoTypeless
 
 同 WiFi 下用手机页语音输入，文本同步到 Windows，审阅后插入当前光标。可选 **OpenAI 兼容** API 做前台纠错与后台学习（BYOK）。**非官方**社区工具，与字节跳动及「豆包」产品无关联。
+<img width="844" height="617" alt="image" src="https://github.com/user-attachments/assets/d5156926-680d-4bb4-8460-558bbdca60d0" />
+
+<img width="899" height="1199" alt="image" src="https://github.com/user-attachments/assets/370eb079-7229-4b51-8b0f-e3bc7d6ce90f" />
 
 ## 为什么做这个
 
