@@ -2009,6 +2009,94 @@ class GUIManager:
         self._suggest_model_msg: str = ""
         self._learn_model_ok: Optional[bool] = None
         self._learn_model_msg: str = ""
+        self._update_dl_win: Optional[ctk.CTkToplevel] = None
+        self._update_dl_bar: Optional[ctk.CTkProgressBar] = None
+        self._update_dl_label: Optional[ctk.CTkLabel] = None
+
+    def open_update_download_progress(
+        self, tag: str, ready: Optional[threading.Event] = None
+    ):
+        self._schedule(self._open_update_download_progress_impl, tag, ready)
+
+    def _open_update_download_progress_impl(
+        self, tag: str, ready: Optional[threading.Event]
+    ):
+        self._close_update_download_progress_impl()
+        try:
+            if not self._root:
+                return
+            w = ctk.CTkToplevel(self._root)
+            w.title("下载更新")
+            w.attributes("-topmost", True)
+            w.resizable(False, False)
+            icon = getattr(self._root, "_doubao_icon_photo", None)
+            if icon is not None:
+                try:
+                    w.iconphoto(True, icon)
+                except tk.TclError:
+                    pass
+            ctk.CTkLabel(
+                w,
+                text=f"正在下载 {tag}",
+                font=ctk.CTkFont(size=15, weight="bold"),
+            ).pack(pady=(14, 6))
+            lb = ctk.CTkLabel(
+                w,
+                text="准备连接…",
+                text_color="#888888",
+                font=ctk.CTkFont(size=12),
+            )
+            lb.pack(pady=(0, 8))
+            bar = ctk.CTkProgressBar(w, width=360)
+            bar.pack(padx=20, pady=(0, 16))
+            bar.set(0)
+            self._update_dl_win = w
+            self._update_dl_bar = bar
+            self._update_dl_label = lb
+        finally:
+            if ready is not None:
+                ready.set()
+
+    def update_update_download_progress(self, done: int, total: Optional[int]):
+        self._schedule(self._update_update_download_progress_impl, done, total)
+
+    def _update_update_download_progress_impl(self, done: int, total: Optional[int]):
+        bar = self._update_dl_bar
+        lb = self._update_dl_label
+        if bar is None or lb is None:
+            return
+        try:
+            if not bar.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        if total is not None and total > 0:
+            bar.set(min(1.0, done / total))
+            lb.configure(
+                text=f"{done / 1048576:.1f} / {total / 1048576:.1f} MB",
+                text_color="#666666",
+            )
+        else:
+            bar.set(0)
+            lb.configure(
+                text=f"已下载 {done / 1048576:.1f} MB（总大小未知）",
+                text_color="#666666",
+            )
+
+    def close_update_download_progress(self):
+        self._schedule(self._close_update_download_progress_impl)
+
+    def _close_update_download_progress_impl(self):
+        w = self._update_dl_win
+        self._update_dl_win = None
+        self._update_dl_bar = None
+        self._update_dl_label = None
+        if w is not None:
+            try:
+                if w.winfo_exists():
+                    w.destroy()
+            except tk.TclError:
+                pass
 
     def set_history_path(self, path: str):
         self._history_path = (path or "").strip()

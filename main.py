@@ -10,6 +10,7 @@ import atexit
 import json
 import os
 import sys
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -325,25 +326,94 @@ class App:
             return
         asyncio.run_coroutine_threadsafe(self._run_update_check(), self._loop)
 
-    async def _run_update_check(self):
-        from updater import run_update_flow
+    async def _run_startup_update_check(self):
+        """打包 exe 启动数秒后静默预检；仅有新版本时再弹窗（与手动检查更新共用逻辑）。"""
+        try:
+            await asyncio.sleep(4)
+            await self._run_update_check(startup_silent=True)
+        except Exception as e:
+            _log(f"[update.auto] {e}")
 
-        msg = await run_update_flow(log=_log)
+    async def _run_update_check(self, *, startup_silent: bool = False):
+        import tkinter.messagebox as mb
+
+        from updater import execute_frozen_exe_update, run_update_precheck
+
+        kind, data = await run_update_precheck(log=_log)
+
+        if kind == "show":
+            msg = data.get("message", "")
+            if startup_silent:
+                _log(f"[update.auto] {msg}")
+                return
+
+            def ui_show():
+                if self.gui._root is not None:
+                    mb.showinfo("检查更新", msg)
+
+            self.gui._schedule(ui_show)
+            return
+
+        ev = threading.Event()
+        approved: dict[str, bool | None] = {"v": None}
+
+        def ui_confirm():
+            try:
+                if self.gui._root is None:
+                    approved["v"] = False
+                    return
+                approved["v"] = mb.askyesno(
+                    "发现新版本",
+                    f"发现新版本 {data['tag']}（当前 v{APP_VERSION}）。\n\n"
+                    "将下载安装包并关闭本程序，由脚本替换 exe 后自动重启。\n\n"
+                    "是否继续？",
+                )
+            finally:
+                ev.set()
+
+        self.gui._schedule(ui_confirm)
+        await asyncio.to_thread(ev.wait, 300.0)
+        if approved["v"] is None:
+            approved["v"] = False
+
+        if not approved["v"]:
+            def ui_cancel():
+                if self.gui._root is not None:
+                    mb.showinfo("检查更新", "已取消更新。")
+
+            self.gui._schedule(ui_cancel)
+            return
+
+        ready = threading.Event()
+        self.gui.open_update_download_progress(str(data["tag"]), ready)
+        await asyncio.to_thread(ready.wait, 5.0)
+
+        def prog(done: int, total: int | None):
+            self.gui.update_update_download_progress(done, total)
+
+        try:
+            msg = await execute_frozen_exe_update(
+                tag=str(data["tag"]),
+                asset_url=str(data["url"]),
+                log=_log,
+                progress=prog,
+            )
+        finally:
+            self.gui.close_update_download_progress()
+
         should_exit = msg.startswith("[EXIT]")
         body = msg[len("[EXIT]") :].strip() if should_exit else msg
 
-        def ui():
-            import tkinter.messagebox as mb
-
+        def ui_done():
             if self.gui._root is None:
                 return
             if should_exit:
                 mb.showinfo("正在更新", body)
                 self._quit()
             else:
-                mb.showinfo("检查更新", body)
+                mb.showinfo("检查更新", msg)
 
-        self.gui._schedule(ui)
+        self.gui._schedule(ui_done)
 
     def _open_debug_log(self):
         self.gui.show_debug_log()
@@ -754,6 +824,15 @@ class App:
         _log("  手机端输入会自动同步到 PC，稳定后自动进入审阅")
         _log("")
         _log("就绪！")
+
+        if getattr(sys, "frozen", False):
+            if os.environ.get("DT_SKIP_AUTO_UPDATE_CHECK", "").strip().lower() not in (
+                "1",
+                "true",
+                "yes",
+                "on",
+            ):
+                self._loop.create_task(self._run_startup_update_check())
 
         try:
             self._loop.run_forever()
