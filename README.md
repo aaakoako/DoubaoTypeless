@@ -40,9 +40,9 @@ Windows 可双击 **`scripts/启动.bat`**（等价于在项目根目录启动 `
 
 **多厂商 OpenAI 兼容**：设置里 **Provider** 下拉与仓库内 **`providers.json`**（url / models / 推荐 **temperature**）对齐常见写法，与 [Open WebUI](https://github.com/open-webui/open-webui) 等工具的「厂商预设」同类。需要**一条网关统一多模型**时，可自建 [LiteLLM Proxy](https://github.com/BerriAI/litellm)，把 Base URL 指到代理即可，无需改本程序代码。
 
-**MiniMax**：Base **`https://api.minimaxi.com/v1`**（[文档](https://platform.minimaxi.com/docs/api-reference/text-openai-api)）；漏写 **`/v1`** 时会自动补全。兼容层要求 **temperature ∈ (0, 1]**；配置留空时程序按网关自动选（MiniMax 默认 `0.01`），也可在 **设置 → 高级** 里分别填前台/后台 **temperature**。会按需加 **`reasoning_split`** 以便读正文。
+**Claude**：Anthropic 提供官方 **OpenAI SDK / Chat Completions 兼容层**（说明见 [OpenAI SDK compatibility](https://docs.anthropic.com/en/api/openai-sdk)）：Base URL **`https://api.anthropic.com/v1`**，Key 为控制台 **Anthropic API Key**，与本程序使用的 **`Authorization: Bearer`** 一致；模型 ID 以 [Models 文档](https://docs.anthropic.com/en/docs/about-claude/models) 为准（预设里列了常用 Sonnet/Haiku/Opus 别名，若报错请改为你账号可用的 ID）。该兼容层部分能力与原生 **Messages API** 不等价，生产环境也可继续用 LiteLLM 等网关。
 
-若曾使用旧版、在仓库**根目录**还留有 `review_history.json` / `learn_pending.json`，而配置已指向 `data/`，可删除根目录这两份以免混淆（见 `.gitignore`）。
+**MiniMax**：Base **`https://api.minimaxi.com/v1`**（[文档](https://platform.minimaxi.com/docs/api-reference/text-openai-api)）；`temperature` 须在 **(0, 1]**，可在设置「高级」留空走自动，或见 `providers.json` 推荐值。
 
 **勿**将含真实密钥的 `config.json` 提交公开仓库（见 `.gitignore`）。
 

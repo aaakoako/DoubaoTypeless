@@ -690,6 +690,17 @@ _DEFAULT_PROVIDERS: dict[str, dict] = {
         "temperature": 0,
         "models": ["deepseek-chat"],
     },
+    # Anthropic 官方 OpenAI 兼容层：https://docs.anthropic.com/en/api/openai-sdk
+    "Claude (Anthropic)": {
+        "url": "https://api.anthropic.com/v1",
+        "temperature": 0,
+        "models": [
+            "claude-sonnet-4-5",
+            "claude-haiku-4-5",
+            "claude-opus-4-5",
+            "claude-3-5-sonnet-20241022",
+        ],
+    },
     "智谱 (GLM)": {
         "url": "https://open.bigmodel.cn/api/paas/v4",
         "temperature": 0,
