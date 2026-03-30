@@ -26,9 +26,14 @@
 
 ## Windows 说明
 
-- 可选开机自启（注册表 Run）；打包 exe 无控制台时日志在 **`debug.log`**（与配置同目录），设置或托盘可开日志窗口。从 Release 自检更新下载完成后会退出并由脚本替换 exe，随后**自动启动新版本**（无需再手动点开）。
-- 需要记录正文级日志时：`set DT_VERBOSE_LOG=1` 后启动（PowerShell：`$env:DT_VERBOSE_LOG=1`）。
+- 可选开机自启（注册表 Run）；打包 exe 无控制台时日志在 **`debug.log`**（与 exe 同目录），设置或托盘可开日志窗口。需要记录正文级日志时：`set DT_VERBOSE_LOG=1` 后启动（PowerShell：`$env:DT_VERBOSE_LOG=1`）。
 - 检测局域网 IP 时会向 `8.8.8.8:80` 做 UDP connect（不写业务内容）。
+
+### 应用内更新与 Release 附件
+
+- **单文件 exe 自动更新**：从 Release 下载新版本到同目录后，程序会退出并由隐藏批处理等待进程结束、删除旧 exe、改名新文件并重启。若杀软/同步盘/文件占用导致替换失败，界面可能已关闭但版本未变；请查看同目录下的 **`update.log`** 与 **`debug.log`**（带 `[update]` 时间戳）。失败时可能保留 **`_DoubaoTypeless_update_failed.bat`**，便于对照日志排查。
+- **更稳妥的方式**：同一 Release 通常还提供 **`DoubaoTypeless_win_portable.zip`**（onedir 便携目录）。请先**完全退出**程序与托盘，解压 zip，用其中的 **`DoubaoTypeless` 文件夹整包覆盖**你正在使用的目录（或只覆盖该文件夹内文件），再启动 exe。这样不依赖「运行中自删 exe」，适合自动更新不稳定的环境。
+- 本地打包：单文件 `pyinstaller --noconfirm DoubaoTypeless.spec`；便携目录 `pyinstaller --noconfirm DoubaoTypeless_portable.spec`，再将 `dist/DoubaoTypeless` 打成 zip 即可。
 
 ## 许可证
 

@@ -223,7 +223,10 @@ def write_update_bat(current_exe: Path, downloaded_exe: Path) -> Path:
     PyInstaller 单文件退出后仍会短暂占用/清理 %TEMP%\\_MEI*；若立刻 start 新版本，bootloader
     可能在不完整环境下加载 python*.dll，出现「Failed to load Python DLL / 找不到指定的模块」。
     因此在 tasklist 不再列出本 exe 后**再额外等待数秒**，并用 PowerShell Start-Process 拉起进程
-   （失败时回退到 cmd start）。
+    （失败时回退到 cmd start）。
+
+    关键步骤追加到 exe 同目录下的 ``update.log`` 与 ``debug.log``，便于排查「下载成功但未替换」。
+    ``move`` 等失败时复制本脚本为 ``_DoubaoTypeless_update_failed.bat`` 并 **exit /b 1**，不删除自身。
     """
     bat = app_root() / "_DoubaoTypeless_update.bat"
     exe_name = current_exe.name
@@ -237,12 +240,19 @@ def write_update_bat(current_exe: Path, downloaded_exe: Path) -> Path:
     # set "VAR=..." 中的路径同样需转义 %
     cur_set = cur.replace("%", "%%")
     dir_set = exe_dir.replace("%", "%%")
+    failed_copy = (
+        'copy /y "%~f0" "%DT_LOG_DIR%\\_DoubaoTypeless_update_failed.bat" >nul 2>&1'
+    )
     bat.write_text(
         "\n".join(
             [
                 "@echo off",
                 "chcp 65001 >nul",
                 "setlocal",
+                f'set "DT_LOG_DIR={dir_set}"',
+                'set "LOGU=%DT_LOG_DIR%\\update.log"',
+                'set "LOGD=%DT_LOG_DIR%\\debug.log"',
+                'call :ulog "update bat started"',
                 "timeout /t 6 /nobreak >nul",
                 ":wait",
                 f'tasklist /FI "IMAGENAME eq {exe_name}" 2>nul | find /I "{exe_name}" >nul',
@@ -250,28 +260,52 @@ def write_update_bat(current_exe: Path, downloaded_exe: Path) -> Path:
                 "  timeout /t 1 /nobreak >nul",
                 "  goto wait",
                 ")",
-                "rem 进程已结束，再等一会让 _MEI 临时目录释放完毕，避免新进程 DLL 加载失败",
+                'call :ulog "old process gone, waiting 8s for _MEI cleanup"',
                 "timeout /t 8 /nobreak >nul",
+                'call :ulog "deleting old exe"',
                 f'del /f /q "{cur_esc}" 2>nul',
+                f'if exist "{cur_esc}" call :ulog "WARN old exe still exists after del"',
+                'call :ulog "moving new exe into place"',
                 f'move /y "{new_esc}" "{cur_esc}"',
-                "if errorlevel 1 exit /b 1",
-                f'if not exist "{cur_esc}" exit /b 1',
-                "rem move 后稍等，避免杀软/索引短暂锁文件",
+                "if errorlevel 1 (",
+                '  call :ulog "ERROR move failed (file lock, path, or permissions)"',
+                f"  {failed_copy}",
+                "  exit /b 1",
+                ")",
+                f'if not exist "{cur_esc}" (',
+                '  call :ulog "ERROR target exe missing after move"',
+                f"  {failed_copy}",
+                "  exit /b 1",
+                ")",
+                'call :ulog "move OK, pre-launch pause 4s"',
                 "timeout /t 4 /nobreak >nul",
                 f'set "DT_RESTART_EXE={cur_set}"',
                 f'set "DT_RESTART_DIR={dir_set}"',
+                'call :ulog "starting new process via PowerShell Start-Process"',
                 "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \""
                 "try { "
                 "Start-Process -LiteralPath $env:DT_RESTART_EXE -WorkingDirectory $env:DT_RESTART_DIR; "
                 "exit 0 "
                 "} catch { exit 1 }\"",
                 "if errorlevel 1 (",
+                '  call :ulog "PowerShell Start-Process failed, trying cmd start"',
                 f'  cd /d "{dir_esc}"',
-                "  if errorlevel 1 exit /b 1",
+                "  if errorlevel 1 (",
+                '    call :ulog "ERROR cd to app dir failed"',
+                f"    {failed_copy}",
+                "    exit /b 1",
+                "  )",
                 f'  start "" "{cur_esc}"',
                 ")",
+                'call :ulog "update script finished OK, removing bat"',
                 "endlocal",
-                "del \"%~f0\"",
+                'del "%~f0"',
+                "exit /b 0",
+                "",
+                ":ulog",
+                '>>"%LOGU%" echo %date% %time% [update] %~1',
+                '>>"%LOGD%" echo %date% %time% [update] %~1',
+                "exit /b",
                 "",
             ]
         ),

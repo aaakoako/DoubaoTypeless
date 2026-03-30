@@ -1,6 +1,6 @@
-# PyInstaller — Windows 单文件 exe（需在项目根目录执行: pyinstaller DoubaoTypeless.spec）
-# 便携目录 + zip 见 DoubaoTypeless_portable.spec（Release 第二附件）
-# 依赖: pip install pyinstaller
+# PyInstaller — Windows onedir（便携目录，便于 zip 覆盖更新）
+# 在项目根目录执行: pyinstaller --noconfirm DoubaoTypeless_portable.spec
+# 产出: dist/DoubaoTypeless/（内含 DoubaoTypeless.exe 与依赖），可打 zip 作为 Release 第二附件
 # -*- mode: python ; coding: utf-8 -*-
 
 from pathlib import Path
@@ -56,10 +56,8 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name="DoubaoTypeless",
     debug=False,
     bootloader_ignore_signals=False,
@@ -74,4 +72,15 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=icon_arg,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name="DoubaoTypeless",
 )
