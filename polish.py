@@ -409,6 +409,61 @@ class SuggestionBatch:
     api_fail_hint: str = ""
 
 
+# 新文件无可对照表头时使用（与仓库 data/dictionary.txt 说明一致）
+DEFAULT_DICTIONARY_HEADER_LINES: tuple[str, ...] = (
+    "# 纠错对照表 = 误听/误写 → 正确写法（不是「纯名词表」）",
+    "# - 学习流水 learning_samples.jsonl 里，后台模型输出的 candidate_pairs 经规则筛选后可自动追加到本文件（若开启「学习后写对照表」）",
+    "# - 前台纠错时整表作为提示参考，不做运行时硬替换",
+    "# 格式：误识形式=正确形式（每行一条）；# 为注释",
+    "",
+    "# --- 数据（可在「词库管理」中编辑）---",
+)
+
+
+def split_dictionary_file(path: str | Path) -> tuple[list[str], list[tuple[str, str]]]:
+    """解析对照表文件：保留首部注释/空行作为头，其余为 wrong=correct 数据行。"""
+    p = Path(path)
+    if not p.exists():
+        return list(DEFAULT_DICTIONARY_HEADER_LINES), []
+    lines = p.read_text(encoding="utf-8").splitlines()
+    header: list[str] = []
+    pairs: list[tuple[str, str]] = []
+    seen_pair = False
+    for line in lines:
+        stripped = line.strip()
+        if not seen_pair:
+            if not stripped or stripped.startswith("#"):
+                header.append(line)
+                continue
+        if "=" in stripped and not stripped.startswith("#"):
+            wrong, correct = stripped.split("=", 1)
+            wrong, correct = wrong.strip(), correct.strip()
+            if wrong and correct:
+                pairs.append((wrong, correct))
+                seen_pair = True
+                continue
+        if seen_pair and (not stripped or stripped.startswith("#")):
+            continue
+    if not header:
+        header = list(DEFAULT_DICTIONARY_HEADER_LINES)
+    return header, pairs
+
+
+def write_dictionary_file(
+    path: str | Path,
+    pairs: list[tuple[str, str]],
+    *,
+    header_lines: list[str] | None = None,
+) -> None:
+    """写回对照表 txt；header_lines 默认使用内置说明头。"""
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    heads = header_lines if header_lines is not None else list(DEFAULT_DICTIONARY_HEADER_LINES)
+    out: list[str] = [h.rstrip("\n\r") for h in heads]
+    out.extend(f"{w}={c}" for w, c in pairs)
+    p.write_text("\n".join(out) + "\n", encoding="utf-8")
+
+
 class Dictionary:
     """误听/误写 → 正确写法 对照表（文本行 wrong=correct），供前台 prompt 参考。"""
 
@@ -421,15 +476,8 @@ class Dictionary:
         self._mappings = []
         if not self._path.exists():
             return
-        for line in self._path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            if "=" in line:
-                wrong, correct = line.split("=", 1)
-                wrong, correct = wrong.strip(), correct.strip()
-                if wrong and correct:
-                    self._mappings.append((wrong, correct))
+        _, pairs = split_dictionary_file(self._path)
+        self._mappings = pairs
 
     def as_prompt_hint(self) -> str:
         if not self._mappings:

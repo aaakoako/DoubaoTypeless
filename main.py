@@ -104,6 +104,7 @@ class App:
             on_quit=self._quit,
             on_debug_log=self._open_debug_log,
             on_check_update=self._on_check_update,
+            on_vocabulary=self._open_vocabulary_manager,
             app_version=APP_VERSION,
         )
         if sys.platform == "win32":
@@ -304,6 +305,13 @@ class App:
             self.gui.set_model_health(target, False, str(e))
             _log(f"[probe.{target}] 失败: {e}")
 
+    def _reload_vocabulary(self):
+        self.polisher.dictionary.reload()
+        self.polisher.term_bank.load()
+
+    def _open_vocabulary_manager(self):
+        self.gui.open_vocabulary(self.config, self._reload_vocabulary)
+
     def _open_settings(self):
         self.gui.open_settings(
             self.config,
@@ -312,6 +320,7 @@ class App:
             on_bridge_rebind=self._on_bridge_port_rebind,
             app_version=APP_VERSION,
             on_check_update=self._on_check_update,
+            on_open_vocabulary=self._open_vocabulary_manager,
         )
 
     def _on_check_update(self):
@@ -606,23 +615,28 @@ class App:
         _log(
             f"[learn.batch] 共 {len(records)} 条，分 {n_batch} 次请求（每批最多 {chunk_size} 条合并为一次 API）"
         )
+        self.gui.set_learn_progress(0, n_batch, True)
         ok_marked = 0
-        for off in range(0, len(records), chunk_size):
-            chunk = records[off : off + chunk_size]
-            bi = off // chunk_size + 1
-            try:
-                if await self.polisher.learn_from_review_batch(chunk):
-                    ok_marked += len(chunk)
-                    for r in chunk:
-                        self.gui.mark_history_learn_ok(
-                            r["raw_text"], r["llm_text"], r["final_text"]
-                        )
-                    self.gui.set_model_health("learn", True, "学习调用成功")
-            except Exception as e:
-                _log(f"[learn.batch] 第 {bi}/{n_batch} 批失败（{len(chunk)} 条）: {e}")
-                self.gui.set_model_health("learn", False, str(e))
-            if off + chunk_size < len(records):
-                await asyncio.sleep(0.35)
+        try:
+            for off in range(0, len(records), chunk_size):
+                chunk = records[off : off + chunk_size]
+                bi = off // chunk_size + 1
+                self.gui.set_learn_progress(bi, n_batch, True)
+                try:
+                    if await self.polisher.learn_from_review_batch(chunk):
+                        ok_marked += len(chunk)
+                        for r in chunk:
+                            self.gui.mark_history_learn_ok(
+                                r["raw_text"], r["llm_text"], r["final_text"]
+                            )
+                        self.gui.set_model_health("learn", True, "学习调用成功")
+                except Exception as e:
+                    _log(f"[learn.batch] 第 {bi}/{n_batch} 批失败（{len(chunk)} 条）: {e}")
+                    self.gui.set_model_health("learn", False, str(e))
+                if off + chunk_size < len(records):
+                    await asyncio.sleep(0.35)
+        finally:
+            self.gui.set_learn_progress(0, 0, False)
         _log(f"[learn.batch] 结束 已标记={ok_marked}/{len(records)}")
 
     def _on_insert(self, payload: dict):
@@ -718,24 +732,30 @@ class App:
             }
             interval = max(0, int(self.config.learn_batch_interval or 0))
             if interval <= 0:
+                _log(
+                    "[learn.invoke] "
+                    f"raw_len={len(raw)} learn_llm_len={len(learn_llm)} "
+                    f"final_len={len(edited_text)} accepted={len(accepted)}"
+                    + (" no_diff_terms=1" if not has_edit_signal else "")
+                )
+                self.gui.set_learn_progress(1, 1, True)
+                ok_lv = False
                 try:
-                    _log(
-                        "[learn.invoke] "
-                        f"raw_len={len(raw)} learn_llm_len={len(learn_llm)} "
-                        f"final_len={len(edited_text)} accepted={len(accepted)}"
-                        + (" no_diff_terms=1" if not has_edit_signal else "")
-                    )
-                    if await self.polisher.learn_from_review(
+                    ok_lv = await self.polisher.learn_from_review(
                         raw_text=raw,
                         llm_text=learn_llm,
                         final_text=edited_text,
                         accepted_suggestions=accepted,
-                    ):
-                        self.gui.mark_history_learn_ok(raw, learn_llm, edited_text)
-                        self.gui.set_model_health("learn", True, "学习调用成功")
+                    )
                 except Exception as e:
                     _log(f"[自学习] 错误: {e}")
                     self.gui.set_model_health("learn", False, str(e))
+                else:
+                    if ok_lv:
+                        self.gui.mark_history_learn_ok(raw, learn_llm, edited_text)
+                        self.gui.set_model_health("learn", True, "学习调用成功")
+                finally:
+                    self.gui.set_learn_progress(0, 0, False)
             else:
                 self._learn_pending.append(rec)
                 self._save_learn_pending()

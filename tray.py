@@ -70,12 +70,14 @@ class SystemTray:
         on_quit: Optional[Callable] = None,
         on_debug_log: Optional[Callable] = None,
         on_check_update: Optional[Callable] = None,
+        on_vocabulary: Optional[Callable] = None,
         app_version: str = "",
     ):
         self._on_settings = on_settings
         self._on_quit = on_quit
         self._on_debug_log = on_debug_log
         self._on_check_update = on_check_update
+        self._on_vocabulary = on_vocabulary
         self._app_version = (app_version or "").strip()
         self._state = STATE_READY
         self._icon: Optional[pystray.Icon] = None
@@ -85,6 +87,8 @@ class SystemTray:
         items = []
         if self._on_settings:
             items.append(pystray.MenuItem("设置", lambda: self._on_settings()))
+        if self._on_vocabulary:
+            items.append(pystray.MenuItem("词库管理", lambda: self._on_vocabulary()))
         if self._on_check_update:
             items.append(pystray.MenuItem("检查更新", lambda: self._on_check_update()))
         if self._on_debug_log:

@@ -197,6 +197,48 @@ class TermBank:
             if self._log:
                 self._log(f"[terms] 保存失败: {e}")
 
+    def list_entries_sorted(self) -> list[TermEntry]:
+        return sorted(
+            self._by_key.values(),
+            key=lambda e: (-int(e.hits), e.last_ts, e.display),
+        )
+
+    def remove_display(self, display: str) -> bool:
+        k = _normalize_key((display or "").strip())
+        if not k or k not in self._by_key:
+            return False
+        del self._by_key[k]
+        return True
+
+    def upsert_manual(self, display: str) -> bool:
+        """手工添加/更新展示文案，命中至少为 1。"""
+        if not _term_ok(display):
+            return False
+        k = _normalize_key(display)
+        if not k:
+            return False
+        now = _utc_now_iso()
+        disp = display.strip()
+        if k in self._by_key:
+            e = self._by_key[k]
+            e.display = disp
+            e.last_ts = now
+        else:
+            self._by_key[k] = TermEntry(display=disp, hits=1, last_ts=now)
+        self._prune()
+        return True
+
+    def replace_from_json_terms(self, terms: list[dict]) -> None:
+        """由 GUI 批量写回（如撤销）；每项为 to_json 形状。"""
+        self._by_key.clear()
+        for item in terms:
+            ent = TermEntry.from_json(item)
+            if ent is None:
+                continue
+            k = _normalize_key(ent.display)
+            if k:
+                self._by_key[k] = ent
+
     @staticmethod
     def _appears_in_finals(display: str, finals: list[str]) -> bool:
         if not display or not finals:

@@ -13,6 +13,7 @@ import customtkinter as ctk
 
 from app_icon import apply_tk_window_icon
 from config import DICT_WRITE_MODES, Config
+from gui_text_bindings import bind_ctk_entry_standard, bind_ctk_subtree_standard, bind_ctk_textbox_standard
 from paths import app_root, resource_dir
 from hotkeys import validate_all_for_save
 from polish import LEARN_PROMPT, LEARN_SYSTEM_DEFAULT, SYSTEM_PROMPT, Suggestion
@@ -88,6 +89,11 @@ class DebugLogWindow:
         ctk.CTkButton(bf, text="关闭", width=72, command=self._close).pack(side="left")
         self._load_once()
         self._schedule_tick()
+        try:
+            if self._tb is not None:
+                bind_ctk_textbox_standard(self._tb, self._win, read_only=True)
+        except Exception:
+            pass
 
     def _load_once(self):
         if self._tb is None:
@@ -176,6 +182,8 @@ class ReviewWindow:
         self._llm_text: str = ""
         self._suggestions: list[Suggestion] = []
         self._accepted_ids: set[str] = set()
+        self._final_editable_mode: bool = False
+        self._learn_prog_label: Optional[ctk.CTkLabel] = None
 
     def set_learn_when_no_diff_getter(self, fn: Optional[Callable[[], bool]]) -> None:
         """与 main 侧 learn_when_no_diff 同步，用于历史菜单批量学习的筛选条件。"""
@@ -218,12 +226,12 @@ class ReviewWindow:
 
         screen_w = self._window.winfo_screenwidth()
         screen_h = self._window.winfo_screenheight()
-        w, h = 560, 380
+        w, h = 560, 440
         x = screen_w - w - 30
         y = screen_h - h - 80
         self._window.geometry(f"{w}x{h}+{x}+{y}")
         self._window.resizable(True, True)
-        self._window.minsize(460, 340)
+        self._window.minsize(460, 360)
 
         self._window.protocol("WM_DELETE_WINDOW", self.hide)
         self._window.bind("<Escape>", lambda _: self.hide())
@@ -235,14 +243,24 @@ class ReviewWindow:
         if icon is not None:
             self._window.iconphoto(True, icon)
 
+        status_row = ctk.CTkFrame(self._window, fg_color="transparent")
+        status_row.pack(pady=(10, 4), padx=14, fill="x")
         self._status_label = ctk.CTkLabel(
-            self._window,
+            status_row,
             text="",
             font=ctk.CTkFont(size=13, weight="bold"),
             anchor="w",
             text_color="#3370FF",
         )
-        self._status_label.pack(pady=(10, 4), padx=14, fill="x")
+        self._status_label.pack(side="left", fill="x", expand=True)
+        self._learn_prog_label = ctk.CTkLabel(
+            status_row,
+            text="",
+            font=ctk.CTkFont(size=12, weight="bold"),
+            anchor="e",
+            text_color="#FF7D00",
+        )
+        self._learn_prog_label.pack(side="right", padx=(8, 0))
 
         ctk.CTkLabel(
             self._window,
@@ -256,7 +274,7 @@ class ReviewWindow:
             self._window,
             font=ctk.CTkFont(size=14),
             wrap="word",
-            height=150,
+            height=140,
             fg_color="#FFFFFF",
             text_color="#1D2129",
             border_width=1,
@@ -264,6 +282,8 @@ class ReviewWindow:
             corner_radius=8,
         )
         self._final_box.pack(fill="x", padx=12, pady=(2, 8))
+        bind_ctk_textbox_standard(self._final_box, self._window, read_only=False)
+        self._final_box._textbox.bind("<KeyPress>", self._final_key_press, add="+")
 
         btn_frame = ctk.CTkFrame(self._window, fg_color="transparent")
         btn_frame.pack(fill="x", padx=12, pady=(0, 8))
@@ -318,13 +338,64 @@ class ReviewWindow:
 
         self._suggestions_frame = ctk.CTkScrollableFrame(
             self._window,
-            height=80,
+            height=160,
             fg_color="#FFFFFF",
             corner_radius=8,
             border_width=1,
             border_color="#E5E6EB",
         )
-        self._suggestions_frame.pack(fill="x", expand=False, padx=12, pady=(2, 10))
+        self._suggestions_frame.pack(fill="both", expand=True, padx=12, pady=(2, 10))
+
+    def set_learn_progress(self, current: int, total: int, active: bool) -> None:
+        lb = self._learn_prog_label
+        if lb is None:
+            return
+        if active and total > 0:
+            cur = max(0, min(current, total))
+            lb.configure(text=f"学习 {cur}/{total}", text_color="#FF7D00")
+        else:
+            lb.configure(text="", text_color="#FF7D00")
+
+    def _final_key_press(self, ev: tk.Event) -> str | None:
+        if self._final_editable_mode:
+            return None
+        st = ev.state or 0
+        if st & 0x4 and ev.keysym.lower() in ("c", "a"):
+            return None
+        if ev.keysym in (
+            "Left",
+            "Right",
+            "Up",
+            "Down",
+            "Home",
+            "End",
+            "Prior",
+            "Next",
+            "Shift_L",
+            "Shift_R",
+            "Control_L",
+            "Control_R",
+            "Alt_L",
+            "Alt_R",
+        ):
+            return None
+        if st & 0x4 and ev.keysym.lower() in ("v", "x"):
+            return "break"
+        if len(ev.char) == 1 and ev.char.isprintable():
+            return "break"
+        if ev.keysym in ("BackSpace", "Delete", "Return", "Tab", "space"):
+            return "break"
+        return None
+
+    def _scroll_final_to_end(self) -> None:
+        if not self._final_box:
+            return
+        try:
+            tw = self._final_box._textbox
+            tw.mark_set("insert", "end")
+            tw.see("insert")
+        except (tk.TclError, AttributeError):
+            pass
 
     # 以下接口由 GUIManager 在 GUI 线程调用
 
@@ -348,6 +419,7 @@ class ReviewWindow:
             return
         self._status_label.configure(text="手机输入中...", text_color="#3370FF")
         self._set_box_text(self._final_box, text, editable=False)
+        self._scroll_final_to_end()
 
     def show_processing(self):
         if not self._status_label or not self._window or not self._window.winfo_exists():
@@ -377,6 +449,7 @@ class ReviewWindow:
                 text_color="#00B578",
             )
         self._set_box_text(self._final_box, raw_text, editable=True)
+        self._scroll_final_to_end()
         self._render_suggestions()
         self._apply_suggestion_tags()
         self._insert_btn.configure(state="normal")
@@ -578,10 +651,16 @@ class ReviewWindow:
         return False
 
     def _set_box_text(self, box: ctk.CTkTextbox, text: str, editable: bool = False):
+        self._final_editable_mode = editable
+        tw = box._textbox
         box.configure(state="normal")
+        try:
+            tw.configure(undo=bool(editable), maxundo=120 if editable else 0)
+        except tk.TclError:
+            pass
         box.delete("1.0", "end")
         box.insert("1.0", text)
-        box.configure(state="normal" if editable else "disabled")
+        box.configure(state="normal")
 
     def _apply_suggestion_tags(self):
         if not self._final_box:
@@ -632,12 +711,14 @@ class ReviewWindow:
             row.pack(fill="x", pady=3, padx=2)
             from_text = suggestion.source or "(空)"
             to_text = suggestion.target or "(删除)"
+            wrap = 420
 
             ctk.CTkLabel(
                 row,
                 text=from_text,
                 anchor="w",
                 justify="left",
+                wraplength=wrap,
                 text_color="#86909C",
                 font=ctk.CTkFont(size=13),
             ).pack(side="left", fill="x", expand=True, padx=(8, 4), pady=6)
@@ -652,6 +733,7 @@ class ReviewWindow:
                 text=to_text,
                 anchor="w",
                 justify="left",
+                wraplength=wrap,
                 text_color="#00B578",
                 font=ctk.CTkFont(size=13, weight="bold"),
             ).pack(side="left", fill="x", expand=True, padx=(4, 8), pady=6)
@@ -709,6 +791,7 @@ class SettingsWindow:
         on_model_probe: Optional[Callable[[str, dict], None]] = None,
         app_version: str = "",
         on_check_update: Optional[Callable[[], None]] = None,
+        on_open_vocabulary: Optional[Callable[[], None]] = None,
     ):
         self._config = config
         self._on_save = on_save
@@ -719,6 +802,7 @@ class SettingsWindow:
         self._on_model_probe = on_model_probe
         self._app_version = (app_version or "").strip()
         self._on_check_update = on_check_update
+        self._on_open_vocabulary = on_open_vocabulary
         self._probe_status_bullets: dict[str, ctk.CTkLabel] = {}
         self._probe_detail_vars: dict[str, tk.StringVar] = {}
         self._suggest_key_visible = False
@@ -954,6 +1038,7 @@ class SettingsWindow:
             self._win.focus()
             return
 
+        self._probe_readonly_entries: list[ctk.CTkEntry] = []
         self._win = ctk.CTkToplevel(self._root)
         self._win.title("DoubaoTypeless 设置")
         self._win.geometry("620x820")
@@ -1170,6 +1255,7 @@ class SettingsWindow:
         )
         pe_s = self._make_copyable_line_entry(self._suggest_probe_row, self._probe_detail_vars["suggest"])
         pe_s.pack(side="left", fill="x", expand=True, padx=4)
+        self._probe_readonly_entries.append(pe_s)
         ctk.CTkButton(
             self._suggest_probe_row,
             text="复制状态",
@@ -1298,6 +1384,7 @@ class SettingsWindow:
         )
         pe_l = self._make_copyable_line_entry(self._learn_probe_row, self._probe_detail_vars["learn"])
         pe_l.pack(side="left", fill="x", expand=True, padx=4)
+        self._probe_readonly_entries.append(pe_l)
         ctk.CTkButton(
             self._learn_probe_row,
             text="复制状态",
@@ -1349,6 +1436,13 @@ class SettingsWindow:
         ctk.CTkLabel(dict_frame, text="对照表文件：").pack(side="left", padx=10)
         ctk.CTkLabel(dict_frame, text=self._config.dictionary_path,
                      text_color="#aaaaaa").pack(side="left", padx=5)
+        if self._on_open_vocabulary:
+            ctk.CTkButton(
+                dict_frame,
+                text="词库管理",
+                width=88,
+                command=self._on_open_vocabulary,
+            ).pack(side="right", padx=(4, 4))
         ctk.CTkButton(dict_frame, text="编辑", width=60,
                       command=self._open_dictionary).pack(side="right", padx=10)
 
@@ -1559,6 +1653,17 @@ class SettingsWindow:
         self._update_group_state("learn")
         self._llm_enabled_var.trace_add("write", lambda *_: self._update_group_state("suggest"))
         self._learn_enabled_var.trace_add("write", lambda *_: self._update_group_state("learn"))
+
+        try:
+            bind_ctk_subtree_standard(container, self._win)
+        except Exception:
+            pass
+        try:
+            for e_ent in self._probe_readonly_entries:
+                bind_ctk_entry_standard(e_ent, self._win, read_only=True)
+        except Exception:
+            pass
+        self.refresh_model_probe_labels()
 
     def _detect_provider(self, url: str) -> str:
         return detect_provider_name(url)
@@ -2013,6 +2118,20 @@ class GUIManager:
         self._update_dl_bar: Optional[ctk.CTkProgressBar] = None
         self._update_dl_label: Optional[ctk.CTkLabel] = None
 
+    def open_vocabulary(self, config: Config, on_saved: Callable[[], None]):
+        self._schedule(self._open_vocabulary_impl, config, on_saved)
+
+    def _open_vocabulary_impl(self, config: Config, on_saved: Callable[[], None]):
+        if self._root is None:
+            return
+        from gui_vocab import VocabularyManagerWindow
+
+        VocabularyManagerWindow(self._root, config, on_saved=on_saved).show()
+
+    def set_learn_progress(self, current: int, total: int, active: bool):
+        if self._review:
+            self._schedule(self._review.set_learn_progress, current, total, active)
+
     def open_update_download_progress(
         self, tag: str, ready: Optional[threading.Event] = None
     ):
@@ -2254,6 +2373,7 @@ class GUIManager:
         on_bridge_rebind: Optional[Callable[[int], None]] = None,
         app_version: str = "",
         on_check_update: Optional[Callable[[], None]] = None,
+        on_open_vocabulary: Optional[Callable[[], None]] = None,
     ):
         self._schedule(
             self._open_settings_impl,
@@ -2263,6 +2383,7 @@ class GUIManager:
             on_bridge_rebind,
             app_version,
             on_check_update,
+            on_open_vocabulary,
         )
 
     def _open_settings_impl(
@@ -2273,6 +2394,7 @@ class GUIManager:
         on_bridge_rebind: Optional[Callable[[int], None]] = None,
         app_version: str = "",
         on_check_update: Optional[Callable[[], None]] = None,
+        on_open_vocabulary: Optional[Callable[[], None]] = None,
     ):
         if self._settings and self._settings._win and self._settings._win.winfo_exists():
             self._settings._win.lift()
@@ -2290,6 +2412,7 @@ class GUIManager:
             on_model_probe=self._forward_model_probe,
             app_version=app_version,
             on_check_update=on_check_update,
+            on_open_vocabulary=on_open_vocabulary,
         )
         self._settings.show()
 
