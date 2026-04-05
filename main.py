@@ -448,7 +448,7 @@ class App:
                 root = self.gui._root
                 if root is not None:
                     try:
-                        root.after(2200, self._quit)
+                        root.after(2800, self._quit)
                     except Exception:
                         self._quit()
                 else:

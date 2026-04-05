@@ -217,13 +217,22 @@ async def download_to_path(
         raise
 
 
-def write_update_bat(current_exe: Path, downloaded_exe: Path) -> Path:
+def write_update_bat(
+    current_exe: Path,
+    downloaded_exe: Path,
+    *,
+    wait_pid: int | None = None,
+) -> Path:
     """当前进程退出后：删旧 exe，把新文件 move 成同名并启动。
 
     PyInstaller 单文件退出后仍会短暂占用/清理 %TEMP%\\_MEI*；若立刻 start 新版本，bootloader
     可能在不完整环境下加载 python*.dll，出现「Failed to load Python DLL / 找不到指定的模块」。
-    因此在 tasklist 不再列出本 exe 后**再额外等待数秒**，并用 PowerShell Start-Process 拉起进程
-    （失败时回退到 cmd start）。
+    因此用 **主进程 PID**（wait_pid）轮询直至进程消失，再等待数秒，然后替换并 **cmd start** 拉起
+    （失败时再试 PowerShell Start-Process）。
+
+    注意：旧版仅用 ``tasklist | find`` 且写 ``if %%errorlevel%%==0`` 会在批解析阶段踩到 **errorlevel 展开时机**
+    错误，表现为「进程未退就开始 del/move」。此处等待循环改为 **if errorlevel 1** 与 PowerShell
+    Get-Process，避免误判。
 
     关键步骤追加到 exe 同目录下的 ``update.log`` 与 ``debug.log``，便于排查「下载成功但未替换」。
     ``move`` 等失败时复制本脚本为 ``_DoubaoTypeless_update_failed.bat`` 并 **exit /b 1**，不删除自身。
@@ -233,6 +242,7 @@ def write_update_bat(current_exe: Path, downloaded_exe: Path) -> Path:
     cur = str(current_exe.resolve())
     newf = str(downloaded_exe.resolve())
     exe_dir = str(current_exe.parent.resolve())
+    pid = int(wait_pid) if wait_pid is not None and wait_pid > 0 else 0
     # 批处理里路径用引号；% 在 bat 中有含义，替换为 %%
     cur_esc = cur.replace("%", "%%")
     new_esc = newf.replace("%", "%%")
@@ -252,16 +262,30 @@ def write_update_bat(current_exe: Path, downloaded_exe: Path) -> Path:
                 f'set "DT_LOG_DIR={dir_set}"',
                 'set "LOGU=%DT_LOG_DIR%\\update.log"',
                 'set "LOGD=%DT_LOG_DIR%\\debug.log"',
+                f'set "WAIT_PID={pid}"',
                 'call :ulog "update bat started"',
-                "timeout /t 6 /nobreak >nul",
+                "timeout /t 2 /nobreak >nul",
+                'if not "!WAIT_PID!"=="0" (',
+                '  call :ulog "waiting for main PID !WAIT_PID! to exit (PowerShell Get-Process)"',
+                "  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \""
+                "while ($null -ne (Get-Process -Id ([int]$env:WAIT_PID) -ErrorAction SilentlyContinue)) "
+                "{ Start-Sleep -Seconds 1 }\"",
+                "  if errorlevel 1 (",
+                '    call :ulog "WARN PowerShell wait failed, fallback tasklist by exe name"',
+                "    goto wait_img",
+                "  )",
+                "  goto wait_after",
+                ")",
+                ":wait_img",
                 ":wait",
                 f'tasklist /FI "IMAGENAME eq {exe_name}" 2>nul | find /I "{exe_name}" >nul',
-                "if %errorlevel%==0 (",
-                "  timeout /t 1 /nobreak >nul",
-                "  goto wait",
-                ")",
-                'call :ulog "old process gone, waiting 8s for _MEI cleanup"',
-                "timeout /t 8 /nobreak >nul",
+                "if errorlevel 1 goto wait_done",
+                "timeout /t 1 /nobreak >nul",
+                "goto wait",
+                ":wait_done",
+                ":wait_after",
+                'call :ulog "old process gone, waiting 10s for _MEI / file handle release"',
+                "timeout /t 10 /nobreak >nul",
                 'call :ulog "deleting old exe (retry on lock)"',
                 'set "DEL_N=0"',
                 ":del_old",
@@ -302,21 +326,24 @@ def write_update_bat(current_exe: Path, downloaded_exe: Path) -> Path:
                 "timeout /t 4 /nobreak >nul",
                 f'set "DT_RESTART_EXE={cur_set}"',
                 f'set "DT_RESTART_DIR={dir_set}"',
-                'call :ulog "starting new process via PowerShell Start-Process"',
-                "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \""
-                "try { "
-                "Start-Process -LiteralPath $env:DT_RESTART_EXE -WorkingDirectory $env:DT_RESTART_DIR; "
-                "exit 0 "
-                "} catch { exit 1 }\"",
+                'call :ulog "starting new process via cmd start /D (working dir + exe)"',
+                f'cd /d "{dir_esc}"',
                 "if errorlevel 1 (",
-                '  call :ulog "PowerShell Start-Process failed, trying cmd start"',
-                f'  cd /d "{dir_esc}"',
+                '  call :ulog "ERROR cd to app dir failed"',
+                f"  {failed_copy}",
+                "  exit /b 1",
+                ")",
+                f'start "" /D "{dir_esc}" "{cur_esc}"',
+                "if errorlevel 1 (",
+                '  call :ulog "WARN cmd start returned errorlevel, trying PowerShell Start-Process"',
+                "  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \""
+                "try { Start-Process -LiteralPath $env:DT_RESTART_EXE "
+                "-WorkingDirectory $env:DT_RESTART_DIR; exit 0 } catch { exit 1 }\"",
                 "  if errorlevel 1 (",
-                '    call :ulog "ERROR cd to app dir failed"',
+                '    call :ulog "ERROR both start and PowerShell failed"',
                 f"    {failed_copy}",
                 "    exit /b 1",
                 "  )",
-                f'  start "" "{cur_esc}"',
                 ")",
                 'call :ulog "update script finished OK, removing bat"',
                 "endlocal",
@@ -477,7 +504,7 @@ async def execute_frozen_exe_update(
             pass
         return "下载文件异常（过小或不存在），已放弃更新。"
 
-    bat = write_update_bat(current, dest)
+    bat = write_update_bat(current, dest, wait_pid=os.getpid())
     if not launch_update_bat(bat, log=log):
         return "无法启动更新脚本，请手动关闭程序后替换 exe。"
 
