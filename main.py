@@ -17,11 +17,17 @@ from pathlib import Path
 
 from app_version import APP_VERSION
 from bridge import PhoneBridge
-from config import Config
+from config import Config, api_key_for_http_header
 from paths import app_root
 from gui import GUIManager
 from hotkeys import GlobalHotkeyService, build_bindings
-from polish import PolishConfig, TextPolisher, effective_chat_temperature, openai_compat_base_url
+from polish import (
+    PolishConfig,
+    TextPolisher,
+    effective_chat_temperature,
+    openai_compat_base_url,
+    zhipu_coding_openai_model_id,
+)
 from tray import STATE_PROCESSING, STATE_READY, STATE_RECORDING, SystemTray
 from typer import Typer
 
@@ -255,10 +261,17 @@ class App:
         import httpx
 
         url = (cfg.get("base_url") or "").strip()
-        key = (cfg.get("api_key") or "").strip()
+        key = api_key_for_http_header(str(cfg.get("api_key") or ""))
         model = (cfg.get("model") or "").strip()
-        if not url or not key or not model:
+        if not url or not model:
             self.gui.set_model_health(target, False, "请填写 Base URL、Key、Model")
+            return
+        if not key:
+            self.gui.set_model_health(
+                target,
+                False,
+                "API Key 为空或疑似误粘贴了终端报错，请清空 Key 后只粘贴密钥。",
+            )
             return
         norm = openai_compat_base_url(url)
         base_root = norm or url.strip()
@@ -277,33 +290,48 @@ class App:
             return None
 
         temp = effective_chat_temperature(url, _probe_temp_override())
+        model_send = zhipu_coding_openai_model_id(model, url)
         try:
             payload = {
-                "model": model,
+                "model": model_send,
                 "messages": [{"role": "user", "content": "ok"}],
                 "max_tokens": 2,
                 "temperature": temp,
             }
-            # 与 polish 学习请求一致：ASCII 转义 JSON + UTF-8 字节体，避免部分环境下非 ASCII 触发 ascii codec
-            body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
             async with httpx.AsyncClient(
                 base_url=base,
                 headers={
                     "Authorization": f"Bearer {key}",
-                    "Content-Type": "application/json; charset=utf-8",
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
                 },
                 timeout=httpx.Timeout(20.0, connect=12.0),
             ) as client:
-                r = await client.post(
-                    "chat/completions",
-                    content=body,
-                )
+                r = await client.post("chat/completions", json=payload)
                 r.raise_for_status()
             self.gui.set_model_health(target, True, "探测成功")
             _log(f"[probe.{target}] 模型探测成功")
+        except httpx.HTTPStatusError as e:
+            msg = str(e)
+            resp = e.response
+            if resp is not None:
+                try:
+                    tb = (resp.text or "").strip().replace("\r\n", " ").replace("\n", " ")
+                    if tb:
+                        msg += f"\nHTTP 响应正文(截断): {tb[:400]}"
+                except Exception:
+                    pass
+            if "401" in msg and "open.bigmodel.cn" in url.lower():
+                msg += (
+                    "\n\n智谱 401：核对开放平台 API Key（整段 id.secret，勿加 Bearer）。"
+                    "若用 Ctrl+V 粘贴后鉴权失败，可能是快捷键重复插入（已修复），请清空 Key 后重贴。"
+                )
+            self.gui.set_model_health(target, False, msg)
+            _log(f"[probe.{target}] 失败: {msg}")
         except Exception as e:
-            self.gui.set_model_health(target, False, str(e))
-            _log(f"[probe.{target}] 失败: {e}")
+            msg = str(e)
+            self.gui.set_model_health(target, False, msg)
+            _log(f"[probe.{target}] 失败: {msg}")
 
     def _reload_vocabulary(self):
         self.polisher.dictionary.reload()

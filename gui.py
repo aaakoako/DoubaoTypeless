@@ -17,7 +17,7 @@ from gui_text_bindings import bind_ctk_entry_standard, bind_ctk_subtree_standard
 from paths import app_root, resource_dir
 from hotkeys import validate_all_for_save
 from polish import LEARN_PROMPT, LEARN_SYSTEM_DEFAULT, SYSTEM_PROMPT, Suggestion
-from providers_registry import LLM_PROVIDERS, detect_provider_name
+from providers_registry import LLM_PROVIDERS, detect_provider_name, provider_billing_hint
 
 _external_logger: Optional[Callable[[str], None]] = None
 
@@ -1161,6 +1161,15 @@ class SettingsWindow:
         # --- 前台纠错建议 ---
         ctk.CTkLabel(container, text="前台纠错建议", font=ctk.CTkFont(size=13, weight="bold"),
                      text_color="#888888", anchor="w").pack(fill="x", padx=10, pady=(12, 2))
+        ctk.CTkLabel(
+            container,
+            text="前台与后台可各选一套模型。厂商若分「Coding/编码套餐」与「开放平台按量」，请在下拉中选不同 Provider；分桶保存的 Key 互不覆盖。",
+            text_color="#777777",
+            font=ctk.CTkFont(size=11),
+            anchor="w",
+            justify="left",
+            wraplength=520,
+        ).pack(fill="x", padx=10, pady=(0, 6))
 
         llm_toggle_frame = ctk.CTkFrame(container)
         llm_toggle_frame.pack(fill="x", padx=10, pady=4)
@@ -1196,6 +1205,17 @@ class SettingsWindow:
             width=180,
         )
         self._provider_menu.pack(side="left", padx=5)
+
+        self._suggest_billing_label = ctk.CTkLabel(
+            container,
+            text="",
+            text_color="#888888",
+            font=ctk.CTkFont(size=11),
+            anchor="w",
+            justify="left",
+            wraplength=520,
+        )
+        self._suggest_billing_label.pack(fill="x", padx=(22, 10), pady=(0, 4))
 
         key_frame = ctk.CTkFrame(container)
         key_frame.pack(fill="x", padx=10, pady=4)
@@ -1320,6 +1340,17 @@ class SettingsWindow:
             width=180,
         ).pack(side="left", padx=5)
 
+        self._learn_billing_label = ctk.CTkLabel(
+            container,
+            text="",
+            text_color="#888888",
+            font=ctk.CTkFont(size=11),
+            anchor="w",
+            justify="left",
+            wraplength=520,
+        )
+        self._learn_billing_label.pack(fill="x", padx=(22, 10), pady=(0, 4))
+
         learn_key_frame = ctk.CTkFrame(container)
         learn_key_frame.pack(fill="x", padx=10, pady=4)
         ctk.CTkLabel(learn_key_frame, text="API Key：").pack(side="left", padx=10)
@@ -1392,6 +1423,9 @@ class SettingsWindow:
             command=lambda: self._copy_probe_line("learn"),
         ).pack(side="left", padx=4)
         self._probe_status_bullets["learn"] = bl_l
+
+        self._refresh_provider_billing_hint("suggest")
+        self._refresh_provider_billing_hint("learn")
 
         learn_batch_frame = ctk.CTkFrame(container)
         learn_batch_frame.pack(fill="x", padx=10, pady=4)
@@ -1668,6 +1702,18 @@ class SettingsWindow:
     def _detect_provider(self, url: str) -> str:
         return detect_provider_name(url)
 
+    def _refresh_provider_billing_hint(self, target: str):
+        pv = self._get_var(target, "provider")
+        lb = (
+            self._suggest_billing_label
+            if target == "suggest"
+            else getattr(self, "_learn_billing_label", None)
+        )
+        if pv is None or lb is None:
+            return
+        hint = provider_billing_hint(pv.get())
+        lb.configure(text=hint if hint else " ")
+
     def _on_provider_changed(self, choice: str, target: str):
         if target == "suggest":
             self._suggest_keys_by_provider[self._prev_suggest_provider] = (
@@ -1713,6 +1759,8 @@ class SettingsWindow:
                 self._flash_settings_status(
                     "该厂商尚未保存过 API Key，请填写", "#FF9800"
                 )
+
+        self._refresh_provider_billing_hint(target)
 
     def _get_var(self, target: str, kind: str):
         attr_map = {
