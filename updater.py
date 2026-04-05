@@ -248,7 +248,7 @@ def write_update_bat(current_exe: Path, downloaded_exe: Path) -> Path:
             [
                 "@echo off",
                 "chcp 65001 >nul",
-                "setlocal",
+                "setlocal EnableDelayedExpansion",
                 f'set "DT_LOG_DIR={dir_set}"',
                 'set "LOGU=%DT_LOG_DIR%\\update.log"',
                 'set "LOGD=%DT_LOG_DIR%\\debug.log"',
@@ -262,16 +262,37 @@ def write_update_bat(current_exe: Path, downloaded_exe: Path) -> Path:
                 ")",
                 'call :ulog "old process gone, waiting 8s for _MEI cleanup"',
                 "timeout /t 8 /nobreak >nul",
-                'call :ulog "deleting old exe"',
+                'call :ulog "deleting old exe (retry on lock)"',
+                'set "DEL_N=0"',
+                ":del_old",
+                f'if not exist "{cur_esc}" goto del_old_done',
                 f'del /f /q "{cur_esc}" 2>nul',
-                f'if exist "{cur_esc}" call :ulog "WARN old exe still exists after del"',
-                'call :ulog "moving new exe into place"',
-                f'move /y "{new_esc}" "{cur_esc}"',
-                "if errorlevel 1 (",
-                '  call :ulog "ERROR move failed (file lock, path, or permissions)"',
+                f'if not exist "{cur_esc}" goto del_old_done',
+                "set /a DEL_N+=1",
+                "if !DEL_N! geq 36 goto del_old_fail",
+                'call :ulog "WARN old exe locked, retry !DEL_N!/35 in 2s"',
+                "timeout /t 2 /nobreak >nul",
+                "goto del_old",
+                ":del_old_fail",
+                'call :ulog "ERROR del old failed after retries (AV/sync holding file?)"',
                 f"  {failed_copy}",
                 "  exit /b 1",
-                ")",
+                ":del_old_done",
+                'call :ulog "moving new exe into place (retry on lock)"',
+                'set "MV_N=0"',
+                ":mv_new",
+                f'move /y "{new_esc}" "{cur_esc}"',
+                "if not errorlevel 1 goto mv_ok",
+                "set /a MV_N+=1",
+                "if !MV_N! geq 26 goto mv_fail",
+                'call :ulog "WARN move failed, retry !MV_N!/25 in 2s"',
+                "timeout /t 2 /nobreak >nul",
+                "goto mv_new",
+                ":mv_fail",
+                'call :ulog "ERROR move failed after retries"',
+                f"  {failed_copy}",
+                "  exit /b 1",
+                ":mv_ok",
                 f'if not exist "{cur_esc}" (',
                 '  call :ulog "ERROR target exe missing after move"',
                 f"  {failed_copy}",
@@ -314,16 +335,43 @@ def write_update_bat(current_exe: Path, downloaded_exe: Path) -> Path:
     return bat
 
 
-def launch_update_bat(bat: Path) -> bool:
+def _win32_updater_creation_flags() -> int:
+    """
+    PyInstaller onefile 在 Windows 上常把进程放进 Job Object，并在主进程退出时结束同 Job 内子进程。
+    若更新脚本由 cmd 以默认方式拉起，会在「主程序已关、尚未删旧 exe」阶段被一并杀掉，表现为下载后无下文。
+    CREATE_BREAKAWAY_FROM_JOB 让 cmd 脱离该 Job，更新批处理才能跑完。参见 Win32 Job Objects 与 PyInstaller 行为。
+    """
+    if sys.platform != "win32":
+        return 0
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    flags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    flags |= getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0x01000000)
+    return flags
+
+
+def launch_update_bat(bat: Path, *, log: Callable[[str], Any] | None = None) -> bool:
     try:
-        subprocess.Popen(
-            ["cmd.exe", "/c", str(bat)],
-            cwd=str(bat.parent),
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            close_fds=True,
-        )
+        bat = bat.resolve()
+        cwd = str(bat.parent.resolve())
+        kw: dict[str, Any] = {
+            "args": ["cmd.exe", "/c", str(bat)],
+            "cwd": cwd,
+            "close_fds": True,
+            "stdin": subprocess.DEVNULL,
+            "stdout": subprocess.DEVNULL,
+            "stderr": subprocess.DEVNULL,
+        }
+        if sys.platform == "win32":
+            kw["creationflags"] = _win32_updater_creation_flags()
+        subprocess.Popen(**kw)
+        if log:
+            log(
+                "[update] 已启动后台更新脚本（CREATE_BREAKAWAY_FROM_JOB，避免随主进程被 Job 结束）"
+            )
         return True
-    except Exception:
+    except Exception as e:
+        if log:
+            log(f"[update] 启动更新脚本失败: {e}")
         return False
 
 
@@ -430,7 +478,7 @@ async def execute_frozen_exe_update(
         return "下载文件异常（过小或不存在），已放弃更新。"
 
     bat = write_update_bat(current, dest)
-    if not launch_update_bat(bat):
+    if not launch_update_bat(bat, log=log):
         return "无法启动更新脚本，请手动关闭程序后替换 exe。"
 
     return f"[EXIT] 已下载 {tag}，即将退出以完成更新（请勿手动删 {dest.name}）。"
