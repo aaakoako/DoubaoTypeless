@@ -12,6 +12,11 @@ dist/
 venv/
 .env
 .env.*
+.agents/
+.claude/
+.pi/
+CLAUDE.md
+
 
 # 工具与 IDE（个人环境不上传）
 .vscode/
