@@ -226,6 +226,8 @@ class App:
                 learn_system_prompt=self.config.learn_system_prompt,
                 learn_user_prompt=self.config.learn_user_prompt,
                 dict_write_mode=self.config.dict_write_mode,
+                dict_conflict_policy=self.config.dict_conflict_policy,
+                dict_suggestions_pending_path=self.config.dict_suggestions_pending_path,
                 dict_auto_min_confidence=self.config.dict_auto_min_confidence,
                 dict_auto_max_pairs=self.config.dict_auto_max_pairs,
                 dict_block_regexes=self.config.dict_block_regexes,
@@ -850,7 +852,7 @@ class App:
         )
         _log(
             f"  纠错对照表: {self.config.dictionary_path} ({len(self.polisher.dictionary._mappings)} 条) "
-            f"学习后自动追加={'开' if (self.config.dict_write_mode or '').lower() == 'auto' else '关'}"
+            f"学习后写对照表={ (self.config.dict_write_mode or 'off').strip().lower() }"
         )
         _log(f"  日志文件: {_LOG_PATH}")
         if self._redact_logs:

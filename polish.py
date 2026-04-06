@@ -8,6 +8,7 @@ import json
 import re
 import shutil
 import time
+import uuid
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -386,6 +387,8 @@ class PolishConfig:
     learn_temperature: float | None = None
 
     dict_write_mode: str = "off"
+    dict_conflict_policy: str = "pending"
+    dict_suggestions_pending_path: str = "./data/dict_suggestions_pending.json"
     dict_auto_min_confidence: float = 0.0
     dict_auto_max_pairs: int = 8
     dict_block_regexes: str = ""
@@ -427,7 +430,7 @@ class SuggestionBatch:
 # 新文件无可对照表头时使用（与仓库 data/dictionary.txt 说明一致）
 DEFAULT_DICTIONARY_HEADER_LINES: tuple[str, ...] = (
     "# 纠错对照表 = 误听/误写 → 正确写法（不是「纯名词表」）",
-    "# - 学习流水 learning_samples.jsonl 里，后台模型输出的 candidate_pairs 经规则筛选后可自动追加到本文件（若开启「学习后写对照表」）",
+    "# - 学习结果：auto 模式可自动追加；confirm 或冲突时先进 dict_suggestions_pending.json，词库管理「待确认对照」采纳后再写入",
     "# - 前台纠错时整表作为提示参考，不做运行时硬替换",
     "# 格式：误识形式=正确形式（每行一条）；# 为注释",
     "",
@@ -477,6 +480,35 @@ def write_dictionary_file(
     out: list[str] = [h.rstrip("\n\r") for h in heads]
     out.extend(f"{w}={c}" for w, c in pairs)
     p.write_text("\n".join(out) + "\n", encoding="utf-8")
+
+
+def load_dict_suggestions_pending(path: str | Path) -> list[dict]:
+    """学习建议待确认队列（JSON 数组）；损坏或非数组时返回空列表。"""
+    p = Path(path)
+    if not p.exists():
+        return []
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    if not isinstance(data, list):
+        return []
+    out: list[dict] = []
+    for x in data:
+        if not isinstance(x, dict):
+            continue
+        w = str(x.get("wrong", "")).strip()
+        c = str(x.get("correct", "")).strip()
+        if not w or not c:
+            continue
+        out.append(x)
+    return out
+
+
+def save_dict_suggestions_pending(path: str | Path, items: list[dict]) -> None:
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 class Dictionary:
@@ -582,20 +614,18 @@ class TextPolisher:
             return False
         return True
 
-    def _auto_append_dictionary_from_learn(self, parsed: dict) -> None:
-        mode = (self.config.dict_write_mode or "off").strip().lower()
-        if mode != "auto":
-            return
+    def _learn_pair_candidates(
+        self, parsed: dict
+    ) -> list[tuple[str, str, float | None]]:
+        """从学习解析结果中筛出可进入对照表流程的候选（不含「是否已存在于词典」判断）。"""
         raw_pairs = parsed.get("candidate_pairs") or []
         if not isinstance(raw_pairs, list):
-            return
+            return []
         max_n = max(1, min(50, int(self.config.dict_auto_max_pairs or 8)))
         patterns = self._compile_block_patterns()
-        dict_path = Path(self.config.dictionary_path)
-        existing_wrong = {w for w, _ in self.dictionary._mappings}
-        to_add: list[tuple[str, str]] = []
+        out: list[tuple[str, str, float | None]] = []
         for item in raw_pairs:
-            if len(to_add) >= max_n:
+            if len(out) >= max_n:
                 break
             if not isinstance(item, dict):
                 continue
@@ -607,12 +637,34 @@ class TextPolisher:
                 continue
             if not self._pair_passes_block_regexes(wrong, correct, patterns):
                 continue
-            if wrong in existing_wrong:
-                continue
-            to_add.append((wrong, correct))
-            existing_wrong.add(wrong)
+            out.append((wrong, correct, conf_f))
+        return out
+
+    @staticmethod
+    def _make_pending_suggestion_row(
+        wrong: str,
+        correct: str,
+        conf_f: float | None,
+        sample_id: str,
+        reason: str,
+        ts: str,
+    ) -> dict:
+        row: dict = {
+            "id": str(uuid.uuid4()),
+            "ts": ts,
+            "wrong": wrong,
+            "correct": correct,
+            "sample_id": sample_id,
+            "reason": reason,
+        }
+        if conf_f is not None:
+            row["confidence"] = conf_f
+        return row
+
+    def _flush_auto_dictionary_append(self, to_add: list[tuple[str, str]]) -> None:
         if not to_add:
             return
+        dict_path = Path(self.config.dictionary_path)
         dict_path.parent.mkdir(parents=True, exist_ok=True)
         backup = dict_path.with_name(dict_path.name + ".bak")
         try:
@@ -633,6 +685,65 @@ class TextPolisher:
             "[dict.auto] "
             f"对照表追加 appended={len(to_add)} path='{dict_path}' backup='{backup.name}'"
         )
+
+    def _flush_pending_suggestions(self, rows: list[dict]) -> None:
+        if not rows:
+            return
+        path = Path(self.config.dict_suggestions_pending_path)
+        cur = load_dict_suggestions_pending(path)
+        cur.extend(rows)
+        save_dict_suggestions_pending(path, cur)
+        self._log(f"[dict.pending] 追加 {len(rows)} 条 path='{path}'")
+
+    def route_dictionary_pairs(self, parsed: dict, sample_id: str) -> None:
+        """
+        dict_write_mode:
+          off — 不写对照表、不追加待确认
+          auto — 新 wrong 直接追加；同 wrong 不同 correct 依 dict_conflict_policy
+          confirm — 候选全部进入待确认 JSON，由词库管理采纳
+        """
+        mode = (self.config.dict_write_mode or "off").strip().lower()
+        if mode == "off":
+            return
+        candidates = self._learn_pair_candidates(parsed)
+        if not candidates:
+            return
+        wmap: dict[str, str] = {}
+        for w, c in self.dictionary._mappings:
+            wmap[w] = c
+        policy = (self.config.dict_conflict_policy or "pending").strip().lower()
+        if policy not in ("skip", "pending"):
+            policy = "pending"
+        ts = datetime.now().isoformat(timespec="seconds")
+        pending_rows: list[dict] = []
+        auto_rows: list[tuple[str, str]] = []
+        for wrong, correct, conf_f in candidates:
+            if mode == "confirm":
+                pending_rows.append(
+                    self._make_pending_suggestion_row(
+                        wrong, correct, conf_f, sample_id, "confirm_mode", ts
+                    )
+                )
+                continue
+            if wrong not in wmap:
+                auto_rows.append((wrong, correct))
+                wmap[wrong] = correct
+                continue
+            if wmap[wrong] == correct:
+                continue
+            if policy == "pending":
+                pending_rows.append(
+                    self._make_pending_suggestion_row(
+                        wrong, correct, conf_f, sample_id, "conflict", ts
+                    )
+                )
+            else:
+                self._log(
+                    "[dict.auto] 冲突跳过 "
+                    f"wrong={wrong!r} 已有={wmap[wrong]!r} 新={correct!r}"
+                )
+        self._flush_auto_dictionary_append(auto_rows)
+        self._flush_pending_suggestions(pending_rows)
 
     @staticmethod
     def _preview(text: str, limit: int = 80) -> str:
@@ -1082,10 +1193,12 @@ class TextPolisher:
             raise LearnJsonError("empty learn model content")
 
         ts = datetime.now().isoformat(timespec="seconds")
+        sample_id = str(uuid.uuid4())
         if n_items == 1:
             r0 = norm[0]
             self._append_learning_sample(
                 {
+                    "sample_id": sample_id,
                     "ts": ts,
                     "raw_text": r0["raw_text"],
                     "llm_text": r0["llm_text"],
@@ -1097,6 +1210,7 @@ class TextPolisher:
         else:
             self._append_learning_sample(
                 {
+                    "sample_id": sample_id,
                     "ts": ts,
                     "batch": True,
                     "item_count": n_items,
@@ -1108,14 +1222,16 @@ class TextPolisher:
             "[learn.sample_saved] "
             f"path='{self.config.learning_samples_path}' "
             f"http_status={resp.status_code} elapsed_ms={elapsed_ms} "
-            f"items={n_items} user_chars={len(user_json)} "
+            f"items={n_items} sample_id={sample_id} user_chars={len(user_json)} "
             f"candidate_pairs={len(parsed.get('candidate_pairs', []))}"
         )
-        self._auto_append_dictionary_from_learn(parsed)
+        self.route_dictionary_pairs(parsed, sample_id)
         self.term_bank.merge_from_learn_parsed(parsed)
         return True
 
     def _append_learning_sample(self, sample: dict):
+        if not sample.get("sample_id"):
+            sample = {**sample, "sample_id": str(uuid.uuid4())}
         path = Path(self.config.learning_samples_path)
         with open(path, "a", encoding="utf-8") as f:
             f.write(json.dumps(sample, ensure_ascii=False) + "\n")

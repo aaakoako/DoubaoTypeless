@@ -16,5 +16,5 @@ jobs:
           python-version: "3.11"
       - name: Syntax check
         run: |
-          python -m py_compile main.py paths.py bridge.py gui.py polish.py config.py \
-            hotkeys.py typer.py app_icon.py windows_startup.py term_bank.py
+          python -m py_compile main.py paths.py bridge.py gui.py gui_vocab.py polish.py config.py \
+            hotkeys.py typer.py app_icon.py windows_startup.py term_bank.py providers_registry.py updater.py

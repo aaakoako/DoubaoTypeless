@@ -8,8 +8,10 @@ from providers_registry import detect_provider_name
 CONFIG_DIR = app_root()
 CONFIG_PATH = CONFIG_DIR / "config.json"
 
-# dict_write_mode: "off" | "auto"
-DICT_WRITE_MODES = frozenset({"off", "auto"})
+# dict_write_mode: "off" | "auto" | "confirm"（confirm=仅进待确认队列，不自动写对照表）
+DICT_WRITE_MODES = frozenset({"off", "auto", "confirm"})
+# dict_conflict_policy: 自动写表时，对照表已有同 wrong 但 correct 不同
+DICT_CONFLICT_POLICIES = frozenset({"skip", "pending"})
 
 
 @dataclass
@@ -66,6 +68,9 @@ class Config:
     # True：无「纠错差异」仍学习；与插入自动学习、历史菜单批量学习筛选一致；不会在启动时自动重学全部旧历史
     learn_when_no_diff: bool = False
     dict_write_mode: str = "auto"
+    # skip：保留已有映射，静默丢弃新 correct；pending：写入待确认 JSON，由词库管理采纳
+    dict_conflict_policy: str = "pending"
+    dict_suggestions_pending_path: str = "./data/dict_suggestions_pending.json"
     dict_auto_min_confidence: float = 0.6
     dict_auto_max_pairs: int = 8
     # One regex per line; empty lines ignored; invalid lines skipped at runtime with log

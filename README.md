@@ -49,6 +49,7 @@ flowchart LR
 
 ### 小提示
 
+- **学习写对照表**：设置 → 高级可选 **`confirm`**（先进「词库管理 → 待确认对照」再采纳）、**`auto`**（自动追加；与已有误听冲突时可进待确认，见 **同误听已存在且正确不同**）。新学习样本带 **`sample_id`**，便于在 **`learning_samples.jsonl`** 里检索。
 - 厂商与模型预设见 **`providers.json`**（含推荐 **temperature**；留空时默认 **0.3**）。  
 - **勿**把带真实密钥的 `config.json` 提交到 Git（已 `.gitignore`）。  
 - 检测局域网 IP 时会向 **`8.8.8.8:80`** 做 UDP connect（不写业务内容）。

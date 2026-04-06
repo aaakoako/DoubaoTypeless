@@ -3,16 +3,29 @@
 from __future__ import annotations
 
 import copy
+import os
+import sys
 import tkinter as tk
 import tkinter.messagebox as tk_msg
+from pathlib import Path
 from typing import Callable, Optional
 
 import customtkinter as ctk
 
 from config import Config
 from gui_text_bindings import bind_ctk_subtree_standard
-from polish import split_dictionary_file, write_dictionary_file
+from polish import (
+    load_dict_suggestions_pending,
+    save_dict_suggestions_pending,
+    split_dictionary_file,
+    write_dictionary_file,
+)
 from term_bank import TermBank, TermEntry
+
+_PENDING_REASON_CN = {
+    "confirm_mode": "确认模式",
+    "conflict": "与现有对照冲突",
+}
 
 
 class VocabularyManagerWindow:
@@ -42,6 +55,8 @@ class VocabularyManagerWindow:
             log=None,
         )
         self._tbank.load()
+        self._pending_rows: list[dict] = []
+        self._pending_scroll: Optional[ctk.CTkScrollableFrame] = None
 
     def show(self):
         if self._win is not None and self._win.winfo_exists():
@@ -114,6 +129,24 @@ class VocabularyManagerWindow:
         self._pairs_scroll = ctk.CTkScrollableFrame(pairs_tab, fg_color="#F7F8FA", corner_radius=8)
         self._pairs_scroll.pack(fill="both", expand=True)
 
+        self._tabs.add("待确认对照")
+        pend_tab = self._tabs.tab("待确认对照")
+        pbar2 = ctk.CTkFrame(pend_tab, fg_color="transparent")
+        pbar2.pack(fill="x", pady=(0, 8))
+        ctk.CTkLabel(
+            pbar2,
+            text="学习产生的误听→正确建议；采纳后写入对照表并从队列移除。文件路径在设置 → 高级 → 对照表待确认 JSON。",
+            text_color="#888888",
+            font=ctk.CTkFont(size=11),
+            wraplength=560,
+            justify="left",
+        ).pack(side="left", padx=4)
+        self._pending_scroll = ctk.CTkScrollableFrame(
+            pend_tab, fg_color="#F7F8FA", corner_radius=8
+        )
+        self._pending_scroll.pack(fill="both", expand=True)
+
+        self._load_pending_from_disk()
         bind_ctk_subtree_standard(self._win, self._win)
         self._refresh_lists()
 
@@ -139,6 +172,16 @@ class VocabularyManagerWindow:
     def _search_q(self) -> str:
         return (self._search_var.get() or "").strip().lower()
 
+    def _load_pending_from_disk(self):
+        self._pending_rows = load_dict_suggestions_pending(
+            self._config.dict_suggestions_pending_path
+        )
+
+    def _save_pending_to_disk(self):
+        save_dict_suggestions_pending(
+            self._config.dict_suggestions_pending_path, self._pending_rows
+        )
+
     def _refresh_lists(self):
         q = self._search_q()
 
@@ -157,6 +200,158 @@ class VocabularyManagerWindow:
                 if q and q not in w.lower() and q not in c.lower():
                     continue
                 self._pair_card(i, w, c)
+
+        self._refresh_pending()
+
+    def _refresh_pending(self):
+        if not self._pending_scroll:
+            return
+        for w in self._pending_scroll.winfo_children():
+            w.destroy()
+        q = self._search_q()
+        for row in self._pending_rows:
+            w = str(row.get("wrong", ""))
+            c = str(row.get("correct", ""))
+            sid = str(row.get("sample_id", ""))
+            if q and q not in w.lower() and q not in c.lower() and q not in sid.lower():
+                continue
+            self._pending_card(row)
+
+    def _pending_card(self, row: dict):
+        wrong = str(row.get("wrong", ""))
+        correct = str(row.get("correct", ""))
+        sid = str(row.get("sample_id", ""))
+        reason = str(row.get("reason", ""))
+        conf = row.get("confidence")
+        conf_s = f"{conf:.2f}" if isinstance(conf, (int, float)) else "—"
+        reason_cn = _PENDING_REASON_CN.get(reason, reason or "—")
+
+        fr = ctk.CTkFrame(self._pending_scroll, fg_color="#FFFFFF", corner_radius=8)
+        fr.pack(fill="x", pady=4, padx=4)
+        left = ctk.CTkFrame(fr, fg_color="transparent")
+        left.pack(side="left", fill="both", expand=True, padx=10, pady=8)
+        ctk.CTkLabel(
+            left,
+            text=f"{wrong}  →  {correct}",
+            anchor="w",
+            justify="left",
+            font=ctk.CTkFont(size=13),
+            text_color="#1D2129",
+        ).pack(fill="x")
+        ctk.CTkLabel(
+            left,
+            text=f"{reason_cn}  ·  置信 {conf_s}  ·  sample_id 前8位…{sid[:8] if sid else '—'}",
+            anchor="w",
+            text_color="#86909C",
+            font=ctk.CTkFont(size=11),
+        ).pack(fill="x")
+
+        bf = ctk.CTkFrame(fr, fg_color="transparent")
+        bf.pack(side="right", padx=6, pady=6)
+        ctk.CTkButton(
+            bf,
+            text="采纳",
+            width=52,
+            fg_color="#3370FF",
+            command=lambda r=row: self._approve_pending(r),
+        ).pack(side="left", padx=2)
+        ctk.CTkButton(
+            bf,
+            text="忽略",
+            width=52,
+            fg_color="#F2F3F5",
+            text_color="#1D2129",
+            command=lambda r=row: self._reject_pending(r),
+        ).pack(side="left", padx=2)
+        ctk.CTkButton(
+            bf,
+            text="复制ID",
+            width=56,
+            fg_color="#F2F3F5",
+            text_color="#1D2129",
+            command=lambda: self._copy_sample_id(sid),
+        ).pack(side="left", padx=2)
+        ctk.CTkButton(
+            bf,
+            text="样本",
+            width=48,
+            fg_color="#F2F3F5",
+            text_color="#1D2129",
+            command=self._open_learning_samples_file,
+        ).pack(side="left", padx=2)
+
+    def _approve_pending(self, row: dict):
+        rid = row.get("id")
+        wi = str(row.get("wrong", "")).strip()
+        co = str(row.get("correct", "")).strip()
+        if not wi or not co or "=" in wi or "=" in co or "\n" in wi or "\n" in co:
+            tk_msg.showwarning("无法采纳", "条目格式无效。")
+            return
+        self._push_undo()
+        replaced = False
+        new_pairs: list[tuple[str, str]] = []
+        for w, c in self._pairs:
+            if w == wi:
+                new_pairs.append((wi, co))
+                replaced = True
+            else:
+                new_pairs.append((w, c))
+        if not replaced:
+            new_pairs.append((wi, co))
+        self._pairs = new_pairs
+        try:
+            write_dictionary_file(
+                self._config.dictionary_path,
+                self._pairs,
+                header_lines=self._header_lines,
+            )
+        except Exception as e:
+            if self._undo_stack:
+                self._undo_stack.pop()
+            tk_msg.showerror("保存失败", str(e))
+            return
+        self._pending_rows = [x for x in self._pending_rows if x.get("id") != rid]
+        self._save_pending_to_disk()
+        self._on_saved()
+        self._refresh_lists()
+
+    def _reject_pending(self, row: dict):
+        rid = row.get("id")
+        self._pending_rows = [x for x in self._pending_rows if x.get("id") != rid]
+        self._save_pending_to_disk()
+        self._refresh_pending()
+
+    def _copy_sample_id(self, sid: str):
+        s = (sid or "").strip()
+        if not s:
+            tk_msg.showinfo("复制", "无 sample_id（旧样本无此字段）。")
+            return
+        w = self._win or self._root
+        try:
+            w.clipboard_clear()
+            w.clipboard_append(s)
+            w.update()
+        except tk.TclError:
+            tk_msg.showwarning("复制失败", "剪贴板不可用。")
+
+    def _open_learning_samples_file(self):
+        p = Path(self._config.learning_samples_path)
+        try:
+            p = p.resolve()
+        except OSError:
+            pass
+        if not p.is_file():
+            tk_msg.showinfo("样本文件", f"文件不存在：\n{p}")
+            return
+        try:
+            if sys.platform == "win32":
+                os.startfile(p)  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                os.system(f'open "{p}"')
+            else:
+                os.system(f'xdg-open "{p}"')
+        except Exception as e:
+            tk_msg.showwarning("打开失败", str(e))
 
     def _term_card(self, ent: TermEntry):
         row = ctk.CTkFrame(self._terms_scroll, fg_color="#FFFFFF", corner_radius=8)

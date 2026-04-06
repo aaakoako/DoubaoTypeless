@@ -12,7 +12,7 @@ from typing import Optional, Callable, Tuple
 import customtkinter as ctk
 
 from app_icon import apply_tk_window_icon
-from config import DICT_WRITE_MODES, Config
+from config import DICT_CONFLICT_POLICIES, DICT_WRITE_MODES, Config
 from gui_text_bindings import bind_ctk_entry_standard, bind_ctk_subtree_standard, bind_ctk_textbox_standard
 from paths import app_root, resource_dir
 from hotkeys import validate_all_for_save
@@ -1616,6 +1616,16 @@ class SettingsWindow:
         self._learn_pending_path_var = ctk.StringVar(value=self._config.learn_pending_path)
         ctk.CTkEntry(lp_frame, textvariable=self._learn_pending_path_var, width=360).pack(side="left", padx=4)
 
+        dsp_frame = ctk.CTkFrame(self._adv_frame)
+        dsp_frame.pack(fill="x", padx=6, pady=4)
+        ctk.CTkLabel(dsp_frame, text="对照表待确认 JSON：").pack(side="left", padx=8)
+        self._dict_suggestions_pending_path_var = ctk.StringVar(
+            value=self._config.dict_suggestions_pending_path
+        )
+        ctk.CTkEntry(dsp_frame, textvariable=self._dict_suggestions_pending_path_var, width=360).pack(
+            side="left", padx=4
+        )
+
         ctk.CTkLabel(self._adv_frame, text="前台 system 提示词", anchor="w",
                      text_color="#777777").pack(fill="x", padx=10, pady=(6, 0))
         self._llm_prompt_box = ctk.CTkTextbox(self._adv_frame, height=90, font=ctk.CTkFont(size=12))
@@ -1644,6 +1654,32 @@ class SettingsWindow:
         ctk.CTkOptionMenu(dict_adv, variable=self._dict_mode_var, values=list(mode_vals), width=100).pack(
             side="left", padx=4
         )
+        ctk.CTkLabel(
+            dict_adv,
+            text="（confirm=仅待确认；auto=自动追加）",
+            text_color="#888888",
+            font=ctk.CTkFont(size=11),
+        ).pack(side="left", padx=(8, 0))
+
+        dict_adv_c = ctk.CTkFrame(self._adv_frame)
+        dict_adv_c.pack(fill="x", padx=6, pady=2)
+        ctk.CTkLabel(dict_adv_c, text="同误听已存在且正确不同：").pack(side="left", padx=8)
+        cpol_vals = sorted(DICT_CONFLICT_POLICIES)
+        self._dict_conflict_var = ctk.StringVar(
+            value=self._config.dict_conflict_policy
+            if self._config.dict_conflict_policy in cpol_vals
+            else "pending"
+        )
+        ctk.CTkOptionMenu(
+            dict_adv_c, variable=self._dict_conflict_var, values=list(cpol_vals), width=100
+        ).pack(side="left", padx=4)
+        ctk.CTkLabel(
+            dict_adv_c,
+            text="仅 auto 时生效；skip=丢弃新建议",
+            text_color="#888888",
+            font=ctk.CTkFont(size=11),
+        ).pack(side="left", padx=(8, 0))
+
         ctk.CTkLabel(dict_adv, text="单次最多写入条数：").pack(side="left", padx=(12, 0))
         self._dict_max_pairs_var = ctk.StringVar(value=str(self._config.dict_auto_max_pairs))
         ctk.CTkEntry(dict_adv, textvariable=self._dict_max_pairs_var, width=48).pack(side="left", padx=4)
@@ -2057,6 +2093,10 @@ class SettingsWindow:
         self._config.learn_pending_path = (
             self._learn_pending_path_var.get().strip() or "./learn_pending.json"
         )
+        self._config.dict_suggestions_pending_path = (
+            self._dict_suggestions_pending_path_var.get().strip()
+            or "./data/dict_suggestions_pending.json"
+        )
         self._config.domain_terms_path = (
             self._domain_terms_path_var.get().strip() or "./data/domain_terms.json"
         )
@@ -2092,6 +2132,12 @@ class SettingsWindow:
             self._status_label.configure(text="写对照表模式无效", text_color="#F44336")
             return
         self._config.dict_write_mode = dm
+
+        cp = (self._dict_conflict_var.get() or "pending").strip().lower()
+        if cp not in DICT_CONFLICT_POLICIES:
+            self._status_label.configure(text="对照表冲突策略无效", text_color="#F44336")
+            return
+        self._config.dict_conflict_policy = cp
 
         try:
             max_pairs = int(self._dict_max_pairs_var.get().strip())

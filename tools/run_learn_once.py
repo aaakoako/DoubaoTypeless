@@ -53,6 +53,10 @@ def _polisher_from_config(cfg: Config) -> TextPolisher:
             learn_system_prompt=cfg.learn_system_prompt,
             learn_user_prompt=cfg.learn_user_prompt,
             dict_write_mode=cfg.dict_write_mode,
+            dict_conflict_policy=getattr(cfg, "dict_conflict_policy", "pending"),
+            dict_suggestions_pending_path=getattr(
+                cfg, "dict_suggestions_pending_path", "./data/dict_suggestions_pending.json"
+            ),
             dict_auto_min_confidence=cfg.dict_auto_min_confidence,
             dict_auto_max_pairs=cfg.dict_auto_max_pairs,
             dict_block_regexes=cfg.dict_block_regexes,

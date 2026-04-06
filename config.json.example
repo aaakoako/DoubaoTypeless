@@ -33,6 +33,8 @@
   "learn_batch_interval": 0,
   "learn_when_no_diff": false,
   "dict_write_mode": "auto",
+  "dict_conflict_policy": "pending",
+  "dict_suggestions_pending_path": "./data/dict_suggestions_pending.json",
   "dict_auto_min_confidence": 0.6,
   "dict_auto_max_pairs": 8,
   "dict_block_regexes": ""

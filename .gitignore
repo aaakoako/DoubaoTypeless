@@ -51,6 +51,7 @@ data/review_history.json
 data/learn_pending.json
 data/learning_samples.jsonl
 data/domain_terms.json
+data/dict_suggestions_pending.json
 
 # 本地归档：二进制与凭据备份（默认不上传）
 archive/legacy_pc_asr/
