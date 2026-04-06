@@ -112,3 +112,30 @@ class Config:
     def save(self):
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(asdict(self), f, indent=2, ensure_ascii=False)
+
+
+def api_key_for_http_header(raw: str) -> str:
+    """
+    供 Authorization Bearer 使用：去掉换行/回车，避免 httpx「Illegal header value」。
+    若疑似误把终端报错贴进 Key 框，返回空串以便上层提示重新填写。
+    """
+    s = (raw or "").strip().replace("\r", "").replace("\n", "")
+    for zw in ("\ufeff", "\u200b", "\u200c", "\u200d", "\u2060"):
+        s = s.replace(zw, "")
+    s = s.strip()
+    low = s.lower()
+    if low.startswith("bearer "):
+        s = s[7:].strip()
+        low = s.lower()
+    if any(
+        x in low
+        for x in (
+            "traceback",
+            "modulenotfounderror",
+            'file "',
+            "press any key",
+            "illegal header",
+        )
+    ):
+        return ""
+    return s

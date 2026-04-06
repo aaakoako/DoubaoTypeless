@@ -102,10 +102,11 @@ def bind_ctk_entry_standard(
     def do_copy(_: tk.Event | None = None):
         txt, _ = _entry_get_selection_or_all(e)
         _clipboard_copy(clipboard_root, txt)
+        return "break"
 
     def do_cut(_: tk.Event | None = None):
         if read_only:
-            return
+            return "break"
         txt, took_all = _entry_get_selection_or_all(e)
         _clipboard_copy(clipboard_root, txt)
         if took_all:
@@ -115,21 +116,24 @@ def bind_ctk_entry_standard(
                 e.delete("sel.first", "sel.last")
             except tk.TclError:
                 pass
+        return "break"
 
     def do_paste(_: tk.Event | None = None):
         try:
             clip = clipboard_root.clipboard_get()
         except tk.TclError:
-            return
+            return "break"
         try:
             if e.selection_present():
                 e.delete("sel.first", "sel.last")
         except tk.TclError:
             pass
         e.insert("insert", clip)
+        return "break"
 
     def do_select_all(_: tk.Event | None = None):
         _entry_select_all(e)
+        return "break"
 
     def on_button_3(ev: tk.Event):
         _build_edit_menu(
@@ -173,7 +177,7 @@ def bind_ctk_textbox_standard(
     def do_copy(_: tk.Event | None = None):
         txt, _ = _text_get_selection_or_all(tb)
         _clipboard_copy(clipboard_root, txt)
-        return "break" if read_only else None
+        return "break"
 
     def do_cut(_: tk.Event | None = None):
         if read_only:
@@ -204,7 +208,7 @@ def bind_ctk_textbox_standard(
 
     def do_select_all(_: tk.Event | None = None):
         _text_select_all(tb)
-        return "break" if read_only else None
+        return "break"
 
     def on_button_3(ev: tk.Event):
         _build_edit_menu(

@@ -16,6 +16,7 @@ from pathlib import Path
 
 import httpx
 
+from config import api_key_for_http_header
 from term_bank import TermBank, load_recent_final_texts
 
 
@@ -61,6 +62,20 @@ def _normalize_openai_base_url(url: str) -> str:
 def openai_compat_base_url(url: str) -> str:
     """与 TextPolisher 一致的 OpenAI 兼容 Base（含 MiniMax 补 /v1）。"""
     return _normalize_openai_base_url((url or "").strip())
+
+
+def zhipu_coding_openai_model_id(model: str, base_url: str) -> str:
+    """
+    智谱 GLM Coding（OpenAI 兼容）线路：官方文档 FAQ 等处的模型示例多为小写 glm-*。
+    UI 预设曾用大写 GLM-*，此处在请求前统一为小写，减少网关拒识或鉴权链路异常。
+    """
+    u = (base_url or "").lower()
+    m = (model or "").strip()
+    if not m:
+        return m
+    if "open.bigmodel.cn" in u and "/api/coding/paas/" in u:
+        return m.lower()
+    return m
 
 
 def _reasoning_details_text(msg: dict) -> str:
@@ -643,7 +658,7 @@ class TextPolisher:
                 self._learn_client = httpx.AsyncClient(
                     base_url=base_url,
                     headers={
-                        "Authorization": f"Bearer {self.config.learn_api_key}",
+                        "Authorization": f"Bearer {api_key_for_http_header(self.config.learn_api_key)}",
                         "Content-Type": "application/json",
                     },
                     timeout=httpx.Timeout(self.config.learn_timeout, connect=5.0),
@@ -657,7 +672,7 @@ class TextPolisher:
             self._client = httpx.AsyncClient(
                 base_url=base_url,
                 headers={
-                    "Authorization": f"Bearer {self.config.api_key}",
+                    "Authorization": f"Bearer {api_key_for_http_header(self.config.api_key)}",
                     "Content-Type": "application/json",
                 },
                 timeout=httpx.Timeout(self.config.timeout, connect=5.0),
@@ -882,7 +897,9 @@ class TextPolisher:
 
         user_content = USER_CORRECT_PREFIX + text
         payload = {
-            "model": self.config.model,
+            "model": zhipu_coding_openai_model_id(
+                self.config.model, self.config.base_url
+            ),
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_content},
@@ -995,7 +1012,9 @@ class TextPolisher:
 
         client = self._ensure_client(learning=True)
         payload = {
-            "model": self.config.learn_model,
+            "model": zhipu_coding_openai_model_id(
+                self.config.learn_model, self.config.learn_base_url
+            ),
             "messages": [
                 {"role": "system", "content": self._effective_learn_system()},
                 {"role": "user", "content": user_content},
