@@ -47,7 +47,24 @@
     font-weight: 500;
   }
   .status.connected { background: rgba(52,211,153,0.15); color: var(--success); }
+  .status.connecting,
+  .status.reconnecting { background: rgba(79,140,255,0.15); color: var(--accent); }
   .status.disconnected { background: rgba(248,113,113,0.15); color: var(--danger); }
+  .connection {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-reconnect {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 16px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .btn-reconnect[hidden] { display: none; }
 
   .input-area {
     flex: 1;
@@ -120,6 +137,17 @@
   }
   .sync-hint.syncing { color: var(--accent); }
   .sync-hint.synced { color: var(--success); }
+  .sync-hint.disconnected { color: var(--danger); }
+  .health {
+    min-height: 18px;
+    margin-top: 4px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .health.ok { color: var(--success); }
+  .health.warn { color: var(--accent); }
+  .health.bad { color: var(--danger); }
 
   .toast {
     position: fixed;
@@ -147,7 +175,10 @@
 
 <div class="header">
   <h1>DoubaoTypeless</h1>
-  <span id="status" class="status disconnected">未连接</span>
+  <div class="connection">
+    <span id="status" class="status disconnected">未连接</span>
+    <button class="btn-reconnect" id="btn-reconnect" hidden>重连</button>
+  </div>
 </div>
 
 <div class="input-area">
@@ -156,6 +187,7 @@
 </div>
 
 <div class="sync-hint" id="sync-hint">输入后自动同步到电脑</div>
+<div class="health" id="health">心跳: 未连接</div>
 
 <div class="actions">
   <button class="btn btn-clear" id="btn-clear">清空</button>
@@ -166,14 +198,16 @@
 
 <script>
 const WS_URL = "{{WS_URL}}";
-const CLIENT_VERSION = "meta-v3";
+const CLIENT_VERSION = "meta-v4";
 
 const textInput = document.getElementById("text-input");
 const btnSend = document.getElementById("btn-send");
 const btnClear = document.getElementById("btn-clear");
+const btnReconnect = document.getElementById("btn-reconnect");
 const statusEl = document.getElementById("status");
 const charCount = document.getElementById("char-count");
 const syncHint = document.getElementById("sync-hint");
+const healthEl = document.getElementById("health");
 const toastEl = document.getElementById("toast");
 
 let ws = null;
@@ -184,6 +218,16 @@ let lastSentText = "";
 let isComposing = false;
 let lastCompositionEndAt = 0;
 let stableComposeRetries = 0;
+let reconnectAttempts = 0;
+let pingSentAt = 0;
+let lastPongMs = null;
+let lastPongAt = 0;
+let lastSyncedAt = 0;
+let healthReason = "未连接";
+
+function timeLabel(ts = Date.now()) {
+  return new Date(ts).toLocaleTimeString("zh-CN", { hour12: false });
+}
 
 function buildMeta(extra = {}) {
   return {
@@ -201,64 +245,117 @@ function showToast(msg, duration = 1500) {
   setTimeout(() => toastEl.classList.remove("show"), duration);
 }
 
-function setSyncState(state) {
+function renderHealth(kind = "warn") {
+  healthEl.className = `health ${kind}`;
+  const parts = [];
+  if (lastPongMs !== null && lastPongAt) {
+    parts.push(`心跳 ${lastPongMs}ms (${timeLabel(lastPongAt)})`);
+  } else {
+    parts.push(`心跳: ${healthReason}`);
+  }
+  if (lastSyncedAt) {
+    parts.push(`上次同步 ${timeLabel(lastSyncedAt)}`);
+  }
+  healthEl.textContent = parts.join(" / ");
+}
+
+function setSyncState(state, detail = "") {
   syncHint.className = "sync-hint";
   if (state === "syncing") {
     syncHint.textContent = "正在同步...";
     syncHint.classList.add("syncing");
   } else if (state === "synced") {
-    syncHint.textContent = "已同步到电脑";
+    lastSyncedAt = Date.now();
+    syncHint.textContent = `已同步到电脑 ${timeLabel(lastSyncedAt)}`;
     syncHint.classList.add("synced");
+    renderHealth(lastPongMs === null ? "warn" : "ok");
+  } else if (state === "disconnected") {
+    syncHint.textContent = detail || "电脑未连接，正在等待重连";
+    syncHint.classList.add("disconnected");
   } else {
     syncHint.textContent = "输入后自动同步到电脑";
   }
 }
 
-function setConnected(connected) {
-  if (connected) {
-    statusEl.textContent = "已连接";
-    statusEl.className = "status connected";
-    btnSend.disabled = !textInput.value.trim();
-  } else {
-    statusEl.textContent = "未连接";
-    statusEl.className = "status disconnected";
-    btnSend.disabled = true;
+function setConnectionState(state, label = "") {
+  const labels = {
+    connected: "已连接",
+    connecting: "连接中",
+    reconnecting: "重连中",
+    disconnected: "未连接",
+  };
+  statusEl.textContent = label || labels[state] || "未连接";
+  statusEl.className = `status ${state}`;
+  btnReconnect.hidden = state === "connected" || state === "connecting";
+  btnSend.disabled = state !== "connected" || !textInput.value.trim();
+  healthReason = label || labels[state] || "未连接";
+  if (state !== "connected") {
+    lastPongMs = null;
+    renderHealth(state === "disconnected" ? "bad" : "warn");
   }
+}
+
+function sendPing() {
+  if (!ws || ws.readyState !== 1) return;
+  pingSentAt = Date.now();
+  ws.send(JSON.stringify({ type: "ping", meta: buildMeta({ pingAt: pingSentAt }) }));
 }
 
 function connect() {
   if (ws && ws.readyState <= 1) return;
+  setConnectionState("connecting");
   try {
     ws = new WebSocket(WS_URL);
   } catch (e) {
     scheduleReconnect();
     return;
   }
+  const socket = ws;
 
-  ws.onopen = () => {
-    setConnected(true);
+  socket.onopen = () => {
+    if (ws !== socket) return;
+    reconnectAttempts = 0;
+    setConnectionState("connected");
+    healthReason = "等待心跳";
+    renderHealth("warn");
+    if (!textInput.value.trim()) setSyncState("idle");
     showToast("已连接到电脑");
-    ws.send(JSON.stringify({
+    socket.send(JSON.stringify({
       type: "hello",
       meta: buildMeta({
         compositionSupport: typeof CompositionEvent !== "undefined",
         userAgent: navigator.userAgent,
       }),
     }));
+    sendPing();
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
   };
 
-  ws.onclose = () => {
-    setConnected(false);
+  socket.onclose = () => {
+    if (ws !== socket) return;
+    ws = null;
     scheduleReconnect();
   };
 
-  ws.onerror = () => setConnected(false);
+  socket.onerror = () => {
+    if (ws !== socket) return;
+    setConnectionState("disconnected", "连接异常");
+    setSyncState("disconnected", "连接异常，正在等待重连");
+  };
 
-  ws.onmessage = (e) => {
+  socket.onmessage = (e) => {
+    if (ws !== socket) return;
     try {
       const data = JSON.parse(e.data);
-      if (data.type === "pong") { /* keepalive */ }
+      if (data.type === "pong") {
+        const now = Date.now();
+        if (pingSentAt) {
+          lastPongMs = Math.max(0, now - pingSentAt);
+        }
+        lastPongAt = now;
+        healthReason = "正常";
+        renderHealth("ok");
+      }
       if (data.type === "cleared") {
         if (stableTimer) { clearTimeout(stableTimer); stableTimer = null; }
         if (autoSendTimer) { clearTimeout(autoSendTimer); autoSendTimer = null; }
@@ -268,9 +365,10 @@ function connect() {
         btnSend.disabled = true;
         lastSentText = "";
         setSyncState("idle");
+        renderHealth(lastPongMs === null ? "warn" : "ok");
         showToast("电脑已插入，输入框已清空");
-        if (ws && ws.readyState === 1) {
-          ws.send(JSON.stringify({ type: "update", text: "", meta: buildMeta() }));
+        if (socket.readyState === 1) {
+          socket.send(JSON.stringify({ type: "update", text: "", meta: buildMeta() }));
         }
         textInput.focus();
       }
@@ -280,10 +378,14 @@ function connect() {
 
 function scheduleReconnect() {
   if (reconnectTimer) return;
+  reconnectAttempts += 1;
+  const delay = Math.min(10000, 3000 + (reconnectAttempts - 1) * 1000);
+  setConnectionState("reconnecting");
+  setSyncState("disconnected", `${Math.round(delay / 1000)} 秒后自动重连`);
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     connect();
-  }, 3000);
+  }, delay);
 }
 
 function armStableTimer() {
@@ -322,7 +424,11 @@ function armStableTimer() {
 
 function autoSync() {
   const text = textInput.value;
-  if (!ws || ws.readyState !== 1) return;
+  if (!ws || ws.readyState !== 1) {
+    setSyncState("disconnected", "电脑未连接，待重连后再同步");
+    scheduleReconnect();
+    return;
+  }
 
   // 仅正文变化时发 update，避免刷屏；但 lastSentText 与 stable 定时器不能绑在一起：
   // 组字过程中已把 lastSentText 推到全文时，compositionend 后文本不变，仍必须 arm stable。
@@ -346,7 +452,13 @@ function autoSync() {
 
 function sendNow() {
   const text = textInput.value.trim();
-  if (!text || !ws || ws.readyState !== 1) return;
+  if (!text) return;
+  if (!ws || ws.readyState !== 1) {
+    showToast("电脑未连接，正在重连");
+    setSyncState("disconnected", "电脑未连接，待重连后再发送");
+    scheduleReconnect();
+    return;
+  }
   if (stableTimer) clearTimeout(stableTimer);
   stableComposeRetries = 0;
   ws.send(JSON.stringify({
@@ -411,6 +523,18 @@ textInput.addEventListener("input", (e) => {
 });
 
 btnSend.addEventListener("click", sendNow);
+btnReconnect.addEventListener("click", () => {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  if (ws && ws.readyState <= 1) {
+    try { ws.close(); } catch (_) {}
+  }
+  ws = null;
+  showToast("正在重连");
+  connect();
+});
 btnClear.addEventListener("click", () => {
   if (stableTimer) {
     clearTimeout(stableTimer);
@@ -429,10 +553,15 @@ btnClear.addEventListener("click", () => {
 });
 
 setInterval(() => {
-  if (ws && ws.readyState === 1) {
-    ws.send(JSON.stringify({ type: "ping" }));
-  }
+  sendPing();
 }, 15000);
+
+setInterval(() => {
+  if (ws && ws.readyState === 1 && (!lastPongAt || Date.now() - lastPongAt > 22000)) {
+    healthReason = "等待电脑响应";
+    renderHealth("warn");
+  }
+}, 3000);
 
 connect();
 </script>

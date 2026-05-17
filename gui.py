@@ -459,6 +459,24 @@ class ReviewWindow:
         self._window.focus_force()
         self._final_box.focus_set()
 
+    def show_insert_failed(self, message: str, allow_skip_retry: bool = False):
+        self._create_window()
+        if not self._window or not self._status_label:
+            return
+        self._window.deiconify()
+        self._window.lift()
+        self._window.focus_force()
+        self._status_label.configure(
+            text=(message or "插入失败，终稿已保留，可重试或复制。"),
+            text_color="#C62828",
+        )
+        if self._insert_btn:
+            self._insert_btn.configure(state="normal")
+        if self._skip_llm_btn:
+            self._skip_llm_btn.configure(state="normal" if allow_skip_retry else "disabled")
+        if self._final_box:
+            self._final_box.focus_set()
+
     def hide(self):
         if self._window and self._window.winfo_exists():
             self._window.withdraw()
@@ -792,6 +810,9 @@ class SettingsWindow:
         app_version: str = "",
         on_check_update: Optional[Callable[[], None]] = None,
         on_open_vocabulary: Optional[Callable[[], None]] = None,
+        get_diagnostics: Optional[Callable[[], dict]] = None,
+        on_export_diagnostics: Optional[Callable[[], str]] = None,
+        on_connection_check: Optional[Callable[[], dict]] = None,
     ):
         self._config = config
         self._on_save = on_save
@@ -803,8 +824,14 @@ class SettingsWindow:
         self._app_version = (app_version or "").strip()
         self._on_check_update = on_check_update
         self._on_open_vocabulary = on_open_vocabulary
+        self._get_diagnostics = get_diagnostics
+        self._on_export_diagnostics = on_export_diagnostics
+        self._on_connection_check = on_connection_check
         self._probe_status_bullets: dict[str, ctk.CTkLabel] = {}
         self._probe_detail_vars: dict[str, tk.StringVar] = {}
+        self._diag_vars: dict[str, tk.StringVar] = {}
+        self._check_result_var: Optional[tk.StringVar] = None
+        self._check_button: Optional[ctk.CTkButton] = None
         self._suggest_key_visible = False
         self._learn_key_visible = False
         self._win: Optional[ctk.CTkToplevel] = None
@@ -1033,6 +1060,146 @@ class SettingsWindow:
             except tk.TclError:
                 pass
 
+    @staticmethod
+    def _yes_no(value: object) -> str:
+        return "是" if bool(value) else "否"
+
+    @staticmethod
+    def _maybe(value: object, empty: str = "暂无") -> str:
+        s = str(value or "").strip()
+        return s if s else empty
+
+    def _model_health_text(self, item: object) -> str:
+        if not isinstance(item, dict):
+            return "未验证"
+        ok = item.get("ok")
+        msg = str(item.get("message") or "").strip()
+        if ok is True:
+            return ("可用 " + msg).strip()
+        if ok is False:
+            return ("不可用 " + msg).strip()
+        return "未验证"
+
+    def _refresh_diagnostics_panel(self):
+        if not self._get_diagnostics or not self._diag_vars:
+            return
+        try:
+            snap = self._get_diagnostics()
+        except Exception as e:
+            self._flash_settings_status(f"诊断刷新失败: {e}", "#C62828")
+            return
+        network = snap.get("network") if isinstance(snap, dict) else {}
+        bridge = snap.get("bridge") if isinstance(snap, dict) else {}
+        runtime = snap.get("runtime") if isinstance(snap, dict) else {}
+        health = snap.get("model_health") if isinstance(snap, dict) else {}
+        config = snap.get("config") if isinstance(snap, dict) else {}
+        suggest_cfg = config.get("suggest", {}) if isinstance(config, dict) else {}
+        learn_cfg = config.get("learn", {}) if isinstance(config, dict) else {}
+        rows = {
+            "local_ip": network.get("local_ip"),
+            "bridge_url": bridge.get("url") or self._current_bridge_url(),
+            "port_ok": "可连接" if network.get("localhost_tcp_ok") else "未监听/不可连接",
+            "clients": bridge.get("connected_clients", 0),
+            "last_update": self._maybe(bridge.get("last_update_at")),
+            "last_stable": (
+                f"{self._maybe(bridge.get('last_stable_at'))} "
+                f"len={bridge.get('last_stable_len', 0)} "
+                f"{self._maybe(bridge.get('last_stable_reason'), '')}"
+            ).strip(),
+            "log_redact": self._yes_no(runtime.get("redact_user_logs")),
+            "pending": runtime.get("learn_pending_count", 0),
+            "suggest": (
+                f"{self._yes_no(suggest_cfg.get('enabled'))} / "
+                f"{self._model_health_text(health.get('suggest'))}"
+            ),
+            "learn": (
+                f"{self._yes_no(learn_cfg.get('enabled'))} / "
+                f"{self._model_health_text(health.get('learn'))}"
+            ),
+        }
+        for key, value in rows.items():
+            var = self._diag_vars.get(key)
+            if var is not None:
+                var.set(str(value))
+
+    def _export_diagnostics_clicked(self):
+        if not self._on_export_diagnostics:
+            self._flash_settings_status("当前版本未注册诊断导出", "#888888")
+            return
+        try:
+            path = self._on_export_diagnostics()
+        except Exception as e:
+            self._flash_settings_status(f"诊断导出失败: {e}", "#C62828")
+            return
+        self._refresh_diagnostics_panel()
+        self._flash_settings_status(f"诊断已导出: {path}", "#2E7D32")
+
+    def _paint_connection_check(self, result: dict):
+        var = self._check_result_var
+        if var is None:
+            return
+        if self._check_button is not None:
+            try:
+                self._check_button.configure(state="normal")
+            except tk.TclError:
+                pass
+        if not isinstance(result, dict):
+            var.set("自检失败：结果为空")
+            return
+        summary = str(result.get("summary") or "自检完成")
+        elapsed = result.get("elapsed_ms")
+        lines = [f"{summary}" + (f"（{elapsed}ms）" if elapsed is not None else "")]
+        for item in result.get("checks") or []:
+            if not isinstance(item, dict):
+                continue
+            status = {"ok": "OK", "warn": "注意", "fail": "失败"}.get(
+                str(item.get("status") or ""), "?"
+            )
+            lines.append(f"{status} {item.get('name')}: {item.get('message')}")
+        var.set(" | ".join(lines))
+        self._refresh_diagnostics_panel()
+
+    def _run_connection_check_clicked(self):
+        if not self._on_connection_check or self._check_result_var is None:
+            self._flash_settings_status("当前版本未注册连接自检", "#888888")
+            return
+        self._check_result_var.set("自检中：正在检查端口、手机页面和 WebSocket...")
+        if self._check_button is not None:
+            self._check_button.configure(state="disabled")
+        result_q: queue.Queue = queue.Queue(maxsize=1)
+
+        def worker():
+            try:
+                result = self._on_connection_check()
+            except Exception as e:
+                result = {
+                    "overall": "fail",
+                    "summary": "自检失败",
+                    "checks": [
+                        {
+                            "name": "自检",
+                            "status": "fail",
+                            "message": f"{type(e).__name__}: {e}",
+                        }
+                    ],
+                }
+            result_q.put(result)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+        def poll_result():
+            try:
+                result = result_q.get_nowait()
+            except queue.Empty:
+                try:
+                    self._root.after(50, poll_result)
+                except tk.TclError:
+                    pass
+                return
+            self._paint_connection_check(result)
+
+        self._root.after(50, poll_result)
+
     def show(self):
         if self._win and self._win.winfo_exists():
             self._win.focus()
@@ -1157,6 +1324,75 @@ class SettingsWindow:
         self._qr_label = ctk.CTkLabel(qr_wrap, text="")
         self._qr_label.pack(padx=4, pady=2)
         self._refresh_qr_image()
+
+        if self._get_diagnostics:
+            ctk.CTkLabel(
+                container,
+                text="连接诊断",
+                font=ctk.CTkFont(size=13, weight="bold"),
+                text_color="#888888",
+                anchor="w",
+            ).pack(fill="x", padx=10, pady=(10, 2))
+            diag_frame = ctk.CTkFrame(container)
+            diag_frame.pack(fill="x", padx=10, pady=4)
+
+            def diag_row(label: str, key: str):
+                row = ctk.CTkFrame(diag_frame, fg_color="transparent")
+                row.pack(fill="x", padx=8, pady=2)
+                ctk.CTkLabel(
+                    row,
+                    text=label,
+                    width=92,
+                    text_color="#666666",
+                    anchor="w",
+                    font=ctk.CTkFont(size=12),
+                ).pack(side="left")
+                var = tk.StringVar(value="...")
+                self._diag_vars[key] = var
+                ent = self._make_copyable_line_entry(row, var)
+                ent.pack(side="left", fill="x", expand=True, padx=(4, 0))
+                self._probe_readonly_entries.append(ent)
+
+            diag_row("本机 IP", "local_ip")
+            diag_row("手机地址", "bridge_url")
+            diag_row("端口状态", "port_ok")
+            diag_row("连接手机", "clients")
+            diag_row("最后预览", "last_update")
+            diag_row("最后稳定稿", "last_stable")
+            diag_row("日志脱敏", "log_redact")
+            diag_row("学习队列", "pending")
+            diag_row("前台模型", "suggest")
+            diag_row("后台学习", "learn")
+            diag_btns = ctk.CTkFrame(diag_frame, fg_color="transparent")
+            diag_btns.pack(fill="x", padx=8, pady=(6, 8))
+            ctk.CTkButton(
+                diag_btns,
+                text="刷新诊断",
+                width=88,
+                command=self._refresh_diagnostics_panel,
+            ).pack(side="left", padx=(0, 6))
+            if self._on_export_diagnostics:
+                ctk.CTkButton(
+                    diag_btns,
+                    text="导出诊断 JSON",
+                    width=116,
+                    command=self._export_diagnostics_clicked,
+                ).pack(side="left", padx=4)
+            if self._on_connection_check:
+                self._check_button = ctk.CTkButton(
+                    diag_btns,
+                    text="开始自检",
+                    width=88,
+                    command=self._run_connection_check_clicked,
+                )
+                self._check_button.pack(side="left", padx=4)
+            self._check_result_var = tk.StringVar(value="自检结果会显示在这里。")
+            check_entry = self._make_copyable_line_entry(
+                diag_frame, self._check_result_var
+            )
+            check_entry.pack(fill="x", padx=8, pady=(0, 8))
+            self._probe_readonly_entries.append(check_entry)
+            self._refresh_diagnostics_panel()
 
         # --- 前台纠错建议 ---
         ctk.CTkLabel(container, text="前台纠错建议", font=ctk.CTkFont(size=13, weight="bold"),
@@ -2440,6 +2676,9 @@ class GUIManager:
             suggest_api_note,
         )
 
+    def show_insert_failed(self, message: str, *, allow_skip_retry: bool = False):
+        self._schedule(self._review.show_insert_failed, message, allow_skip_retry)
+
     def hide(self):
         self._schedule(self._review.hide)
 
@@ -2468,6 +2707,9 @@ class GUIManager:
         app_version: str = "",
         on_check_update: Optional[Callable[[], None]] = None,
         on_open_vocabulary: Optional[Callable[[], None]] = None,
+        get_diagnostics: Optional[Callable[[], dict]] = None,
+        on_export_diagnostics: Optional[Callable[[], str]] = None,
+        on_connection_check: Optional[Callable[[], dict]] = None,
     ):
         self._schedule(
             self._open_settings_impl,
@@ -2478,6 +2720,9 @@ class GUIManager:
             app_version,
             on_check_update,
             on_open_vocabulary,
+            get_diagnostics,
+            on_export_diagnostics,
+            on_connection_check,
         )
 
     def _open_settings_impl(
@@ -2489,6 +2734,9 @@ class GUIManager:
         app_version: str = "",
         on_check_update: Optional[Callable[[], None]] = None,
         on_open_vocabulary: Optional[Callable[[], None]] = None,
+        get_diagnostics: Optional[Callable[[], dict]] = None,
+        on_export_diagnostics: Optional[Callable[[], str]] = None,
+        on_connection_check: Optional[Callable[[], dict]] = None,
     ):
         if self._settings and self._settings._win and self._settings._win.winfo_exists():
             self._settings._win.lift()
@@ -2507,6 +2755,9 @@ class GUIManager:
             app_version=app_version,
             on_check_update=on_check_update,
             on_open_vocabulary=on_open_vocabulary,
+            get_diagnostics=get_diagnostics,
+            on_export_diagnostics=on_export_diagnostics,
+            on_connection_check=on_connection_check,
         )
         self._settings.show()
 

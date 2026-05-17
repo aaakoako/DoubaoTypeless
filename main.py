@@ -18,6 +18,11 @@ from pathlib import Path
 from app_version import APP_VERSION
 from bridge import PhoneBridge
 from config import Config, api_key_for_http_header
+from diagnostics import (
+    build_diagnostics_snapshot,
+    export_diagnostics_json,
+    run_connection_self_check,
+)
 from paths import app_root
 from gui import GUIManager
 from hotkeys import GlobalHotkeyService, build_bindings
@@ -143,6 +148,16 @@ class App:
         self._last_suggest_source_text = ""
         self._dup_stable_guard_text = ""
         self._dup_stable_guard_at = 0.0
+        self._model_health: dict[str, dict] = {
+            "suggest": {"ok": None, "message": ""},
+            "learn": {"ok": None, "message": ""},
+        }
+
+    def _set_model_health(self, target: str, ok, msg: str = ""):
+        t = (target or "").strip().lower()
+        if t in self._model_health:
+            self._model_health[t] = {"ok": ok, "message": (msg or "").strip()}
+        self.gui.set_model_health(target, ok, msg)
 
     def _load_review_history(self) -> list[dict]:
         p = Path(self.config.review_history_path)
@@ -253,7 +268,7 @@ class App:
 
     def _queue_model_probe(self, target: str, cfg: dict):
         if not self._loop:
-            self.gui.set_model_health(target, False, "程序未完全启动")
+            self._set_model_health(target, False, "程序未完全启动")
             return
         asyncio.run_coroutine_threadsafe(
             self._run_model_probe(target, cfg), self._loop
@@ -266,10 +281,10 @@ class App:
         key = api_key_for_http_header(str(cfg.get("api_key") or ""))
         model = (cfg.get("model") or "").strip()
         if not url or not model:
-            self.gui.set_model_health(target, False, "请填写 Base URL、Key、Model")
+            self._set_model_health(target, False, "请填写 Base URL、Key、Model")
             return
         if not key:
-            self.gui.set_model_health(
+            self._set_model_health(
                 target,
                 False,
                 "API Key 为空或疑似误粘贴了终端报错，请清空 Key 后只粘贴密钥。",
@@ -311,7 +326,7 @@ class App:
             ) as client:
                 r = await client.post("chat/completions", json=payload)
                 r.raise_for_status()
-            self.gui.set_model_health(target, True, "探测成功")
+            self._set_model_health(target, True, "探测成功")
             _log(f"[probe.{target}] 模型探测成功")
         except httpx.HTTPStatusError as e:
             msg = str(e)
@@ -328,11 +343,11 @@ class App:
                     "\n\n智谱 401：核对开放平台 API Key（整段 id.secret，勿加 Bearer）。"
                     "若用 Ctrl+V 粘贴后鉴权失败，可能是快捷键重复插入（已修复），请清空 Key 后重贴。"
                 )
-            self.gui.set_model_health(target, False, msg)
+            self._set_model_health(target, False, msg)
             _log(f"[probe.{target}] 失败: {msg}")
         except Exception as e:
             msg = str(e)
-            self.gui.set_model_health(target, False, msg)
+            self._set_model_health(target, False, msg)
             _log(f"[probe.{target}] 失败: {msg}")
 
     def _reload_vocabulary(self):
@@ -351,7 +366,66 @@ class App:
             app_version=APP_VERSION,
             on_check_update=self._on_check_update,
             on_open_vocabulary=self._open_vocabulary_manager,
+            get_diagnostics=self._diagnostics_snapshot,
+            on_export_diagnostics=self._export_diagnostics,
+            on_connection_check=self._connection_self_check,
         )
+
+    def _runtime_diagnostics(self) -> dict:
+        bridge_diag = self.bridge.diagnostics() if self.bridge else {}
+        bridge_diag["configured_port"] = self.config.bridge_port
+        return {
+            "bridge": bridge_diag,
+            "loop_running": bool(self._loop and self._loop.is_running()),
+            "redact_user_logs": self._redact_logs,
+            "learn_pending_count": len(self._learn_pending),
+            "pending_raw_len": len((self._pending_raw or "").strip()),
+            "tray_state": getattr(self.tray, "_state", ""),
+        }
+
+    def _diagnostics_snapshot(self) -> dict:
+        return build_diagnostics_snapshot(
+            self.config,
+            runtime=self._runtime_diagnostics(),
+            app_version=APP_VERSION,
+            model_health=dict(self._model_health),
+        )
+
+    def _export_diagnostics(self) -> str:
+        path = export_diagnostics_json(self._diagnostics_snapshot())
+        _log(f"[diagnostics] 已导出: {path}")
+        return str(path)
+
+    def _connection_self_check(self) -> dict:
+        if not self._loop or not self._loop.is_running():
+            return {
+                "overall": "fail",
+                "summary": "程序尚未完成启动",
+                "checks": [
+                    {
+                        "name": "主循环",
+                        "status": "fail",
+                        "message": "asyncio 主循环未运行，请稍后重试。",
+                    }
+                ],
+                "elapsed_ms": 0,
+            }
+        bridge_diag = self.bridge.diagnostics() if self.bridge else {}
+        fut = asyncio.run_coroutine_threadsafe(
+            run_connection_self_check(
+                port=int(self.config.bridge_port),
+                connected_clients=int(bridge_diag.get("connected_clients") or 0),
+                last_stable_at=str(bridge_diag.get("last_stable_at") or ""),
+            ),
+            self._loop,
+        )
+        result = fut.result(timeout=5.0)
+        _log(
+            "[diagnostics.check] "
+            f"overall={result.get('overall')} summary={result.get('summary')} "
+            f"elapsed_ms={result.get('elapsed_ms')}"
+        )
+        return result
 
     def _on_check_update(self):
         if not self._loop:
@@ -479,8 +553,8 @@ class App:
         self.config = new_config
         self.typer.clipboard_protection = new_config.clipboard_protection
         self.polisher = self._make_polisher()
-        self.gui.set_model_health("suggest", None, "")
-        self.gui.set_model_health("learn", None, "")
+        self._set_model_health("suggest", None, "")
+        self._set_model_health("learn", None, "")
         _hk_n = sum(
             1
             for x in (new_config.hotkey_toggle_review, new_config.hotkey_insert)
@@ -613,7 +687,7 @@ class App:
             s_msg = "纠错调用成功"
             if not batch.api_ok:
                 s_msg = (batch.api_fail_hint or "").strip() or "纠错 API 失败"
-            self.gui.set_model_health("suggest", batch.api_ok, s_msg)
+            self._set_model_health("suggest", batch.api_ok, s_msg)
         suggest_note = ""
         if batch.api_called and not batch.api_ok:
             suggest_note = (batch.api_fail_hint or "").strip() or (
@@ -659,10 +733,10 @@ class App:
                             self.gui.mark_history_learn_ok(
                                 r["raw_text"], r["llm_text"], r["final_text"]
                             )
-                        self.gui.set_model_health("learn", True, "学习调用成功")
+                        self._set_model_health("learn", True, "学习调用成功")
                 except Exception as e:
                     _log(f"[learn.batch] 第 {bi}/{n_batch} 批失败（{len(chunk)} 条）: {e}")
-                    self.gui.set_model_health("learn", False, str(e))
+                    self._set_model_health("learn", False, str(e))
                 if off + chunk_size < len(records):
                     await asyncio.sleep(0.35)
         finally:
@@ -690,7 +764,16 @@ class App:
                 t.cancel()
             self.tray.set_state(STATE_READY)
         await asyncio.sleep(0.15)
-        paste_result = self.typer.paste_text(edited_text, keep_in_clipboard=True)
+        try:
+            paste_result = self.typer.paste_text(edited_text, keep_in_clipboard=True)
+        except Exception as e:
+            _log(f"[插入结果] 异常: {type(e).__name__}: {e}")
+            self.tray.set_state(STATE_READY)
+            self.gui.show_insert_failed(
+                "插入失败：剪贴板或焦点操作异常，终稿已保留，可重试或复制。",
+                allow_skip_retry=skip_llm,
+            )
+            return
         _log(
             "[插入结果] "
             f"attempted={paste_result.get('attempted')} "
@@ -698,6 +781,14 @@ class App:
             f"paste_sent={paste_result.get('paste_sent')} "
             f"clipboard_kept={paste_result.get('clipboard_kept')}"
         )
+        if not paste_result.get("paste_sent"):
+            self.tray.set_state(STATE_READY)
+            if not paste_result.get("focus_restored"):
+                msg = "未能恢复目标窗口焦点，终稿已留在剪贴板；请点目标输入框后重试或直接粘贴。"
+            else:
+                msg = "未能发送 Ctrl+V，终稿已留在剪贴板；可重试或手动粘贴。"
+            self.gui.show_insert_failed(msg, allow_skip_retry=skip_llm)
+            return
         if skip_llm:
             raw = edited_text
             llm_text = edited_text
@@ -779,11 +870,11 @@ class App:
                     )
                 except Exception as e:
                     _log(f"[自学习] 错误: {e}")
-                    self.gui.set_model_health("learn", False, str(e))
+                    self._set_model_health("learn", False, str(e))
                 else:
                     if ok_lv:
                         self.gui.mark_history_learn_ok(raw, learn_llm, edited_text)
-                        self.gui.set_model_health("learn", True, "学习调用成功")
+                        self._set_model_health("learn", True, "学习调用成功")
                 finally:
                     self.gui.set_learn_progress(0, 0, False)
             else:

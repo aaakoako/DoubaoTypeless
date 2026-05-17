@@ -10,6 +10,7 @@ import asyncio
 import json
 import socket
 import time
+from datetime import datetime
 from typing import Callable, Optional
 
 from aiohttp import web
@@ -54,6 +55,39 @@ class PhoneBridge:
         self._update_log_last_ts: float = 0.0
         self._update_log_last_comp: object = None
         self._update_log_last_len: int = -1
+        self._last_update_at: str = ""
+        self._last_update_len: int = 0
+        self._last_stable_at: str = ""
+        self._last_stable_len: int = 0
+        self._last_stable_reason: str = ""
+        self._last_client_at: str = ""
+        self._last_disconnect_at: str = ""
+        self._last_client_version: str = ""
+        self._last_meta_enabled: object = None
+        self._last_composition_support: object = None
+
+    @staticmethod
+    def _now_iso() -> str:
+        return datetime.now().isoformat(timespec="seconds")
+
+    def diagnostics(self) -> dict:
+        """运行态摘要；不包含手机正文或 User-Agent。"""
+        return {
+            "url": self.url,
+            "configured_port": self.port,
+            "runtime_port": self.port,
+            "connected_clients": len(self._ws_clients),
+            "last_client_at": self._last_client_at,
+            "last_disconnect_at": self._last_disconnect_at,
+            "last_client_version": self._last_client_version,
+            "last_meta_enabled": self._last_meta_enabled,
+            "last_composition_support": self._last_composition_support,
+            "last_update_at": self._last_update_at,
+            "last_update_len": self._last_update_len,
+            "last_stable_at": self._last_stable_at,
+            "last_stable_len": self._last_stable_len,
+            "last_stable_reason": self._last_stable_reason,
+        }
 
     async def start(self, loop: asyncio.AbstractEventLoop):
         self._app = web.Application()
@@ -120,6 +154,8 @@ class PhoneBridge:
                         now = time.monotonic()
                         comp = meta.get("isComposing")
                         plen = len(text)
+                        self._last_update_at = self._now_iso()
+                        self._last_update_len = plen
                         if self._update_log_last_len < 0:
                             should_log = True
                         else:
@@ -147,6 +183,9 @@ class PhoneBridge:
                         self._on_update(text, meta)
                     elif msg_type == "stable" and text and self._on_text:
                         st = len(text)
+                        self._last_stable_at = self._now_iso()
+                        self._last_stable_len = st
+                        self._last_stable_reason = str(meta.get("stableReason") or "")
                         tail = (
                             ""
                             if self._redact_text_in_logs
@@ -162,6 +201,9 @@ class PhoneBridge:
                         self._on_text(text, meta)
                     elif msg_type == "send" and text and self._on_text:
                         sn = len(text)
+                        self._last_stable_at = self._now_iso()
+                        self._last_stable_len = sn
+                        self._last_stable_reason = "send"
                         tail = (
                             ""
                             if self._redact_text_in_logs
@@ -181,6 +223,10 @@ class PhoneBridge:
                             f"since_comp_end_ms={meta.get('sinceCompositionEndMs')}"
                         )
                     elif msg_type == "hello":
+                        self._last_client_at = self._now_iso()
+                        self._last_client_version = str(meta.get("clientVersion") or "")
+                        self._last_meta_enabled = meta.get("metaEnabled")
+                        self._last_composition_support = meta.get("compositionSupport")
                         self._log(
                             "[bridge.hello] "
                             f"client_version={meta.get('clientVersion')} "
@@ -194,6 +240,7 @@ class PhoneBridge:
                     self._log(f"[bridge] WS error: {ws.exception()}")
         finally:
             self._ws_clients.discard(ws)
+            self._last_disconnect_at = self._now_iso()
             self._log(f"[bridge] 手机断开 ({len(self._ws_clients)} 台)")
 
         return ws

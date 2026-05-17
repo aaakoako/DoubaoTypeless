@@ -57,6 +57,9 @@ class VocabularyManagerWindow:
         self._tbank.load()
         self._pending_rows: list[dict] = []
         self._pending_scroll: Optional[ctk.CTkScrollableFrame] = None
+        self._search_after_id: Optional[str] = None
+        # 只注册一次，避免反复打开词库窗口时 trace 叠加导致每次按键多次调度
+        self._search_var.trace_add("write", lambda *_: self._schedule_refresh())
 
     def show(self):
         if self._win is not None and self._win.winfo_exists():
@@ -82,7 +85,6 @@ class VocabularyManagerWindow:
         ctk.CTkEntry(top, textvariable=self._search_var, width=200, placeholder_text="过滤显示").pack(
             side="left", padx=(0, 8)
         )
-        self._search_var.trace_add("write", lambda *_: self._refresh_lists())
 
         ctk.CTkButton(top, text="撤销", width=72, command=self._undo).pack(side="left", padx=4)
         ctk.CTkButton(
@@ -181,6 +183,39 @@ class VocabularyManagerWindow:
         save_dict_suggestions_pending(
             self._config.dict_suggestions_pending_path, self._pending_rows
         )
+
+    def _alive_win(self) -> Optional[ctk.CTkToplevel]:
+        """词库窗口仍存在且未销毁时返回该窗口，否则 None（避免 TclError / 已 destroy 仍调度）。"""
+        w = self._win
+        if w is None:
+            return None
+        try:
+            if w.winfo_exists():
+                return w
+        except tk.TclError:
+            pass
+        return None
+
+    def _schedule_refresh(self):
+        w = self._alive_win()
+        if w is None:
+            return
+        if self._search_after_id is not None:
+            try:
+                w.after_cancel(self._search_after_id)
+            except tk.TclError:
+                pass
+            self._search_after_id = None
+        self._search_after_id = w.after(250, self._debounced_refresh_lists)
+
+    def _debounced_refresh_lists(self):
+        self._search_after_id = None
+        w = self._alive_win()
+        if w is None:
+            return
+        if self._terms_scroll is None:
+            return
+        self._refresh_lists()
 
     def _refresh_lists(self):
         q = self._search_q()
@@ -511,6 +546,12 @@ class VocabularyManagerWindow:
             return
         self._on_saved()
         if self._win:
+            if self._search_after_id is not None:
+                try:
+                    self._win.after_cancel(self._search_after_id)
+                except tk.TclError:
+                    pass
+                self._search_after_id = None
             try:
                 self._win.destroy()
             except Exception:

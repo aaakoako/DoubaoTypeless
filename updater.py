@@ -18,6 +18,7 @@ import re
 import subprocess
 import sys
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable
 
@@ -111,8 +112,27 @@ def normalize_version_tuple(s: str) -> tuple[int, ...]:
     return tuple(parts) if parts else (0,)
 
 
+def compare_version_tags(left: str, right: str) -> int:
+    """语义化比较版本号；0.4 与 0.4.0 视为相同。"""
+    a = list(normalize_version_tuple(left))
+    b = list(normalize_version_tuple(right))
+    n = max(len(a), len(b))
+    a.extend([0] * (n - len(a)))
+    b.extend([0] * (n - len(b)))
+    if a > b:
+        return 1
+    if a < b:
+        return -1
+    return 0
+
+
 def remote_is_newer(remote_tag: str, current: str = APP_VERSION) -> bool:
-    return normalize_version_tuple(remote_tag) > normalize_version_tuple(current)
+    return compare_version_tags(remote_tag, current) > 0
+
+
+def _schtasks_start_time() -> str:
+    """schtasks /Create 需要一个时间；创建后会立即 /Run，此时间只用于满足参数。"""
+    return (datetime.now() + timedelta(minutes=1)).strftime("%H:%M")
 
 
 async def fetch_latest_release(*, log) -> tuple[dict[str, Any] | None, str | None]:
@@ -264,7 +284,7 @@ def write_update_bat(
                 'set "LOGD=%DT_LOG_DIR%\\debug.log"',
                 f'set "WAIT_PID={pid}"',
                 'call :ulog "update bat started"',
-                "timeout /t 2 /nobreak >nul",
+                "call :sleep_sec 2",
                 'if not "!WAIT_PID!"=="0" (',
                 '  call :ulog "waiting for main PID !WAIT_PID! to exit (PowerShell Get-Process)"',
                 "  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \""
@@ -280,12 +300,12 @@ def write_update_bat(
                 ":wait",
                 f'tasklist /FI "IMAGENAME eq {exe_name}" 2>nul | find /I "{exe_name}" >nul',
                 "if errorlevel 1 goto wait_done",
-                "timeout /t 1 /nobreak >nul",
+                "call :sleep_sec 1",
                 "goto wait",
                 ":wait_done",
                 ":wait_after",
                 'call :ulog "old process gone, waiting 10s for _MEI / file handle release"',
-                "timeout /t 10 /nobreak >nul",
+                "call :sleep_sec 10",
                 'call :ulog "deleting old exe (retry on lock)"',
                 'set "DEL_N=0"',
                 ":del_old",
@@ -295,7 +315,7 @@ def write_update_bat(
                 "set /a DEL_N+=1",
                 "if !DEL_N! geq 36 goto del_old_fail",
                 'call :ulog "WARN old exe locked, retry !DEL_N!/35 in 2s"',
-                "timeout /t 2 /nobreak >nul",
+                "call :sleep_sec 2",
                 "goto del_old",
                 ":del_old_fail",
                 'call :ulog "ERROR del old failed after retries (AV/sync holding file?)"',
@@ -310,7 +330,7 @@ def write_update_bat(
                 "set /a MV_N+=1",
                 "if !MV_N! geq 26 goto mv_fail",
                 'call :ulog "WARN move failed, retry !MV_N!/25 in 2s"',
-                "timeout /t 2 /nobreak >nul",
+                "call :sleep_sec 2",
                 "goto mv_new",
                 ":mv_fail",
                 'call :ulog "ERROR move failed after retries"',
@@ -323,7 +343,7 @@ def write_update_bat(
                 "  exit /b 1",
                 ")",
                 'call :ulog "move OK, pre-launch pause 4s"',
-                "timeout /t 4 /nobreak >nul",
+                "call :sleep_sec 4",
                 f'set "DT_RESTART_EXE={cur_set}"',
                 f'set "DT_RESTART_DIR={dir_set}"',
                 'call :ulog "starting new process via cmd start /D (working dir + exe)"',
@@ -349,6 +369,16 @@ def write_update_bat(
                 "endlocal",
                 'del "%~f0"',
                 "exit /b 0",
+                "",
+                ":sleep_sec",
+                'set "DT_SLEEP_SECONDS=%~1"',
+                "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \""
+                "Start-Sleep -Seconds ([int]$env:DT_SLEEP_SECONDS)\"",
+                "if errorlevel 1 (",
+                "  set /a DT_PING_COUNT=%~1+1",
+                "  ping -n !DT_PING_COUNT! 127.0.0.1 >nul",
+                ")",
+                "exit /b",
                 "",
                 ":ulog",
                 '>>"%LOGU%" echo %date% %time% [update] %~1',
@@ -376,12 +406,99 @@ def _win32_updater_creation_flags() -> int:
     return flags
 
 
+def _write_update_task_wrapper(bat: Path, task_name: str) -> Path:
+    """给 schtasks 兜底启动用：跑真实更新 bat，随后删除计划任务与 wrapper。"""
+    wrapper = bat.with_name("_DoubaoTypeless_update_task.cmd")
+    bat_esc = str(bat.resolve()).replace("%", "%%")
+    task_esc = task_name.replace("%", "%%")
+    wrapper.write_text(
+        "\n".join(
+            [
+                "@echo off",
+                "chcp 65001 >nul",
+                "setlocal",
+                f'set "DT_UPDATE_TASK={task_esc}"',
+                f'call "{bat_esc}"',
+                "set \"DT_UPDATE_EXIT=%ERRORLEVEL%\"",
+                'schtasks.exe /Delete /TN "%DT_UPDATE_TASK%" /F >nul 2>&1',
+                'del "%~f0" >nul 2>&1',
+                "exit /b %DT_UPDATE_EXIT%",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return wrapper
+
+
+def _run_schtasks(cmd: list[str]) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        errors="replace",
+        timeout=12,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        if sys.platform == "win32"
+        else 0,
+    )
+
+
+def _launch_update_bat_scheduled(
+    bat: Path, *, log: Callable[[str], Any] | None = None
+) -> bool:
+    if sys.platform != "win32":
+        return False
+    task_name = f"DoubaoTypeless_Update_{os.getpid()}_{int(time.time())}"
+    wrapper = _write_update_task_wrapper(bat, task_name)
+    tr = f'cmd.exe /d /c "{wrapper.resolve()}"'
+    create_cmd = [
+        "schtasks.exe",
+        "/Create",
+        "/TN",
+        task_name,
+        "/TR",
+        tr,
+        "/SC",
+        "ONCE",
+        "/ST",
+        _schtasks_start_time(),
+        "/F",
+    ]
+    run_cmd = ["schtasks.exe", "/Run", "/TN", task_name]
+    try:
+        created = _run_schtasks(create_cmd)
+        if created.returncode != 0:
+            if log:
+                log(
+                    "[update] 计划任务兜底创建失败: "
+                    + ((created.stderr or created.stdout or "").strip()[:500])
+                )
+            return False
+        started = _run_schtasks(run_cmd)
+        if started.returncode != 0:
+            _run_schtasks(["schtasks.exe", "/Delete", "/TN", task_name, "/F"])
+            if log:
+                log(
+                    "[update] 计划任务兜底启动失败: "
+                    + ((started.stderr or started.stdout or "").strip()[:500])
+                )
+            return False
+        if log:
+            log("[update] 已通过计划任务启动后台更新脚本（兜底脱离主进程 Job）")
+        return True
+    except Exception as e:
+        if log:
+            log(f"[update] 计划任务兜底失败: {e}")
+        return False
+
+
 def launch_update_bat(bat: Path, *, log: Callable[[str], Any] | None = None) -> bool:
     try:
         bat = bat.resolve()
         cwd = str(bat.parent.resolve())
         kw: dict[str, Any] = {
-            "args": ["cmd.exe", "/c", str(bat)],
+            "args": ["cmd.exe", "/d", "/c", str(bat)],
             "cwd": cwd,
             "close_fds": True,
             "stdin": subprocess.DEVNULL,
@@ -399,7 +516,11 @@ def launch_update_bat(bat: Path, *, log: Callable[[str], Any] | None = None) -> 
     except Exception as e:
         if log:
             log(f"[update] 启动更新脚本失败: {e}")
-        return False
+    if sys.platform == "win32":
+        if log:
+            log("[update] 尝试使用 Windows 计划任务兜底启动更新脚本")
+        return _launch_update_bat_scheduled(bat, log=log)
+    return False
 
 
 async def run_update_precheck(*, log) -> tuple[str, dict[str, Any]]:
@@ -423,10 +544,21 @@ async def run_update_precheck(*, log) -> tuple[str, dict[str, Any]]:
     if not tag:
         return ("show", {"message": "Release 数据异常（无 tag）。"})
 
-    if not remote_is_newer(tag, APP_VERSION):
+    cmp_latest = compare_version_tags(tag, APP_VERSION)
+    if cmp_latest == 0:
         return (
             "show",
             {"message": f"当前已是最新（本机 v{APP_VERSION}，远端 {tag}）。"},
+        )
+    if cmp_latest < 0:
+        return (
+            "show",
+            {
+                "message": (
+                    f"本机版本 v{APP_VERSION} 高于远端最新 Release {tag}；"
+                    "若这是本地开发版，无需更新。"
+                )
+            },
         )
 
     releases_page = (

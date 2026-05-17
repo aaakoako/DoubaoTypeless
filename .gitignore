@@ -35,6 +35,7 @@ credentials.json
 # 日志
 debug.log
 *.log
+doubao_diagnostics_*.json
 
 # PyInstaller / 杂项
 opus.dll

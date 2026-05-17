@@ -14,7 +14,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest httpx aiohttp
+      - name: Unit tests
+        run: python -m pytest -q
       - name: Syntax check
         run: |
           python -m py_compile main.py paths.py bridge.py gui.py gui_vocab.py polish.py config.py \
-            hotkeys.py typer.py app_icon.py windows_startup.py term_bank.py providers_registry.py updater.py
+            hotkeys.py typer.py app_icon.py app_version.py windows_startup.py term_bank.py providers_registry.py updater.py diagnostics.py scripts/preflight_release.py
