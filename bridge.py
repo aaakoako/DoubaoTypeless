@@ -7,10 +7,13 @@ the review / optional LLM / insert pipeline.
 """
 
 import asyncio
+import hmac
 import json
+import secrets
 import socket
 import time
 from typing import Callable, Optional
+from urllib.parse import quote
 
 from aiohttp import web
 
@@ -41,12 +44,14 @@ class PhoneBridge:
         on_update: Optional[Callable[[str, dict], None]] = None,
         logger: Optional[Callable[[str], None]] = None,
         redact_text_in_logs: bool = False,
+        pair_token: str | None = None,
     ):
         self.port = port
         self._on_text = on_text
         self._on_update = on_update
         self._log = logger or (lambda m: None)
         self._redact_text_in_logs = redact_text_in_logs
+        self._pair_token = pair_token or secrets.token_urlsafe(24)
         self._app: Optional[web.Application] = None
         self._runner: Optional[web.AppRunner] = None
         self._ws_clients: set[web.WebSocketResponse] = set()
@@ -54,6 +59,10 @@ class PhoneBridge:
         self._update_log_last_ts: float = 0.0
         self._update_log_last_comp: object = None
         self._update_log_last_len: int = -1
+
+    def _request_token_ok(self, request: web.Request) -> bool:
+        supplied = (request.query.get("t") or "").strip()
+        return bool(supplied) and hmac.compare_digest(supplied, self._pair_token)
 
     async def start(self, loop: asyncio.AbstractEventLoop):
         self._app = web.Application()
@@ -66,7 +75,8 @@ class PhoneBridge:
         await site.start()
 
         ip = _get_local_ip()
-        self.url = f"http://{ip}:{self.port}"
+        token_q = quote(self._pair_token, safe="")
+        self.url = f"http://{ip}:{self.port}/?t={token_q}"
         self._log(f"[bridge] 手机页面已启动: {self.url}")
 
     async def notify_cleared(self):
@@ -84,8 +94,16 @@ class PhoneBridge:
             await self._runner.cleanup()
 
     async def _handle_page(self, request: web.Request) -> web.Response:
+        if not self._request_token_ok(request):
+            self._log("[bridge.auth] 拒绝未配对的手机页面访问")
+            return web.Response(
+                status=403,
+                text="配对链接无效或已过期，请在电脑端重新扫码/复制手机访问地址。",
+                content_type="text/plain",
+            )
         ip = _get_local_ip()
-        ws_url = f"ws://{ip}:{self.port}/ws"
+        token_q = quote(self._pair_token, safe="")
+        ws_url = f"ws://{ip}:{self.port}/ws?t={token_q}"
         html = _PHONE_HTML.replace("{{WS_URL}}", ws_url)
         return web.Response(
             text=html,
@@ -98,6 +116,10 @@ class PhoneBridge:
         )
 
     async def _handle_ws(self, request: web.Request) -> web.WebSocketResponse:
+        if not self._request_token_ok(request):
+            self._log("[bridge.auth] 拒绝未配对的 WebSocket 连接")
+            raise web.HTTPForbidden(text="invalid pairing token")
+
         ws = web.WebSocketResponse()
         await ws.prepare(request)
         self._ws_clients.add(ws)
