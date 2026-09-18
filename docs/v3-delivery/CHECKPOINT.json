@@ -2,10 +2,10 @@
   "schema_version": 1,
   "product_goal": "V3完整范围R01-R10，达到可发布候选；实际公开发布另行批准",
   "review_base": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
-  "current_head": "658b273e51972b7f2467ee67234a2fc8fa592e28",
-  "last_completed_slice": "S4_product_ux_soak",
-  "active_slice": "S5_final_candidate_review",
-  "next_action": "S5：固定 SHA 打隔离 onedir、干净启动、迁移/回退材料、独立复核包。S4 已证实电脑设置可授权、拒绝截图后文字仍在、BYOK 401 保留原文且不泄露密钥、换主机需重新授权、生产页无额外配对字段、协议浸泡 200 轮、JS gzip 66.81KiB。不是 Cursor，不是真机 10 分钟长连接或 2 小时语音矩阵。S2 独立复核仍 WAITING。",
+  "current_head": "5f122b07ee1e438fb118e5b516e0d5119c13ca67",
+  "last_completed_slice": "S5_candidate_materials",
+  "active_slice": "WAITING_INDEPENDENT_REVIEW",
+  "next_action": "独立复核 S2+S5；真机主流程仍 BLOCKED。候选 onedir 已干净启动并绑定 SHA 5f122b07 与 exe 3ae9173f。不得自签 RELEASE_READY。未 merge/tag/Release。用户若批准具体 SHA/包哈希/版本号后再公开发布。",
   "accepted_requirements": [
     "R01-R10 原义全部保留",
     "96 项验收定义不改",
@@ -17,10 +17,10 @@
     {
       "missing": "真实 Android + 豆包输入法",
       "probed": "shutil.which('adb') is None",
-      "blocks": ["AC3-002", "AC3-009", "AC3-010", "AC3-011", "AC3-037", "AC3-041", "AC3-045", "AC3-048", "AC3-049", "AC3-053", "AC3-077 真机", "AC3-080 真机", "AC3-082", "AC3-083 真机", "J1 真机", "J3 真机相册", "J4 真机白板", "J7 真机"],
+      "blocks": ["AC3-002", "AC3-009", "AC3-010", "AC3-011", "AC3-037", "AC3-041", "AC3-045", "AC3-048", "AC3-049", "AC3-053", "AC3-077 真机", "AC3-080 真机", "AC3-082", "AC3-083 真机", "J1 真机", "J3 真机相册", "J4 真机白板", "J7 真机", "J8 真机"],
       "who": "设备持有者",
       "min_action": "真机打开候选页，完成引导、拒绝截图后继续语音、相册/白板；可录屏",
-      "unblocked_work": "S5 隔离候选打包与独立复核材料"
+      "unblocked_work": "独立复核材料已齐；不能自签 PASS"
     },
     {
       "missing": "Cursor Composer 可观察 UIA",
@@ -28,47 +28,38 @@
       "blocks": ["AC3-006", "AC3-008", "AC3-061", "主目标一键图文"],
       "who": "本机探测或用户确认半自动路径",
       "min_action": "安装/探测 UIAutomation 并对真实 Cursor Composer 列出可验证字段",
-      "unblocked_work": "S5 不冒充 Cursor"
+      "unblocked_work": "指定粘贴目标证据保留，不冒充 Cursor"
     },
     {
-      "missing": "S2 独立复核签署",
+      "missing": "S2 与 S5 独立复核签署",
       "probed": "实现者不可自签",
-      "blocks": ["S2 完成声明扩大", "RELEASE_READY"],
+      "blocks": ["RELEASE_READY", "PUBLISHED"],
       "who": "独立审阅者",
-      "min_action": "按 docs/evidence/v3-s2/result.json 与截图复核生产入口、像素与目标观察",
-      "unblocked_work": "S5 可准备候选包与复核清单，不能自签 PASS"
-    },
-    {
-      "missing": "10 分钟真机长连接与 2 小时真机 200 轮",
-      "probed": "协议浸泡 200 轮 PASS；S4 后 idle 12s HUD 隐藏；既有 10min 无手机采样仍保留",
-      "blocks": ["AC3-081 真机", "AC3-083 真机"],
-      "who": "设备持有者",
-      "min_action": "真机长连接 10 分钟录像；连续语音/截屏/改图/重试/断连 200 轮",
-      "unblocked_work": "S5 打包不依赖这两项 PASS"
+      "min_action": "按 docs/evidence/v3-s5/INDEPENDENT_REVIEW.md 核对 SHA、包哈希、S2 图文与授权边界",
+      "unblocked_work": "无；产品完成声明停止在 WAITING"
     },
     {
       "missing": "GitHub Actions 对本分支最新 SHA",
-      "probed": "workflow 已接好；尚未推送本批 S4 提交",
+      "probed": "preview-v3.yml 已改为 pytest 通过后再打 Windows onedir；尚未推送",
       "blocks": ["AC3-085 云端"],
       "who": "推送 v3/00-baseline（禁止 tag/Release）",
       "min_action": "用户若允许推送隔离分支",
-      "unblocked_work": "本地 pytest 103 passed；S4 脚本退出码 0"
+      "unblocked_work": "本地 pytest 110 passed；本地 onedir 干净启动 PASS"
     }
   ],
   "in_progress_files": [],
   "last_commands": [
-    {"cmd": "python -m pytest -q --tb=line", "exit_code": 0, "output": "103 passed"},
-    {"cmd": "python tools/v3_s4_product_ux.py", "exit_code": 0, "output": "ok true; byok_401_keeps_text; pc_grant_insert; capture_denied_keeps_text; not_cursor"},
-    {"cmd": "python tools/v3_soak.py", "exit_code": 0, "output": "PASS 200 rounds 2.34s"},
-    {"cmd": "DT_V3_IDLE_S=12 python tools/v3_idle_sample.py", "exit_code": 0, "output": "PASS hud_visible_samples=0"}
+    {"cmd": "python -m pytest -q --tb=line", "exit_code": 0, "output": "110 passed"},
+    {"cmd": "python -m PyInstaller --noconfirm packaging/v3_preview.spec", "exit_code": 0, "output": "Build complete onedir"},
+    {"cmd": "python tools/v3_s5_candidate.py", "exit_code": 0, "output": "ok true; second_instance_aborted; daily_config_unchanged; idle_hud"}
   ],
   "candidate_artifact": {
     "path": "dist/DoubaoTypelessV3Preview/DoubaoTypelessV3Preview.exe",
-    "sha256": "210f1c98f4c1619ae4665421ded97065b58031975d5653d2ad2714716822e2ff",
+    "sha256": "3ae9173fcf5ab79a8ecaa990458555f4775527f1dfdb7f5f147f3bbf957f60d4",
     "kind": "isolated_dev_onedir",
     "release": false,
-    "source_head": "988f3294dc47316e6cf36dc14b0e7ec325de2e42",
-    "stale_vs_s4": false
+    "source_head": "5f122b07ee1e438fb118e5b516e0d5119c13ca67",
+    "stale_vs_s5": false
   },
   "published": false
 }

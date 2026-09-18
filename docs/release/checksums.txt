@@ -1,0 +1,7 @@
+source 5f122b07ee1e438fb118e5b516e0d5119c13ca67
+branch v3/00-baseline
+exe 3ae9173fcf5ab79a8ecaa990458555f4775527f1dfdb7f5f147f3bbf957f60d4
+exe_bytes 12583613
+release false
+not a GitHub Release
+no v* tag created by this pack
