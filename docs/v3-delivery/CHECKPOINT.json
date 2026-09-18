@@ -2,7 +2,7 @@
   "schema_version": 1,
   "product_goal": "V3完整范围R01-R10，达到可发布候选；实际公开发布另行批准",
   "review_base": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
-  "current_head": "55181942f37069cffa41e5b383522eb55d126ee0",
+  "current_head": "bd394889f783efabc7d60b761600ac691244d60f",
   "last_completed_slice": "S3_multi_board_recovery",
   "active_slice": "S4_product_ux_soak",
   "next_action": "S4：BYOK 真实配置/错误反馈、首次连接与设置可达、视觉逐屏、2小时200轮与性能预算、R01–R10接通。S3 已证实生产页两图+白板、重排、空白板拒绝、撤销重做、再编辑、先三图后文、召回不吞当前稿、快照字节可恢复。不是 Cursor。S2 独立复核仍 WAITING。",
