@@ -2,7 +2,7 @@
   "schema_version": 1,
   "product_goal": "V3完整范围R01-R10，达到可发布候选；实际公开发布另行批准",
   "review_base": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
-  "current_head": "be18a6c6199e23235080f17a0579dca23ce8435b",
+  "current_head": "6b80b332a86fceb7df47c27fd7b1128d8196faa5",
   "last_completed_slice": "S1_real_text_path",
   "active_slice": "S2_image_then_text",
   "next_action": "S2：截图或选图→裁剪标注→真实分块上传→冻结成品→先图后文进入指定目标。不得写成 Cursor PASS。S1 已证实生产前端纯文字到 DT-S1-TextTarget；适配器 UNKNOWN 属实，控件文本已独立读出。",
