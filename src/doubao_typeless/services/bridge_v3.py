@@ -119,10 +119,8 @@ class V3Bridge:
         height = int(request.query.get("h", "1"))
         role = request.query.get("role", "photo")
         meta = self.store.put_png(data, width=width, height=height, role=role)
-        self.draft.assets.append(meta)
-        self.draft.revision += 1
-        if self._on_activity:
-            self._on_activity(self.draft.text, len(self.draft.assets))
+        if self._on_activity and should_wake("draft.update"):
+            self._on_activity(self.draft.text, max(1, len(self.draft.assets)))
         return web.json_response(meta)
 
     async def _asset_get(self, request: web.Request) -> web.StreamResponse:

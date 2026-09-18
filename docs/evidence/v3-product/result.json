@@ -1,0 +1,72 @@
+{
+  "started_at": "2026-09-18T07:41:04.653518+00:00",
+  "prototype_used": false,
+  "repo_config_exists_before": false,
+  "isolated_data_dir": "G:\\AgentStorage\\Temp\\User\\dt-v3-product-29820",
+  "image_sha256": [
+    "7b96e8661dcc3bf90db8b2cb4fecc2e6637cae63a7f62d8b2cc764adc1e413d8",
+    "65bf51e7bc1bf473cc2a2c89cfd10b4c57c12e4cf6026cf7598d783c24003149"
+  ],
+  "events": [
+    "target_visible",
+    "idle_hud_visible=False",
+    "bridge_port=18766",
+    "attempt={'type': 'attempt.status', 'attempt_id': '991a4390-026a-48b6-a835-89a453c61e00', 'intent_id': 'b178c45d-36f8-49ee-bd27-812f4a97acdb', 'bundle_id': '5f69488e-bdc2-4d62-af2f-337187b8233f', 'adapter_id': 'cursor_windows', 'result': 'CONFIRMED', 'steps': [{'index': 0, 'kind': 'image', 'asset_id': 'ff745d4d-babe-4903-8aec-e347aafbfe4d', 'state': 'observed', 'evidence': 'target_attachment'}, {'index': 1, 'kind': 'image', 'asset_id': 'c7c67075-36b0-470d-97cd-24c65910bbaf', 'state': 'observed', 'evidence': 'target_attachment'}, {'index': 2, 'kind': 'text', 'asset_id': None, 'state': 'observed', 'evidence': 'target_text'}]}"
+  ],
+  "gates": {
+    "idle_hud_hidden": true,
+    "product_composer": true,
+    "two_images": true,
+    "text_after_images": true,
+    "zero_enter": true,
+    "no_auto_send": true,
+    "attempt_confirmed": true,
+    "repo_config_untouched": true
+  },
+  "ui": {
+    "served_product_composer": true,
+    "single_canvas": true,
+    "has_insert": true,
+    "not_design_prototype": true,
+    "hit_44": true
+  },
+  "received_images": [
+    "7b96e8661dcc3bf90db8b2cb4fecc2e6637cae63a7f62d8b2cc764adc1e413d8",
+    "65bf51e7bc1bf473cc2a2c89cfd10b4c57c12e4cf6026cf7598d783c24003149"
+  ],
+  "received_text": "BEFORE把按钮右移\nOpus 与 Image2\n",
+  "enter_count": 0,
+  "attempt": {
+    "type": "attempt.status",
+    "attempt_id": "991a4390-026a-48b6-a835-89a453c61e00",
+    "intent_id": "b178c45d-36f8-49ee-bd27-812f4a97acdb",
+    "bundle_id": "5f69488e-bdc2-4d62-af2f-337187b8233f",
+    "adapter_id": "cursor_windows",
+    "result": "CONFIRMED",
+    "steps": [
+      {
+        "index": 0,
+        "kind": "image",
+        "asset_id": "ff745d4d-babe-4903-8aec-e347aafbfe4d",
+        "state": "observed",
+        "evidence": "target_attachment"
+      },
+      {
+        "index": 1,
+        "kind": "image",
+        "asset_id": "c7c67075-36b0-470d-97cd-24c65910bbaf",
+        "state": "observed",
+        "evidence": "target_attachment"
+      },
+      {
+        "index": 2,
+        "kind": "text",
+        "asset_id": null,
+        "state": "observed",
+        "evidence": "target_text"
+      }
+    ]
+  },
+  "hud_after_insert": true,
+  "repo_config_exists_after": false
+}

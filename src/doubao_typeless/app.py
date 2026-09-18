@@ -18,6 +18,7 @@ from doubao_typeless.services.delivery import DeliveryService
 from doubao_typeless.services.history import HistoryService
 from doubao_typeless.storage.asset_store import AssetStore
 from doubao_typeless.storage.credentials import AuthService
+from doubao_typeless.adapters.observable_target import from_env as observer_from_env
 from doubao_typeless.ui.hud import HudController
 
 
@@ -43,6 +44,7 @@ class V3App:
         self.history = HistoryService(self.data_dir / "history.json", persist=True)
         self.byok = ByokService()
         self.hud = HudController(on_insert=self.insert_last)
+        self._observer = observer_from_env()
         self._last_attempt: Attempt | None = None
         self.bridge = V3Bridge(
             port=self.port,
@@ -125,11 +127,15 @@ class V3App:
         set_clipboard_text(text)
 
     def _observe_image(self) -> str:
+        if self._observer is not None:
+            return self._observer.observe_image()
         from doubao_typeless.adapters.cursor_windows import observe_image
 
         return observe_image()
 
     def _observe_text(self) -> str:
+        if self._observer is not None:
+            return self._observer.observe_text()
         from doubao_typeless.adapters.generic_text import observe_text
 
         return observe_text()
@@ -152,11 +158,18 @@ class V3App:
             return {"result": self.ledger.status(intent_id) or "UNKNOWN", "duplicate": True}
         if decision == "busy":
             return {"result": "BUSY", "error_code": "BUSY"}
+        class_name, control = self._read_focus()
+        if "V3ComposerTarget" in f"{class_name} {control}":
+            adapter_id = "product_target"
+        else:
+            from doubao_typeless.adapters.cursor_windows import identify
+
+            adapter_id = identify(class_name, control)
         attempt = Attempt(
             attempt_id=str(uuid.uuid4()),
             intent_id=intent_id,
             bundle_id=bundle["bundle_id"],
-            adapter_id="cursor_windows",
+            adapter_id=adapter_id,
         )
         hydrated = self._hydrate_bundle(bundle)
         frozen_text = hydrated.get("text")
@@ -218,6 +231,15 @@ class V3App:
         _log(f"[v3] 配对码 {code} （2分钟内）")
         _log(f"[v3] 数据目录 {self.data_dir}")
         _log("[v3] 空闲无浮窗；Alt+I 插入，Alt+Shift+I 召回；不发送 Enter")
+
+    def start_background(self, *, start_hud: bool = False):
+        if start_hud:
+            self.hud.start()
+        loop = asyncio.new_event_loop()
+        thread = threading.Thread(target=loop.run_forever, daemon=True)
+        thread.start()
+        asyncio.run_coroutine_threadsafe(self.start(), loop).result(15)
+        return loop
 
     async def stop(self) -> None:
         await self.bridge.stop()

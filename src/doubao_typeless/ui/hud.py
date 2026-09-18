@@ -32,6 +32,7 @@ class HudController:
             return
         self._app = QApplication.instance() or QApplication([])
         w = QWidget()
+        w.setWindowTitle("DT-V3-HUD")
         w.setWindowFlags(
             Qt.Tool
             | Qt.FramelessWindowHint
@@ -68,6 +69,13 @@ class HudController:
         self.image_count = image_count
         self.visible = True
         if self._widget is None:
+            return
+        try:
+            from PySide6.QtCore import QThread
+
+            if QThread.currentThread() != self._widget.thread():
+                return
+        except Exception:
             return
         w, h = TOKENS["image_size"] if image_count else TOKENS["text_size"]
         self._widget.resize(w, h)

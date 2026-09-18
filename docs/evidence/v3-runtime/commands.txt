@@ -1,5 +1,6 @@
 $env:PYTHONPATH="src"; python -m pytest -q
 exit_code=0
-passed=54
-python tools/preflight_v3.py
+passed=55
+python tools/v3_product_pass.py
 exit_code=0
+gates_failed=[]
