@@ -1,72 +1,151 @@
+<div align="center">
+
 # DoubaoTypeless
 
-**手机当话筒，Windows 当键盘。** 同一 WiFi 下，用手机页语音输入（或豆包输入法语音），文本实时到 PC；小窗审阅后 **一键插入当前光标**——写代码、怼 IDE 聊天、填表单都不用停下手。
+### 说清需求，圈出位置，画出想法。
 
-可选接入 **任意 OpenAI 兼容 API**（DeepSeek、智谱、MiniMax、Kimi、OpenAI…）做 **前台纠错** 与 **后台学习专名口癖**；**BYOK**，密钥与模型全在你自己手里。
+把手机变成更顺手的 Composer。电脑端按需出现，用完即隐。
 
-> **非官方**社区项目，与字节跳动及「豆包」产品 **无关联**；名称仅说明常见使用路径。
+[![V3 Development](https://img.shields.io/badge/V3-in_development-167D71)](#v3-开发路线)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Released version](https://img.shields.io/github/v/release/aaakoako/DoubaoTypeless?label=released)](https://github.com/aaakoako/DoubaoTypeless/releases)
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Releases](https://img.shields.io/github/v/release/aaakoako/DoubaoTypeless?label=release)](https://github.com/aaakoako/DoubaoTypeless/releases/latest)
+[设计预览](#v3-设计预览) · [下载现有版本](#先使用现有发布版) · [旧版完整指南](docs/legacy-v0.4.md) · [反馈与建议](https://github.com/aaakoako/DoubaoTypeless/issues)
 
-<img width="422" height="308" alt="审阅与插入示意" src="https://github.com/user-attachments/assets/d5156926-680d-4bb4-8460-558bbdca60d0" />
+</div>
+
+> [!IMPORTANT]
+> **V3 已进入开发。** 下方界面为设计原型，截图、标注、白板与图文投递属于本轮开发目标，不代表现有安装包已经支持。现有发布版为 **v0.4.2**，提供手机到 Windows 的语音文本桥接。这里的 V3 是重构方案代号，**不是已发布的 v3.0.0**；实际交付以 [Release 说明](https://github.com/aaakoako/DoubaoTypeless/releases)为准。
+
+## 手机负责表达，电脑负责插入
+
+写给 Agent 的需求，有时很难只靠键盘说清楚：这个按钮要往哪里移，这一块布局哪里不对，脑子里的界面大概长什么样。
+
+DoubaoTypeless 正在从手机语音文本桥接，升级为一个轻量的图文输入工具：**用熟悉的手机输入法说话，用手指圈画和裁剪，再把处理过的图片与文字放进电脑上的 Composer。** 不用为了画几条线切换专业设计软件，也不需要另买手写板。
+
+不是新的聊天客户端，不是远程桌面，也不是常驻桌面的控制台。
+
+## V3 设计预览
+
+<table>
+  <tr>
+    <th width="33%">说清需求</th>
+    <th width="33%">圈出位置</th>
+    <th width="33%">画出想法</th>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/v3/phone-composer.webp" width="260" alt="V3 设计原型：手机单页 Composer，包含图片、语音输入文字和插入电脑按钮" /></td>
+    <td align="center"><img src="docs/images/v3/phone-markup.webp" width="260" alt="V3 设计原型：手机截图标注编辑器，支持箭头、编号与快速裁剪" /></td>
+    <td align="center"><img src="docs/images/v3/phone-whiteboard.webp" width="260" alt="V3 设计原型：手机轻量白板，用简单图形和手绘表达目标布局" /></td>
+  </tr>
+  <tr>
+    <td align="center">用手机输入法说话，图片和说明放在一起。</td>
+    <td align="center">在截图上圈、画、标记，直接指出要改哪里。</td>
+    <td align="center">随手画出目标结构，不必追求专业制图。</td>
+  </tr>
+</table>
+
+*以上为可交互原型的设计截图，含模拟连接状态，并非已发布应用截图。正式界面会随开发与实测调整。*
+
+### 桌面不是主界面，只是短暂出现的浮窗
+
+| 什么时候 | 计划中的桌面表现 |
+|---|---|
+| 平时不用 | **没有浮窗、悬浮球或常驻面板**；托盘保留低频入口 |
+| 手机输入、添图或标注 | 短暂出现的小提示，不抢走正在使用的编辑器焦点 |
+| 准备插入 | 显示当前图文摘要与进度；长文不会把窗口撑大 |
+| 插入结束或停止活动 | 自动收起，**隐藏不等于丢弃草稿** |
+| 需要找回内容 | 主动唤起上次图文，重新确认目标后再插入 |
+
+手机也不做复杂导航：**一个 Composer，三个素材入口——截电脑、相册、白板。** 图片标注和白板共用同一个编辑器，不用在“输入／发送／项目管理”之间来回跳转。
+
+## V3 正在做什么
+
+| 能力 | 本轮方向 |
+|---|---|
+| **语音输入** | 保留豆包等手机输入法路径，不重新做语音识别；原文不等待 AI |
+| **截图与传图** | 在手机请求已授权的电脑截图，或从相册添加图片，直接进入编辑 |
+| **快速标注** | 裁剪、圆头笔、记号笔、荧光笔、箭头、形状、编号、文字、撤销与重做 |
+| **轻量白板** | 用简单画布和线框图形表达布局、流程与修改意图；包含在本轮范围内 |
+| **图文插入** | 明确触发后，先插入处理过的图片，再插入文字；**不按 Enter，不替你发送** |
+| **上次图文召回** | 保存图片、顺序和文字；重新选中 Composer 后重试，区分完整重贴与补贴 |
+| **可选 BYOK** | 使用自己的 API Key 做手动文字辅助；不配置模型也能使用核心图文流程 |
+
+### 从看到问题，到把想法放进输入框
+
+**截图修改：** 手机点“截电脑” → 裁剪、圈画 → 语音补充说明 → 插入电脑。
+
+**新设计：** 打开白板 → 随手画出结构 → 说明哪些地方保留、哪些地方改 → 插入电脑。
+
+例如，给截图标上①，再附一张草图：
+
+> 图1①是当前的“装备技能”按钮。按图2的草图，把它移到右下角并缩小一点。技能描述、图标和其它区域不要改。
+
+不要求你写一份完整设计文档，也不让 AI 替你猜“这里”“那里”到底指哪里。
+
+### 焦点错了，不用重新整理一遍
+
+V3 会保留最近一次实际尝试插入的**完整图文快照**。修正目标焦点后，可以重新唤起，而不必再截图、画图或重新说一遍。
+
+已经插入部分图片、只差文字时，不应该无差别重贴整份；无法确认接收结果时，先让你选择恢复方式。**发出粘贴按键，不等于目标输入框已经收到。** 不自动清空目标输入框，也不通过重连重放插入操作。
+
+首批重点验证 Windows、Android 手机和 Cursor Agent／Composer；不同应用的图片接收与焦点行为需要分别实测，暂不承诺“任意 Agent 都能自动插入”。
+
+## 先使用现有发布版
+
+**v0.4.2 仍可使用：手机语音输入 → 电脑审阅小窗 → 插入文字。** 此版本不包含上面展示的 V3 图片编辑、白板和图文投递能力。
+
+[下载 Windows 单文件 EXE](https://github.com/aaakoako/DoubaoTypeless/releases/download/v0.4.2/DoubaoTypeless.exe) · [下载 Windows 便携 ZIP](https://github.com/aaakoako/DoubaoTypeless/releases/download/v0.4.2/DoubaoTypeless_win_portable.zip) · [查看 v0.4.2 发布页](https://github.com/aaakoako/DoubaoTypeless/releases/tag/v0.4.2)
+
+1. 启动电脑端，让手机和电脑处于同一可信局域网；从托盘设置查看手机地址或扫码。
+2. 在手机网页的输入框里，使用豆包等手机输入法语音输入。
+3. 在电脑小窗确认文字后插入。不配置 API 也可以完成这个流程。
+
+<details>
+<summary><strong>从源码运行现有版本（Windows / Python 3.11+）</strong></summary>
+
+下面的标签固定到现有发布版，避免将开发分支与 V3 成品混淆：
+
+```bash
+git clone https://github.com/aaakoako/DoubaoTypeless.git
+cd DoubaoTypeless
+git checkout v0.4.2
+python -m pip install -r requirements.txt
+python main.py
+```
+
+旧版的模型配置、词库、连接诊断、自启动、日志、更新和打包命令已保留在[旧版完整指南](docs/legacy-v0.4.md)。
+
+</details>
+
+## V3 开发路线
+
+目前已进入开发；下表是交付顺序，不表示各阶段已经完成。
+
+| 阶段 | 要验证或交付的内容 |
+|---|---|
+| 技术验证 | 非激活浮窗、真实手机绘画与输入法、真实 Composer 图片接收、焦点修复与恢复 |
+| 纯文字体验 | 无 Key 可用、不等 AI、不常驻、可靠同步，保住现有高频使用体验 |
+| 手机图文闭环 | 电脑截图、相册、裁剪与标注、先图后文、上次图文召回 |
+| 完整表达工具 | 轻量白板、实用笔刷与形状、编号说明、简单引导和可选 BYOK |
+| 候选版本 | Windows 便携包、迁移与回退、真实机器和持续使用验收 |
+
+macOS、Linux 与安全的跨网络连接作为后续方向；本轮先把 Windows 日常使用做好。不做持续屏幕直播、协作白板、无限画布或新的模型聊天客户端。
+
+## 隐私与使用边界
+
+输入法的语音处理由你选择的输入法服务负责；DoubaoTypeless 不提供新的语音识别服务。配置模型辅助时，相关文字会发送到你选择的服务商，请自行确认其数据政策。
+
+**同一局域网不等于传输已加密。** 现有版本请仅用于可信的私人网络，不要直接把桥接端口暴露到公网。V3 的设备配对、截图授权与受控插入属于开发范围，不能当作旧版本已经具备的保障。
+
+V3 的截图设计是按明确操作获取已授权画面，不持续截屏；图文投递默认使用处理后的成品图，不自动附带裁剪前的整张截图。最终发送给模型仍由你在目标应用中确认。
+
+## 反馈与贡献
+
+欢迎在 [Issues](https://github.com/aaakoako/DoubaoTypeless/issues) 分享高频场景和使用问题。反馈现有版本故障时，请注明应用版本、系统、手机浏览器及输入法，优先附脱敏诊断；反馈 V3 设计时请注明“V3 设计建议”。**不要上传 API Key、私人截图或敏感输入正文。**
 
 ---
 
-## 为什么值得试
+应用代码采用 [MIT License](LICENSE)，运行依赖遵循各自许可证。
 
-| 痛点 | 这里怎么解 |
-|------|------------|
-| 长段落手敲打断思路 | 先说完，再在 PC 上改几个字就能发 |
-| 不想把语音交给陌生云端 | 桥接在 **你家局域网**；LLM 只在你 **主动配置** 时才参与纠错/学习 |
-| 手机输入法语音顺手 | 兼容 **豆包输入法（Android）** 等路径；**不依赖**官方 PC 客户端 |
-| 想用自己买的模型 | **OpenAI 兼容 Base URL + Key + Model**，多厂商预设见 `providers.json`，也可走 [LiteLLM](https://github.com/BerriAI/litellm) 统一出口 |
-
-## 和 Vibe Coding 怎么搭
-
-光标停在 **IDE 聊天 / Composer / 终端 / 注释** 里：手机说完 → **PC 小窗确认** → **插入**。这是 **HTTP + WebSocket 桥 + 审阅窗口**，不是 VS Code 插件——因此 **不绑编辑器**，凡能收键盘输入的地方都能用。
-
-```mermaid
-flowchart LR
-  A[手机浏览器 / 输入法] -->|同 WiFi| B[Windows 桥接]
-  B --> C[审阅小窗]
-  C -->|可选 LLM 纠错| D[OpenAI 兼容 API]
-  C --> E[插入当前焦点]
-```
-
-## 快速开始
-
-1. **装依赖并启动**（仅 Windows，**Python 3.11+**）  
-   `pip install -r requirements.txt` → `python main.py`（或 `scripts/启动.bat`）。
-2. **不配 API 也能用**：只做「语音 → 审阅 → 插入」完全没问题。  
-3. 首次运行生成 **`config.json`**。托盘 **设置** 里看 **手机访问地址** 或 **扫码**（须同一 WiFi）。
-4. 需要纠错/学习时，在设置里填 **Base URL、Key、Model**；字段说明见 **`config.json.example`**，数据默认在 **`data/`**。
-
-**免编译尝鲜：** 直接下 [Releases](https://github.com/aaakoako/DoubaoTypeless/releases/latest) 里的 **`DoubaoTypeless.exe`** 或 **`DoubaoTypeless_win_portable.zip`**。
-
-<img width="450" height="600" alt="设置与扫码示意" src="https://github.com/user-attachments/assets/370eb079-7229-4b51-8b0f-e3bc7d6ce90f" />
-
-### 小提示
-
-- **学习写对照表**：设置 → 高级可选 **`confirm`**（先进「词库管理 → 待确认对照」再采纳）、**`auto`**（自动追加；与已有误听冲突时可进待确认，见 **同误听已存在且正确不同**）。新学习样本带 **`sample_id`**，便于在 **`learning_samples.jsonl`** 里检索。
-- **连接诊断**：设置页可看本机 IP、手机地址、端口状态、已连接手机数、最近同步/稳定稿时间、模型状态；点 **开始自检** 可检查端口、手机页面、WebSocket 与手机在线状态，也可导出不含 Key/正文的诊断 JSON。
-- 厂商与模型预设见 **`providers.json`**（含推荐 **temperature**；留空时默认 **0.3**）。  
-- **勿**把带真实密钥的 `config.json` 提交到 Git（已 `.gitignore`）。  
-- 检测局域网 IP 时会向 **`8.8.8.8:80`** 做 UDP connect（不写业务内容）。
-
-## Windows 进阶
-
-- **开机自启**、托盘、日志：可选注册表 Run；打包 exe 无控制台时看同目录 **`debug.log`**，设置里可开日志窗口。正文级日志：`set DT_VERBOSE_LOG=1`（PowerShell：`$env:DT_VERBOSE_LOG=1`）。
-- **反馈问题**：优先在设置页点 **导出诊断 JSON**；它只包含状态、路径、计数、时间戳和脱敏日志片段，不包含 API Key 或语音正文。
-- **应用内更新**：单文件 exe 会从 Release 下载并尝试就地替换；若杀软/占用导致失败，请看 **`update.log`**、**`debug.log`**（`[update]`），或保留的 **`_DoubaoTypeless_update_failed.bat`**。更稳的方式是 **完全退出** 后用 **`DoubaoTypeless_win_portable.zip`** 整包覆盖 `DoubaoTypeless` 目录。
-- **本地打包**：`pyinstaller --noconfirm DoubaoTypeless.spec`（单文件）；`pyinstaller --noconfirm DoubaoTypeless_portable.spec`（便携目录，再把 `dist/DoubaoTypeless` 打成 zip）。
-- **发版前预检**：`python scripts/preflight_release.py` 会跑测试、语法检查、版本号和发布文件/忽略规则检查。
-
-## 许可证
-
-应用代码 **MIT**（[LICENSE](LICENSE)）。运行依赖以 **`requirements.txt`** 及各包声明为准（含 LGPL 等），分发前请自行评估。
-
-## 声明
-
-个人/社区工具；「豆包」为相关权利人商标，仅说明输入法使用场景。
+**非官方社区项目，与字节跳动及「豆包」产品无关联。** 名称仅说明常见输入法使用场景；「豆包」为相关权利人商标。
