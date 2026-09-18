@@ -83,6 +83,38 @@ class AuthService:
             raise ValueError("action not granted")
         return session
 
+    def set_grants(
+        self,
+        session_id: str,
+        *,
+        allow_insert: bool | None = None,
+        allow_capture: bool | None = None,
+    ) -> Session:
+        session = self.sessions.get(session_id)
+        if session is None or time.time() > session.expires_at:
+            raise ValueError("session missing")
+        if allow_insert is not None:
+            session.allow_insert = bool(allow_insert)
+        if allow_capture is not None:
+            session.allow_capture = bool(allow_capture)
+        return session
+
+    def public_sessions(self) -> list[dict]:
+        return [
+            {
+                "session_id": s.session_id,
+                "device_id": s.device_id,
+                "allow_insert": s.allow_insert,
+                "allow_capture": s.allow_capture,
+                "allow_sync": s.allow_sync,
+            }
+            for s in self.sessions.values()
+            if time.time() <= s.expires_at
+        ]
+
+    def revoke(self, session_id: str) -> bool:
+        return self.sessions.pop(session_id, None) is not None
+
     def issue_nonce(self, session: Session) -> str:
         nonce = secrets.token_urlsafe(24)
         session.used_nonces[nonce] = time.time() + 10

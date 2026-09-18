@@ -13,6 +13,7 @@ asset_dir = ROOT / "assets"
 
 datas = [
     (str(ROOT / "src/doubao_typeless/static/composer.html"), "doubao_typeless/static"),
+    (str(ROOT / "src/doubao_typeless/static/pc.html"), "doubao_typeless/static"),
 ]
 if web_dist.is_dir():
     datas.append((str(web_dist), "web/dist"))

@@ -175,9 +175,16 @@ export function boot(root: HTMLElement): void {
       if (msg.type === "draft.ack") toast("电脑已收到 · 不自动发送");
       if (msg.type === "attempt.status") toast(`电脑：${msg.result} · 未发送Enter`);
       if (msg.type === "recall.ready") toast(msg.text_unchanged ? "已召回上次待插入，当前草稿未改" : "召回异常");
+      if (msg.type === "error") {
+        const err = String(msg.error || "");
+        toast(err.includes("not granted") || err === "CAPTURE_DENIED" ? "这台手机还没有截图权限，文字仍可同步" : err);
+        return;
+      }
       if (msg.type === "capture.result") {
         if (msg.error) {
-          toast(String(msg.error));
+          toast(String(msg.message || msg.error).includes("CAPTURE") || String(msg.error).includes("not granted")
+            ? "这台手机还没有截图权限，文字仍可同步"
+            : String(msg.message || msg.error));
           return;
         }
         const a: Asset = {
@@ -212,11 +219,23 @@ export function boot(root: HTMLElement): void {
     );
   }
 
+  let termTimer = 0;
   $("text").addEventListener("input", (e) => {
     state.text = (e.target as HTMLTextAreaElement).value;
     sendDraft();
     update();
+    window.clearTimeout(termTimer);
+    termTimer = window.setTimeout(() => {
+      void refreshTerms();
+    }, 400);
   });
+  async function refreshTerms() {
+    if (!state.session || !state.text.trim()) return;
+    const res = await fetch("/v3/terms?q=" + encodeURIComponent(state.text), { headers: headers() });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.hints && data.hints.length) toast(String(data.hints[0].hint));
+  }
   $("boardBtn").onclick = () => {
     const a: Asset = { id: "board-" + Date.now(), kind: "白板", preview: "", w: 1600, h: 1000 };
     state.assets.push(a);
@@ -367,7 +386,12 @@ export function boot(root: HTMLElement): void {
     if (!state.text.trim() && !state.assets.length) return;
     sendDraft();
     ws.send(JSON.stringify({ protocol: 3, type: "bundle.commit", text: state.text, revision: state.revision, asset_refs: assetRefs() }));
-    const nonce = await (await fetch("/v3/nonce", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(state.session) })).json();
+    const nonceRes = await fetch("/v3/nonce", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(state.session) });
+    if (!nonceRes.ok) {
+      toast("请在电脑确认插入权限。拒绝后仍可同步文字。练习插入用电脑 Alt+I。");
+      return;
+    }
+    const nonce = await nonceRes.json();
     ws.send(
       JSON.stringify({
         protocol: 3,
@@ -386,7 +410,7 @@ export function boot(root: HTMLElement): void {
 
   function showPair() {
     const sheet = $("sheet");
-    $("sheetCard").innerHTML = `<h2>连接这台电脑</h2><p>三步上手：打开地址 → 输入配对码 → 电脑确认插入/截图权限。手机不能自授按键或截屏。</p><input id="pairCode" /><button class="primary" id="pairGo">配对</button>`;
+    $("sheetCard").innerHTML = `<h2>连接这台电脑</h2><p>三步上手：打开地址 → 输入配对码 → 电脑确认插入/截图权限。手机不能自授按键或截屏。练习插入用电脑 Alt+I。召回是 Alt+Shift+I，不是跳过纠错。</p><input id="pairCode" /><button class="primary" id="pairGo">配对</button>`;
     sheet.classList.add("show");
     $("pairGo").onclick = async () => {
       const res = await fetch("/v3/pair", {
@@ -424,7 +448,11 @@ export function boot(root: HTMLElement): void {
     };
   };
   $("settingsBtn").onclick = () => {
-    $("sheetCard").innerHTML = "<h2>简单设置</h2><p>不配 Key 也能画图和投递。密钥只存在电脑。</p>";
+    $("sheetCard").innerHTML = `<h2>简单设置</h2>
+      <p>密钥只存在电脑；不配 Key 也能画图和投递。拒绝截图仍可同步文字。Alt+Shift+I 是召回，不再是跳过纠错。</p>
+      <p>插入 / 召回：Alt+I / Alt+Shift+I</p>
+      <p>最近图文：20份 · 24小时</p>
+      <p>AI 纠错：可选 · 电脑 BYOK</p>`;
     $("sheet").classList.add("show");
   };
   $("sheet").onclick = (e) => {

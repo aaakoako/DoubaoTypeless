@@ -20,6 +20,11 @@ from doubao_typeless.services.assets import UploadService, resolve_asset_refs
 
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
+PC_FALLBACK = """<!doctype html><meta charset=utf-8><title>电脑设置</title>
+<p>密钥只存在电脑。不配 Key 也能用。拒绝截图仍可同步文字。Alt+I 插入，Alt+Shift+I 召回，不再是跳过纠错。</p>
+"""
+
+
 def _web_dist() -> Path:
     here = Path(__file__).resolve()
     candidates = [
@@ -89,6 +94,8 @@ class V3Bridge:
         history_list: Callable[[], list] | None = None,
         uploads: UploadService | None = None,
         logger: Callable[[str], None] | None = None,
+        byok: Any | None = None,
+        data_dir: Path | None = None,
     ):
         self.port = port
         self.auth = auth
@@ -101,6 +108,8 @@ class V3Bridge:
         self._on_recall = on_recall
         self._history_list = history_list
         self.uploads = uploads
+        self.byok = byok
+        self.data_dir = Path(data_dir) if data_dir else None
         self._log = logger or (lambda _m: None)
         self._runner: Optional[web.AppRunner] = None
         self._clients: set[web.WebSocketResponse] = set()
@@ -139,6 +148,16 @@ class V3Bridge:
             app.router.add_static("/assets", _web_dist() / "assets")
         app.router.add_get("/v3/history", self._history)
         app.router.add_get("/v3/status", self._status)
+        app.router.add_get("/pc", self._pc)
+        app.router.add_get("/v3/sessions", self._sessions)
+        app.router.add_post("/v3/sessions/revoke", self._revoke)
+        app.router.add_post("/v3/grants", self._grants)
+        app.router.add_get("/v3/byok", self._byok_get)
+        app.router.add_post("/v3/byok", self._byok_post)
+        app.router.add_post("/v3/byok/probe", self._byok_probe)
+        app.router.add_get("/v3/hotkeys", self._hotkeys_get)
+        app.router.add_post("/v3/hotkeys", self._hotkeys_post)
+        app.router.add_get("/v3/terms", self._terms)
         return app
 
     async def start(self) -> None:
@@ -170,6 +189,168 @@ class V3Bridge:
                 "idle_hud": True,
             }
         )
+
+    def _require_loopback(self, request: web.Request) -> web.Response | None:
+        if not is_loopback_host(peer_host(request)):
+            return web.json_response({"error": "pc only"}, status=403)
+        return None
+
+    async def _pc(self, request: web.Request) -> web.Response:
+        denied = self._require_loopback(request)
+        if denied:
+            return denied
+        path = STATIC / "pc.html"
+        if path.is_file():
+            return web.FileResponse(path)
+        return web.Response(text=PC_FALLBACK, content_type="text/html; charset=utf-8")
+
+    async def _sessions(self, request: web.Request) -> web.Response:
+        denied = self._require_loopback(request)
+        if denied:
+            return denied
+        return web.json_response({"items": self.auth.public_sessions()})
+
+    async def _grants(self, request: web.Request) -> web.Response:
+        denied = self._require_loopback(request)
+        if denied:
+            return denied
+        body = await request.json()
+        try:
+            session = self.auth.set_grants(
+                str(body.get("session_id") or ""),
+                allow_insert=body.get("allow_insert"),
+                allow_capture=body.get("allow_capture"),
+            )
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        return web.json_response(
+            {
+                "session_id": session.session_id,
+                "allow_insert": session.allow_insert,
+                "allow_capture": session.allow_capture,
+            }
+        )
+
+    async def _revoke(self, request: web.Request) -> web.Response:
+        denied = self._require_loopback(request)
+        if denied:
+            return denied
+        body = await request.json()
+        removed = self.auth.revoke(str(body.get("session_id") or ""))
+        return web.json_response({"ok": removed})
+
+    async def _byok_get(self, request: web.Request) -> web.Response:
+        denied = self._require_loopback(request)
+        if denied:
+            return denied
+        from doubao_typeless.services.byok import redact_for_log
+
+        byok = self.byok
+        key = getattr(byok, "api_key", "") if byok else ""
+        return web.json_response(
+            {
+                "endpoint": getattr(byok, "endpoint", "") if byok else "",
+                "api_key_set": bool(key),
+                "redacted": redact_for_log(key),
+                "phone_cannot_set": True,
+            }
+        )
+
+    async def _byok_post(self, request: web.Request) -> web.Response:
+        denied = self._require_loopback(request)
+        if denied:
+            return denied
+        body = await request.json()
+        if self.byok is None:
+            return web.json_response({"error": "byok unavailable"}, status=400)
+        from doubao_typeless.services.byok import endpoint_host, redact_for_log
+
+        new_endpoint = str(body.get("endpoint") or "").strip()
+        old_host = endpoint_host(self.byok.endpoint)
+        new_host = endpoint_host(new_endpoint)
+        if new_endpoint and old_host and new_host and new_host != old_host and "api_key" not in body:
+            return web.json_response(
+                {
+                    "needs_reauth": True,
+                    "message": "更换服务地址后，需重新授权密钥",
+                    "endpoint": self.byok.endpoint,
+                }
+            )
+        self.byok.endpoint = new_endpoint
+        if "api_key" in body:
+            self.byok.api_key = str(body.get("api_key") or "").strip()
+        if self.data_dir is not None:
+            from doubao_typeless.storage.settings_store import save_settings
+
+            save_settings(
+                self.data_dir,
+                {"byok_endpoint": self.byok.endpoint, "byok_api_key": self.byok.api_key},
+            )
+        return web.json_response({"ok": True, "redacted": redact_for_log(self.byok.api_key)})
+
+    async def _byok_probe(self, request: web.Request) -> web.Response:
+        denied = self._require_loopback(request)
+        if denied:
+            return denied
+        if self.byok is None:
+            return web.json_response({"status": "skipped", "reason": "no_key", "text": "probe"})
+        body = await request.json()
+        text = str(body.get("text") or "probe")
+        out = self.byok.polish(
+            text,
+            draft_id=self.draft.draft_id,
+            revision=self.draft.revision,
+            current_draft_id=self.draft.draft_id,
+            current_revision=self.draft.revision,
+        )
+        dumped = json.dumps(out, ensure_ascii=False)
+        key = getattr(self.byok, "api_key", "")
+        if key and key in dumped:
+            return web.json_response({"error": "key leaked"}, status=500)
+        return web.json_response(out)
+
+    async def _hotkeys_get(self, request: web.Request) -> web.Response:
+        denied = self._require_loopback(request)
+        if denied:
+            return denied
+        from doubao_typeless.platform.windows.hotkeys import probe_hotkey_conflicts
+        from doubao_typeless.storage.settings_store import load_settings
+
+        stored = load_settings(self.data_dir) if self.data_dir else {}
+        probe = probe_hotkey_conflicts()
+        return web.json_response(
+            {
+                "insert": stored.get("hotkey_insert") or "<alt>+i",
+                "recall": stored.get("hotkey_recall") or "<alt>+<shift>+i",
+                "probe": probe,
+                "note": "Alt+Shift+I 现为召回上次图文，不再同时绑定跳过纠错。语法合法不等于注册成功。",
+                "restart_required_to_apply": True,
+            }
+        )
+
+    async def _hotkeys_post(self, request: web.Request) -> web.Response:
+        denied = self._require_loopback(request)
+        if denied:
+            return denied
+        if self.data_dir is None:
+            return web.json_response({"error": "no isolated settings"}, status=400)
+        body = await request.json()
+        from doubao_typeless.storage.settings_store import save_settings
+
+        save_settings(
+            self.data_dir,
+            {
+                "hotkey_insert": str(body.get("hotkey_insert") or "<alt>+i"),
+                "hotkey_recall": str(body.get("hotkey_recall") or "<alt>+<shift>+i"),
+            },
+        )
+        return web.json_response({"ok": True, "restart_required": True, "hint": "失败请改键，语法合法不等于注册成功"})
+
+    async def _terms(self, request: web.Request) -> web.Response:
+        self._session_from(request)
+        from doubao_typeless.services.terms import hints
+
+        return web.json_response({"hints": hints(str(request.query.get("q") or "")), "auto_replace": False})
 
     async def _pair_get(self, request: web.Request) -> web.Response:
         if not is_loopback_host(peer_host(request)):
@@ -425,7 +606,17 @@ class V3Bridge:
                 await ws.send_json({"type": "attempt.status", **status})
                 return True
             if kind == "capture.request":
-                self.auth.authorize(data["session_id"], data.get("token") or "", "capture")
+                try:
+                    self.auth.authorize(data["session_id"], data.get("token") or "", "capture")
+                except ValueError:
+                    await ws.send_json(
+                        {
+                            "type": "capture.result",
+                            "error": "CAPTURE_DENIED",
+                            "message": "这台手机还没有截图权限，文字仍可同步",
+                        }
+                    )
+                    return True
                 if not self._on_capture:
                     await ws.send_json({"type": "capture.result", "error": "unavailable"})
                     return True

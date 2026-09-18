@@ -50,7 +50,10 @@ class V3App:
             text="",
         )
         self.history = HistoryService(self.data_dir / "history.json", persist=True, db=self.db)
-        self.byok = ByokService()
+        from doubao_typeless.storage.settings_store import load_settings
+
+        stored = load_settings(self.data_dir)
+        self.byok = ByokService(endpoint=stored.get("byok_endpoint") or "", api_key=stored.get("byok_api_key") or "")
         self.hud = HudController(on_insert=self.insert_last)
         self._observer = observer_from_env()
         self._last_attempt: Attempt | None = None
@@ -75,6 +78,8 @@ class V3App:
             history_list=self._history_public,
             uploads=self.uploads,
             logger=_log,
+            byok=self.byok,
+            data_dir=self.data_dir,
         )
         self.capture = CaptureService(grab=self._grab, hide_surfaces=self.hud.hide)
         self.delivery = DeliveryService(
@@ -386,8 +391,16 @@ def main() -> None:
     app.hud.start()
     try:
         from doubao_typeless.platform.windows.hotkeys import start_hotkeys
+        from doubao_typeless.storage.settings_store import load_settings
 
-        start = start_hotkeys(on_insert=app.insert_last, on_recall=app.recall_last, on_region=app.capture_region)
+        stored = load_settings(app.data_dir)
+        start = start_hotkeys(
+            on_insert=app.insert_last,
+            on_recall=app.recall_last,
+            on_region=app.capture_region,
+            insert_combo=str(stored.get("hotkey_insert") or "<alt>+i"),
+            recall_combo=str(stored.get("hotkey_recall") or "<alt>+<shift>+i"),
+        )
         if start.get("failures"):
             _log(f"[v3] 热键注册失败，不会把语法合法当成成功: {start['failures']}")
         if start.get("esc_bound"):

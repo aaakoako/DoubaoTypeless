@@ -1,0 +1,8 @@
+{
+  "case_id": "AC3-081-smoke",
+  "status": "PASS",
+  "duration_s": 12,
+  "hud_visible_samples": 0,
+  "max_rss": 76615680,
+  "note": "S4 后短采样：HUD 仍隐藏。10 分钟无手机采样仍见 docs/evidence/v3-idle/result.json。不是 10 分钟真机长连接。"
+}

@@ -12,6 +12,8 @@ def start_hotkeys(
     on_insert: Callable[[], None],
     on_recall: Callable[[], None],
     on_region: Callable[[], None] | None = None,
+    insert_combo: str = "<alt>+i",
+    recall_combo: str = "<alt>+<shift>+i",
 ):
     from pynput.keyboard import GlobalHotKeys, Key, Listener
 
@@ -28,8 +30,8 @@ def start_hotkeys(
         return _inner
 
     mapping = {
-        "<alt>+i": wrap(insert_gate, on_insert),
-        "<alt>+<shift>+i": wrap(recall_gate, on_recall),
+        insert_combo or "<alt>+i": wrap(insert_gate, on_insert),
+        recall_combo or "<alt>+<shift>+i": wrap(recall_gate, on_recall),
     }
     if on_region:
         mapping["<alt>+<shift>+s"] = wrap(region_gate, on_region)
@@ -37,7 +39,7 @@ def start_hotkeys(
         listener = GlobalHotKeys(mapping)
         listener.start()
     except Exception as exc:
-        failures.append(str(exc))
+        failures.append(f"热键注册失败，不会把语法合法当成成功: {exc}")
         listener = None
 
     def on_release(key):
@@ -52,3 +54,31 @@ def start_hotkeys(
     except Exception as exc:
         failures.append(str(exc))
     return {"listener": listener, "release": release_listener, "failures": failures, "esc_bound": False}
+
+
+def probe_hotkey_conflicts() -> dict:
+    """RegisterHotKey probe. Syntax-legal combos can still be occupied."""
+    import sys
+
+    result = {"insert": "unknown", "recall": "unknown", "hint": "失败请改键，语法合法不等于注册成功", "esc_bound": False}
+    if sys.platform != "win32":
+        result["insert"] = "unsupported"
+        result["recall"] = "unsupported"
+        return result
+    import ctypes
+
+    user32 = ctypes.windll.user32
+    MOD_ALT = 0x0001
+    MOD_SHIFT = 0x0004
+    VK_I = 0x49
+
+    def _probe(ident: int, mods: int) -> str:
+        ok = user32.RegisterHotKey(None, ident, mods, VK_I)
+        if ok:
+            user32.UnregisterHotKey(None, ident)
+            return "free"
+        return "conflict"
+
+    result["insert"] = _probe(0xD701, MOD_ALT)
+    result["recall"] = _probe(0xD702, MOD_ALT | MOD_SHIFT)
+    return result

@@ -46,6 +46,7 @@ docs/evidence/v3-soak/assets/
 docs/evidence/v3-soak/soak.sqlite
 docs/evidence/v3-ci/junit.xml
 docs/evidence/v3-idle/data/
+docs/evidence/v3-s4/data/
 opus.dll
 *.spec.bak
 _DoubaoTypeless_update.bat

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Any, Callable
+from urllib.parse import urlparse
 
 
 class ByokService:
@@ -32,7 +33,7 @@ class ByokService:
         if images:
             raise ValueError("byok does not accept images")
         if not self.available():
-            return {"status": "skipped", "reason": "no_key", "text": text}
+            return {"status": "skipped", "reason": "no_key", "message": ERROR_LABELS["no_key"], "text": text}
         if draft_id != current_draft_id or revision != current_revision:
             return {"status": "stale", "reason": "draft moved", "text": None}
         if self._post is None:
@@ -44,25 +45,46 @@ class ByokService:
                 {"Authorization": f"Bearer {self.api_key}"},
             )
         except Exception as exc:
-            return {"status": "error", "reason": classify_api_error(exc), "text": text}
+            reason = classify_api_error(exc, self.api_key)
+            return {
+                "status": "error",
+                "reason": reason,
+                "message": ERROR_LABELS[reason],
+                "text": text,
+            }
         if draft_id != current_draft_id or revision != current_revision:
             return {"status": "stale", "reason": "draft moved after response", "text": None}
         out = str(body.get("text") or text)
         return {"status": "ok", "text": out, "reason": ""}
 
 
-def classify_api_error(exc: Exception) -> str:
-    message = str(exc).lower()
+ERROR_LABELS = {
+    "unauthorized": "密钥无效（401），原文仍可插入",
+    "not_found": "接口不存在（404），原文仍可插入",
+    "rate_limited": "请求过于频繁（429），原文仍可插入",
+    "timeout": "模型超时，原文仍可插入",
+    "tls": "证书或 TLS 失败，原文仍可插入",
+    "format": "返回格式无法使用，原文仍可插入",
+    "no_key": "未配置密钥，跳过模型，原文可用",
+}
+
+
+def classify_api_error(exc: Exception, api_key: str = "") -> str:
+    raw = str(exc)
+    if api_key and api_key in raw:
+        raw = raw.replace(api_key, "…")
+    message = raw.lower()
+    name = type(exc).__name__.lower()
+    if isinstance(exc, TimeoutError) or "timeout" in message or "timeout" in name:
+        return "timeout"
+    if "ssl" in message or "tls" in message or "ssl" in name:
+        return "tls"
     if "401" in message or "unauthorized" in message:
         return "unauthorized"
-    if "404" in message:
+    if "404" in message or "not found" in message:
         return "not_found"
-    if "429" in message:
+    if "429" in message or "rate" in message:
         return "rate_limited"
-    if "timeout" in message:
-        return "timeout"
-    if "ssl" in message or "tls" in message:
-        return "tls"
     return "format"
 
 
@@ -70,3 +92,7 @@ def redact_for_log(api_key: str) -> str:
     if not api_key:
         return ""
     return api_key[:2] + "…" if len(api_key) > 2 else "…"
+
+
+def endpoint_host(url: str) -> str:
+    return (urlparse(url or "").hostname or "").lower()
