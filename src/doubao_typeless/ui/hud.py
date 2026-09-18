@@ -71,15 +71,21 @@ class HudController:
         if self._widget is None:
             return
         try:
-            from PySide6.QtCore import QThread
+            from PySide6.QtCore import QThread, QTimer
 
             if QThread.currentThread() != self._widget.thread():
+                QTimer.singleShot(0, self._widget, self._apply_show)
                 return
         except Exception:
             return
-        w, h = TOKENS["image_size"] if image_count else TOKENS["text_size"]
+        self._apply_show()
+
+    def _apply_show(self) -> None:
+        if self._widget is None:
+            return
+        w, h = TOKENS["image_size"] if self.image_count else TOKENS["text_size"]
         self._widget.resize(w, h)
-        self._body.setText(text[-200:] if text else (f"{image_count} 图" if image_count else ""))
+        self._body.setText(self.text[-200:] if self.text else (f"{self.image_count} 图" if self.image_count else ""))
         self._widget.show()
         if self._timer:
             self._timer.start(TOKENS["idle_ms"])

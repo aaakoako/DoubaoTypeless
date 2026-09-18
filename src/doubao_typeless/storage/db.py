@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -59,11 +60,13 @@ class V3DB:
     def __init__(self, path: Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(self.path)
+        self.conn = sqlite3.connect(self.path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
-        self.conn.executescript(SCHEMA)
-        self.conn.execute("INSERT OR IGNORE INTO migrations(id, name) VALUES (1, 'v3-init')")
-        self.conn.commit()
+        self._lock = threading.RLock()
+        with self._lock:
+            self.conn.executescript(SCHEMA)
+            self.conn.execute("INSERT OR IGNORE INTO migrations(id, name) VALUES (1, 'v3-init')")
+            self.conn.commit()
 
     def upsert_asset(
         self,
@@ -74,7 +77,8 @@ class V3DB:
         referenced: bool = False,
         created_at: float | None = None,
     ) -> None:
-        self.conn.execute(
+        with self._lock:
+            self.conn.execute(
             "INSERT OR REPLACE INTO assets(asset_id, sha256, bytes, referenced, created_at) VALUES (?,?,?,?,?)",
             (asset_id, sha256, nbytes, int(referenced), time.time() if created_at is None else created_at),
         )
@@ -107,29 +111,30 @@ class V3DB:
         return removed
 
     def record_bundle(self, bundle: dict[str, Any], *, attempt_result: str) -> None:
-        self.conn.execute(
-            "INSERT OR REPLACE INTO bundles(bundle_id, draft_id, epoch, revision, manifest_hash, text, recorded_at, attempt_result) VALUES (?,?,?,?,?,?,?,?)",
-            (
-                bundle["bundle_id"],
-                bundle.get("draft_id"),
-                bundle.get("epoch"),
-                bundle.get("revision"),
-                bundle.get("manifest_hash"),
-                bundle.get("text", ""),
-                time.time(),
-                attempt_result,
-            ),
-        )
-        self.conn.execute("DELETE FROM bundle_assets WHERE bundle_id=?", (bundle["bundle_id"],))
-        for i, asset in enumerate(bundle.get("assets") or []):
-            aid = asset.get("asset_id")
+        with self._lock:
             self.conn.execute(
-                "INSERT INTO bundle_assets(bundle_id, asset_id, ordinal) VALUES (?,?,?)",
-                (bundle["bundle_id"], aid, i),
+                "INSERT OR REPLACE INTO bundles(bundle_id, draft_id, epoch, revision, manifest_hash, text, recorded_at, attempt_result) VALUES (?,?,?,?,?,?,?,?)",
+                (
+                    bundle["bundle_id"],
+                    bundle.get("draft_id"),
+                    bundle.get("epoch"),
+                    bundle.get("revision"),
+                    bundle.get("manifest_hash"),
+                    bundle.get("text", ""),
+                    time.time(),
+                    attempt_result,
+                ),
             )
-            if aid:
-                self.mark_referenced(aid, True)
-        self.conn.commit()
+            self.conn.execute("DELETE FROM bundle_assets WHERE bundle_id=?", (bundle["bundle_id"],))
+            for i, asset in enumerate(bundle.get("assets") or []):
+                aid = asset.get("asset_id")
+                self.conn.execute(
+                    "INSERT INTO bundle_assets(bundle_id, asset_id, ordinal) VALUES (?,?,?)",
+                    (bundle["bundle_id"], aid, i),
+                )
+                if aid:
+                    self.mark_referenced(aid, True)
+            self.conn.commit()
 
     def last_bundle(self) -> dict[str, Any] | None:
         row = self.conn.execute("SELECT * FROM bundles ORDER BY recorded_at DESC LIMIT 1").fetchone()

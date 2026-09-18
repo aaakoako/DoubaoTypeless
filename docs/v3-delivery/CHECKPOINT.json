@@ -2,10 +2,10 @@
   "schema_version": 1,
   "product_goal": "V3完整范围R01-R10，达到可发布候选；实际公开发布另行批准",
   "review_base": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
-  "current_head": "1a7a1adbec0f794922075365da0d895f779c6db2",
-  "last_completed_slice": "S0_local_foundation",
-  "active_slice": "S1_real_text_path",
-  "next_action": "S1：生产前端→真实桥接→原生HUD→指定输入框纯文字；记录手机/Cursor真实能力，不用产品窗冒充Cursor。S0 GitHub Actions 需推送后才有干净云端执行。S0授权/隔离待独立复核，不扩大完成声明。",
+  "current_head": "be18a6c6199e23235080f17a0579dca23ce8435b",
+  "last_completed_slice": "S1_real_text_path",
+  "active_slice": "S2_image_then_text",
+  "next_action": "S2：截图或选图→裁剪标注→真实分块上传→冻结成品→先图后文进入指定目标。不得写成 Cursor PASS。S1 已证实生产前端纯文字到 DT-S1-TextTarget；适配器 UNKNOWN 属实，控件文本已独立读出。",
   "accepted_requirements": [
     "R01-R10 原义全部保留",
     "96 项验收定义不改",
@@ -17,49 +17,39 @@
     {
       "missing": "真实 Android + 豆包输入法",
       "probed": "shutil.which('adb') is None",
-      "blocks": ["AC3-002", "AC3-009", "AC3-010", "AC3-011", "J1 真机"],
+      "blocks": ["AC3-002", "AC3-009", "AC3-010", "AC3-011", "AC3-037", "J1 真机"],
       "who": "设备持有者",
-      "min_action": "真机浏览器打开候选页，豆包输入法说两段，电脑 Alt+I；可录屏",
-      "unblocked_work": "S1 桌面纯文字、S0 CI 推送后观察"
+      "min_action": "真机打开候选页，豆包输入法说两段，电脑 Alt+I；可录屏",
+      "unblocked_work": "S2 桌面截图/上传/先图后文"
     },
     {
       "missing": "Cursor Composer 可观察 UIA",
-      "probed": "python 3.13 无 comtypes；此前 ProgID 失败",
+      "probed": "python 3.13 无 comtypes",
       "blocks": ["AC3-006", "AC3-008", "主目标一键图文"],
-      "who": "本机安装探测依赖后再测，或用户确认半自动路径",
+      "who": "本机探测或用户确认半自动路径",
       "min_action": "安装/探测 UIAutomation 并对真实 Cursor Composer 列出可验证字段",
-      "unblocked_work": "指定非 Cursor 输入框的 S1 文字链路（不得写成 Cursor PASS）"
+      "unblocked_work": "S2 对非 Cursor 指定目标；不得冒充 Cursor"
     },
     {
-      "missing": "本 SHA 的 GitHub Actions 运行",
-      "probed": "workflow 已含 Node/tsc/vite/pytest/playwright/检查器/windows onedir",
+      "missing": "GitHub Actions 对本分支最新 SHA",
+      "probed": "workflow 已接好；尚未推送本批 S1 提交",
       "blocks": ["AC3-085 云端"],
-      "who": "推送 v3/00-baseline 后查看 run",
-      "min_action": "用户若允许推送隔离分支（仍禁止 tag/Release）",
-      "unblocked_work": "本地已 85 passed + onedir 启动"
+      "who": "推送 v3/00-baseline（禁止 tag/Release）",
+      "min_action": "用户若允许推送隔离分支",
+      "unblocked_work": "本地 pytest 86 passed；S1 脚本退出码 0"
     }
   ],
   "in_progress_files": [],
   "last_commands": [
-    {"cmd": "python -m pytest -q --tb=line", "exit_code": 0, "output": "85 passed"},
-    {"cmd": "python -m unittest discover -s docs/v3-delivery/tests -v", "exit_code": 0},
-    {"cmd": "python -m PyInstaller --noconfirm packaging/v3_preview.spec", "exit_code": 0}
+    {"cmd": "python -m pytest -q --tb=line", "exit_code": 0, "output": "86 passed"},
+    {"cmd": "python tools/v3_s1_text_path.py", "exit_code": 0, "output": "ok true; target_has_text; hud_shown; zero_enter"}
   ],
   "candidate_artifact": {
     "path": "dist/DoubaoTypelessV3Preview/DoubaoTypelessV3Preview.exe",
     "sha256": "1178218f1bccbaa0b039756aa3ce9c4c32c0f0009f65f5cbb949cda45688d3c9",
     "kind": "isolated_dev_onedir",
-    "release": false
+    "release": false,
+    "stale_vs_s1": true
   },
-  "published": false,
-  "paths": {
-    "app": "src/doubao_typeless/app.py",
-    "bridge": "src/doubao_typeless/services/bridge_v3.py",
-    "frontend": "web/",
-    "tests": "tests/",
-    "ci": ".github/workflows/preview-v3.yml",
-    "pack": "packaging/v3_preview.spec",
-    "acceptance": "docs/pocket-composer-v3/fixtures/acceptance.json",
-    "entry": "docs/v3-delivery/START_HERE.md"
-  }
+  "published": false
 }

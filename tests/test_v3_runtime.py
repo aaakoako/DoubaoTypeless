@@ -188,3 +188,28 @@ def test_v3_app_uses_isolated_dir(tmp_path, monkeypatch):
     assert app.hud.visible is False
     assert app.delivery.enter_count == 0
     assert VK_RETURN != 0
+
+
+@pytest.mark.skipif(__import__("sys").platform != "win32", reason="native Qt HUD")
+def test_hud_applies_show_from_worker_thread():
+    import threading
+
+    hud = HudController()
+    hud.start()
+    if hud._widget is None:
+        pytest.skip("PySide6 HUD widget missing")
+    from PySide6.QtWidgets import QApplication
+
+    def worker():
+        hud.show_receiving("from-worker", 0)
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    thread.join(2)
+    app = QApplication.instance()
+    if app is not None:
+        app.processEvents()
+    assert hud.visible is True
+    assert hud._widget.isVisible() is True
+    hud.hide()
+

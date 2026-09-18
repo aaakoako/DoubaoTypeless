@@ -144,6 +144,8 @@ class V3Bridge:
         await self._runner.setup()
         site = web.TCPSite(self._runner, "0.0.0.0", self.port)
         await site.start()
+        if self.port == 0 and getattr(site, "_server", None) and site._server.sockets:
+            self.port = int(site._server.sockets[0].getsockname()[1])
         self._log(f"[v3.bridge] http://127.0.0.1:{self.port}")
 
     async def stop(self) -> None:

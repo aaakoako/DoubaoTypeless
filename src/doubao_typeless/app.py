@@ -307,6 +307,7 @@ class V3App:
     async def start(self) -> None:
         self._acquire_instance_lock()
         await self.bridge.start()
+        self.port = self.bridge.port
         code = self.auth.new_pairing_challenge()
         url = f"http://{lan_ip()}:{self.port}/"
         pair_note = self.data_dir / "pair.txt"
