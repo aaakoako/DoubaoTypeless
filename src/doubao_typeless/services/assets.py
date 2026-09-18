@@ -18,6 +18,40 @@ MAX_PIXELS = 48_000_000
 SAFE_ID = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
+def resolve_asset_refs(store: AssetStore, refs: object) -> list[dict]:
+    """Map client asset_refs to completed store objects. Never trust client assets."""
+    if not isinstance(refs, list):
+        raise ValueError("invalid asset_refs")
+    ids: list[str] = []
+    for ref in refs:
+        if not isinstance(ref, str) or not SAFE_ID.match(ref):
+            raise ValueError("invalid asset_ref")
+        ids.append(ref)
+    if len(ids) != len(set(ids)):
+        raise ValueError("duplicate asset id")
+    resolved: list[dict] = []
+    for asset_id in ids:
+        try:
+            payload = store.get(asset_id)
+        except FileNotFoundError as exc:
+            raise ValueError("unknown asset_ref") from exc
+        image = Image.open(io.BytesIO(payload))
+        image.load()
+        resolved.append(
+            {
+                "asset_id": asset_id,
+                "render_revision": 1,
+                "sha256": hashlib.sha256(payload).hexdigest(),
+                "mime": "image/png" if payload.startswith(PNG_MAGIC) else "image/jpeg",
+                "bytes": len(payload),
+                "width": image.width,
+                "height": image.height,
+                "role": "photo",
+            }
+        )
+    return resolved
+
+
 class UploadService:
     def __init__(self, store: AssetStore, db: V3DB, *, chunk_size: int = CHUNK):
         self.store = store

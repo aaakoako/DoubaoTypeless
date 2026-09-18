@@ -12,6 +12,8 @@ def test_vite_konva_sources_exist():
     canvas = (WEB / "src" / "editor" / "canvas.ts").read_text(encoding="utf-8")
     assert "import Konva from" in canvas
     assert "crop" in canvas
+    assert "applyCrop" in canvas
+    assert "addMask" in canvas
     app = (WEB / "src" / "app.ts").read_text(encoding="utf-8")
     assert "uploadPng" in app
     assert "插入电脑" in app

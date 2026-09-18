@@ -13,7 +13,9 @@ textarea{flex:1;border:0;resize:none;font-size:17px;min-height:140px;outline:non
 .writehint{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;padding:8px 0}
 .tools{display:flex;gap:8px}.tools button{flex:1;background:#f2f5f1;border-radius:12px;height:52px}
 .editor{display:none;flex:1;flex-direction:column;min-height:0}.editor.show{display:flex}
-#stage{flex:1;background:#eef1ea;touch-action:none;min-height:240px}
+.crop-actions{display:none;gap:8px;padding:0 8px 8px}
+.crop-actions.show{display:flex}
+.crop-actions button{flex:1;background:#f2f5f1;border-radius:12px}
 .palette{display:flex;gap:8px;padding:8px;flex-wrap:wrap}
 .palette.extra{display:none}.palette.extra.show{display:flex}
 .swatch{width:44px;height:44px;min-width:44px;min-height:44px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #dae1da}

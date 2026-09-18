@@ -42,6 +42,10 @@ export function boot(root: HTMLElement): void {
           <button class="primary" id="done">完成</button>
         </div>
         <div id="stage"></div>
+        <div class="crop-actions" id="cropActions">
+          <button id="cropReset">全图</button>
+          <button id="cropApply">应用裁剪</button>
+        </div>
         <div class="palette">
           <button data-color="#D45243" class="swatch selected" style="background:#D45243"></button>
           <button data-color="#326AC5" class="swatch" style="background:#326AC5"></button>
@@ -182,6 +186,10 @@ export function boot(root: HTMLElement): void {
     };
   }
 
+  function assetRefs(): string[] {
+    return state.assets.map((a) => a.asset_id).filter((id): id is string => Boolean(id));
+  }
+
   function sendDraft() {
     if (!ws || ws.readyState !== 1) return;
     ws.send(
@@ -190,7 +198,7 @@ export function boot(root: HTMLElement): void {
         type: "draft.update",
         text: state.text,
         revision: ++state.revision,
-        asset_refs: state.assets.map((a) => a.asset_id || a.id),
+        asset_refs: assetRefs(),
       })
     );
   }
@@ -210,20 +218,36 @@ export function boot(root: HTMLElement): void {
     if (!state.session || !ws) return;
     ws.send(JSON.stringify({ protocol: 3, type: "capture.request", session_id: state.session.session_id, token: state.session.token, scope: "primary" }));
   };
+  $("cropApply").onclick = () => {
+    if (!editor?.applyCrop()) toast("请拖出至少64×64像素的选区");
+  };
+  $("cropReset").onclick = () => editor?.resetCrop();
+
   $("file").addEventListener("change", async (e) => {
     const files = Array.from((e.target as HTMLInputElement).files || []);
     for (const f of files) {
       if (state.assets.length >= 6) break;
+      const allowed = /^(image\/png|image\/jpeg|image\/jpg|image\/webp)$/i.test(f.type) || /\.(png|jpe?g|webp)$/i.test(f.name);
+      if (!allowed) {
+        toast("不支持的图片类型");
+        continue;
+      }
       const preview = URL.createObjectURL(f);
       const a: Asset = { id: "p-" + f.name + Date.now(), kind: "图片", preview };
       const image = new Image();
       image.src = preview;
-      await image.decode().catch(() => undefined);
+      try {
+        await image.decode();
+      } catch {
+        toast("图片无法解码");
+        continue;
+      }
       a.w = image.naturalWidth || 1;
       a.h = image.naturalHeight || 1;
       state.assets.push(a);
       openEditor("图片标注", a);
     }
+    (e.target as HTMLInputElement).value = "";
     update();
   });
 
@@ -237,8 +261,10 @@ export function boot(root: HTMLElement): void {
     const host = $("stage") as HTMLDivElement;
     host.replaceChildren();
     editor = new SharedEditor(host, asset.w || 1600, asset.h || 1000);
-    if (title === "快速白板") editor.addBlankBoard(asset.w || 1600, asset.h || 1000);
-    else if (asset.preview) editor.loadImage(asset.preview, asset.w || 1600, asset.h || 1000);
+    if (title === "快速白板") {
+      editor.addBlankBoard(asset.w || 1600, asset.h || 1000);
+      host.dataset.ready = "1";
+    } else if (asset.preview) editor.loadImage(asset.preview, asset.w || 1600, asset.h || 1000);
     requestAnimationFrame(() => editor?.resize());
     if (ws?.readyState === 1) ws.send(JSON.stringify({ protocol: 3, type: "editor.activity", kind: "edit" }));
   }
@@ -248,6 +274,7 @@ export function boot(root: HTMLElement): void {
       document.querySelectorAll("[data-tool]").forEach((b) => b.classList.remove("selected"));
       btn.classList.add("selected");
       if (editor) editor.tool = (btn as HTMLElement).dataset.tool as Tool;
+      $("cropActions").classList.toggle("show", (btn as HTMLElement).dataset.tool === "crop");
     });
   });
   document.querySelectorAll("[data-color]").forEach((btn) => {
@@ -284,6 +311,10 @@ export function boot(root: HTMLElement): void {
         state.uploading = true;
         update();
         try {
+          const bmp = await createImageBitmap(blob);
+          item.w = bmp.width;
+          item.h = bmp.height;
+          bmp.close();
           const meta = await uploadPng(blob, headers(), item.w || 1, item.h || 1, item.kind === "白板" ? "whiteboard" : "markup");
           item.asset_id = meta.asset_id;
         } catch {
@@ -323,7 +354,7 @@ export function boot(root: HTMLElement): void {
     }
     if (!state.text.trim() && !state.assets.length) return;
     sendDraft();
-    ws.send(JSON.stringify({ protocol: 3, type: "bundle.commit", text: state.text, revision: state.revision, asset_refs: state.assets.map((a) => a.asset_id || a.id) }));
+    ws.send(JSON.stringify({ protocol: 3, type: "bundle.commit", text: state.text, revision: state.revision, asset_refs: assetRefs() }));
     const nonce = await (await fetch("/v3/nonce", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(state.session) })).json();
     ws.send(
       JSON.stringify({
@@ -336,7 +367,7 @@ export function boot(root: HTMLElement): void {
         trigger: "phone",
         text: state.text,
         revision: state.revision,
-        asset_refs: state.assets.map((a) => a.asset_id || a.id),
+        asset_refs: assetRefs(),
       })
     );
   };

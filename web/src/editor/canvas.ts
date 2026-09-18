@@ -37,6 +37,7 @@ export class SharedEditor {
   private pinch: { dist: number; scale: number; x: number; y: number } | null = null;
   private bg: Konva.Image | null = null;
   private source = { w: 1600, h: 1000 };
+  cropTemp: Crop | null = null;
 
   constructor(container: HTMLDivElement, width = 1600, height = 1000) {
     this.source = { w: width, h: height };
@@ -56,6 +57,8 @@ export class SharedEditor {
     el.addEventListener("pointermove", (e) => this.onPointerMove(e));
     el.addEventListener("pointerup", (e) => this.onPointerUp(e));
     el.addEventListener("pointercancel", (e) => this.onPointerUp(e, true));
+    (container as HTMLDivElement & { __dtEditor?: SharedEditor }).__dtEditor = this;
+    container.dataset.ready = "0";
   }
 
   resize(): void {
@@ -67,12 +70,16 @@ export class SharedEditor {
   loadImage(src: string, w: number, h: number): void {
     this.source = { w, h };
     this.crop = { x: 0, y: 0, w, h };
+    this.cropTemp = null;
+    const host = this.stage.container();
+    host.dataset.ready = "0";
     const image = new window.Image();
     image.onload = () => {
       this.bg = new Konva.Image({ image, x: 0, y: 0, width: w, height: h });
       this.imageLayer.destroyChildren();
       this.imageLayer.add(this.bg);
       this.fit();
+      host.dataset.ready = "1";
     };
     image.src = src;
   }
@@ -275,15 +282,16 @@ export class SharedEditor {
         const w = Math.abs(this.drawing.width());
         const h = Math.abs(this.drawing.height());
         if (w >= 64 && h >= 64) {
-          this.pushUndo();
-          this.crop = {
+          this.cropTemp = {
             x: Math.min(this.drawing.x(), this.drawing.x() + this.drawing.width()),
             y: Math.min(this.drawing.y(), this.drawing.y() + this.drawing.height()),
             w,
             h,
           };
+          this.drawing.name("cropGuide");
+        } else {
+          this.drawing.destroy();
         }
-        this.drawing.destroy();
       } else {
         this.pushUndo();
         this.ops += 1;
@@ -292,6 +300,43 @@ export class SharedEditor {
       this.drawing.destroy();
     }
     this.drawing = null;
+  }
+
+  applyCrop(crop?: Crop): boolean {
+    const next = crop || this.cropTemp;
+    if (!next || next.w < 64 || next.h < 64) return false;
+    this.pushUndo();
+    this.crop = { ...next };
+    this.cropTemp = null;
+    this.layer.find(".cropGuide").forEach((node) => node.destroy());
+    this.stage.batchDraw();
+    return true;
+  }
+
+  resetCrop(): void {
+    this.pushUndo();
+    this.crop = { x: 0, y: 0, w: this.source.w, h: this.source.h };
+    this.cropTemp = null;
+    this.layer.find(".cropGuide").forEach((node) => node.destroy());
+    this.stage.batchDraw();
+  }
+
+  addMask(x: number, y: number, w: number, h: number): void {
+    this.pushUndo();
+    this.layer.add(new Konva.Rect({ x, y, width: w, height: h, fill: "#111111", name: "mask" }));
+    this.ops += 1;
+    this.layer.draw();
+  }
+
+  stampNumber(x: number, y: number): void {
+    this.pushUndo();
+    this.numbers += 1;
+    const g = new Konva.Group({ x, y, name: "number" });
+    g.add(new Konva.Circle({ radius: 18, fill: this.color }));
+    g.add(new Konva.Text({ text: String(this.numbers), fill: "#fff", fontSize: 16, offsetX: 5, offsetY: 8 }));
+    this.layer.add(g);
+    this.ops += 1;
+    this.layer.draw();
   }
 
   addWireframe(): void {
@@ -305,14 +350,16 @@ export class SharedEditor {
   }
 
   exportBlob(): Promise<Blob> {
-    const url = this.stage.toDataURL({
-      x: this.crop.x * this.stage.scaleX() + this.stage.x(),
-      y: this.crop.y * this.stage.scaleY() + this.stage.y(),
-      width: this.crop.w * this.stage.scaleX(),
-      height: this.crop.h * this.stage.scaleY(),
-      pixelRatio: 2,
-      mimeType: "image/png",
+    const scale = this.stage.scaleX() || 1;
+    const canvas = this.stage.toCanvas({
+      x: this.stage.x() + this.crop.x * scale,
+      y: this.stage.y() + this.crop.y * scale,
+      width: Math.max(1, this.crop.w * scale),
+      height: Math.max(1, this.crop.h * scale),
+      pixelRatio: 1 / scale,
     });
-    return fetch(url).then((r) => r.blob());
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("export failed"))), "image/png");
+    });
   }
 }

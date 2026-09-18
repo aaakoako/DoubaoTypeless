@@ -16,7 +16,7 @@ from doubao_typeless.core.bundle import Draft, apply_draft_update, freeze_bundle
 from doubao_typeless.storage.asset_store import AssetStore
 from doubao_typeless.storage.credentials import AuthService, looks_like_key_script
 from doubao_typeless.ui.tokens import should_wake
-from doubao_typeless.services.assets import UploadService
+from doubao_typeless.services.assets import UploadService, resolve_asset_refs
 
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
@@ -199,7 +199,10 @@ class V3Bridge:
 
     async def _nonce(self, request: web.Request) -> web.Response:
         body = await request.json()
-        session = self.auth.authorize(body["session_id"], body["token"], "insert")
+        try:
+            session = self.auth.authorize(body["session_id"], body["token"], "insert")
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=403)
         return web.json_response({"nonce": self.auth.issue_nonce(session)})
 
     def _session_from(self, request: web.Request):
@@ -335,13 +338,19 @@ class V3Bridge:
         return len(bucket) <= WS_RATE_LIMIT
 
     def _apply_draft_fields(self, data: dict[str, Any]) -> None:
+        refs = data.get("asset_refs")
+        if refs is not None:
+            assets = resolve_asset_refs(self.store, refs)
+        else:
+            assets = self.draft.assets
+            refs = [a["asset_id"] for a in assets]
         apply_draft_update(
             self.draft,
             {
                 "text": data.get("text", self.draft.text),
                 "revision": int(data.get("revision") or self.draft.revision + 1),
-                "asset_refs": data.get("asset_refs", [a["asset_id"] for a in self.draft.assets]),
-                "assets": data.get("assets", self.draft.assets),
+                "asset_refs": refs,
+                "assets": assets,
             },
         )
 

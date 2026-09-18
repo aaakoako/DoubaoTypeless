@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-FocusKind = Literal["composer", "code", "terminal", "unknown", "other"]
+FocusKind = Literal["composer", "code", "terminal", "paste", "unknown", "other"]
 
 
 @dataclass(frozen=True)
@@ -22,13 +22,15 @@ def classify_focus(class_name: str, control_type: str = "", automation_id: str =
         return "terminal"
     if any(token in lowered for token in ("scintilla", "editordocument", "monaco", "codeditor")):
         return "code"
+    if "dt-s2-pastetarget" in lowered:
+        return "paste"
     if "composer" in lowered or "chatinput" in lowered or "promptinput" in lowered:
         return "composer"
     return "unknown"
 
 
 def may_inject(kind: FocusKind, *, wants_images: bool) -> bool:
-    if kind == "composer":
+    if kind in {"composer", "paste"}:
         return True
     if kind in {"code", "terminal"}:
         return False

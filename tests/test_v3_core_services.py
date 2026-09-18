@@ -45,6 +45,10 @@ def test_code_focus_does_not_inject_images():
     assert classify_focus("Chrome_WidgetWin_1", "EditorDocument") == "code"
     assert may_inject("code", wants_images=True) is False
     assert may_inject("composer", wants_images=True) is True
+    assert classify_focus("TkTopLevel", "DT-S2-PasteTarget") == "paste"
+    assert may_inject("paste", wants_images=True) is True
+    assert may_inject("unknown", wants_images=True) is False
+    assert classify_focus("TkTopLevel", "DT-S1-TextTarget") == "unknown"
 
 
 def test_delivery_unknown_image_does_not_paste_text_or_enter():

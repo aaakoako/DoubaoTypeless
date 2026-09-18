@@ -222,3 +222,23 @@ def test_ws_burst_is_rate_limited(tmp_path):
 
     asyncio.run(run())
 
+
+def test_nonce_without_insert_grant_is_forbidden(tmp_path):
+    async def run():
+        auth, _bridge, runner, port = await _serve(tmp_path)
+        try:
+            async with ClientSession() as session:
+                code = (await (await session.get(f"http://127.0.0.1:{port}/v3/pair")).json())["challenge"]
+                creds = await (
+                    await session.post(f"http://127.0.0.1:{port}/v3/pair", json={"code": code})
+                ).json()
+                assert creds["allow_insert"] is False
+                response = await session.post(f"http://127.0.0.1:{port}/v3/nonce", json=creds)
+                body = await response.json()
+                assert response.status == 403
+                assert "nonce" not in body
+        finally:
+            await runner.cleanup()
+
+    asyncio.run(run())
+

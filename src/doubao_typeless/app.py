@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import threading
 import time
 import uuid
@@ -34,10 +35,12 @@ class V3App:
         self.auth = AuthService()
         self.store = AssetStore(self.data_dir / "assets")
         from doubao_typeless.storage.db import V3DB
-        from doubao_typeless.services.assets import UploadService
+        from doubao_typeless.services.assets import CHUNK, UploadService
 
         self.db = V3DB(self.data_dir / "v3.sqlite")
-        self.uploads = UploadService(self.store, self.db)
+        raw_chunk = os.environ.get("DT_V3_CHUNK_SIZE", "").strip()
+        chunk = int(raw_chunk) if raw_chunk.isdigit() and int(raw_chunk) >= 1024 else CHUNK
+        self.uploads = UploadService(self.store, self.db, chunk_size=chunk)
         self.ledger = IntentLedger()
         self.draft = Draft(
             draft_id=str(uuid.uuid4()),
@@ -190,7 +193,12 @@ class V3App:
         if decision == "busy":
             return {"result": "BUSY", "error_code": "BUSY"}
         class_name, control = self._read_focus()
-        if "V3ComposerTarget" in f"{class_name} {control}":
+        from doubao_typeless.core.policy import classify_focus
+
+        kind = classify_focus(class_name, control)
+        if kind == "paste":
+            adapter_id = "s2_paste_target"
+        elif "V3ComposerTarget" in f"{class_name} {control}":
             adapter_id = "product_target"
         else:
             from doubao_typeless.adapters.cursor_windows import identify
