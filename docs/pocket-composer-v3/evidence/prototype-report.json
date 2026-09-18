@@ -1,0 +1,150 @@
+{
+  "kind": "offline_browser_prototype_checks",
+  "environment": {
+    "browser": "Chromium / local set_content",
+    "native_windows": false,
+    "real_phone": false,
+    "network": false
+  },
+  "passed": 34,
+  "total": 34,
+  "results": [
+    {
+      "name": "idle has no popup and no insertion",
+      "status": "PASS"
+    },
+    {
+      "name": "text input is mirrored; popup does not move DOM focus",
+      "status": "PASS"
+    },
+    {
+      "name": "idle timer hides popup without clearing draft",
+      "status": "PASS"
+    },
+    {
+      "name": "text-only insert preserves whitespace and never sends",
+      "status": "PASS"
+    },
+    {
+      "name": "success popup disappears, immutable last text remains",
+      "status": "PASS"
+    },
+    {
+      "name": "screenshot sample opens shared editor and compact HUD",
+      "status": "PASS"
+    },
+    {
+      "name": "pointer stroke creates one object",
+      "status": "PASS"
+    },
+    {
+      "name": "undo and redo restore stroke",
+      "status": "PASS"
+    },
+    {
+      "name": "crop changes actual PNG dimensions and undo restores bounds",
+      "status": "PASS"
+    },
+    {
+      "name": "caption sheet keeps text without leaving editor",
+      "status": "PASS"
+    },
+    {
+      "name": "cannot insert unfinished editor",
+      "status": "PASS"
+    },
+    {
+      "name": "done returns image and text to single composer",
+      "status": "PASS"
+    },
+    {
+      "name": "wrong target creates zero paste steps and preserves bundle",
+      "status": "PASS"
+    },
+    {
+      "name": "opening history never retries implicitly",
+      "status": "PASS"
+    },
+    {
+      "name": "refocus and hotkey-style recall reuses exact images plus text",
+      "status": "PASS"
+    },
+    {
+      "name": "partial image success stops before text",
+      "status": "PASS"
+    },
+    {
+      "name": "text-only retry does not duplicate image",
+      "status": "PASS"
+    },
+    {
+      "name": "unknown image receipt never advances text",
+      "status": "PASS"
+    },
+    {
+      "name": "offline click and reconnect never replay insertion",
+      "status": "PASS"
+    },
+    {
+      "name": "changing text mid-attempt preserves new draft",
+      "status": "PASS"
+    },
+    {
+      "name": "focus loss during text delay cancels injection",
+      "status": "PASS"
+    },
+    {
+      "name": "whiteboard has editable primitives, no screenshot source",
+      "status": "PASS"
+    },
+    {
+      "name": "whiteboard zoom and fit keep object coordinates",
+      "status": "PASS"
+    },
+    {
+      "name": "whiteboard wireframe button is drawable objects",
+      "status": "PASS"
+    },
+    {
+      "name": "solid mask export has opaque replacement pixels",
+      "status": "PASS"
+    },
+    {
+      "name": "empty whiteboard cannot become output",
+      "status": "PASS"
+    },
+    {
+      "name": "local PNG upload decodes and enters editor",
+      "status": "PASS"
+    },
+    {
+      "name": "image count capped at six in prototype",
+      "status": "PASS"
+    },
+    {
+      "name": "settings are on-demand and do not insert",
+      "status": "PASS"
+    },
+    {
+      "name": "dark theme toggles without draft change",
+      "status": "PASS"
+    },
+    {
+      "name": "responsive layout 360px (not real IME)",
+      "status": "PASS"
+    },
+    {
+      "name": "responsive layout 390px (not real IME)",
+      "status": "PASS"
+    },
+    {
+      "name": "responsive layout 430px (not real IME)",
+      "status": "PASS"
+    },
+    {
+      "name": "no runtime JavaScript exceptions",
+      "status": "PASS"
+    }
+  ],
+  "product_acceptance": "96 cases NOT_RUN"
+}

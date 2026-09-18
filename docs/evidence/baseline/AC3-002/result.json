@@ -1,0 +1,22 @@
+{
+  "case_id": "AC3-002",
+  "status": "BLOCKED_NATIVE",
+  "observed": "Windows isolated worktree ran old text path via WebSocket composition/update/stable and Alt+I. inserted=True. No ADB/Android Doubao IME device. Did not send keys into the current Cursor Composer to avoid contaminating this session. events=['bridge_port_open', 'idle_visible_DoubaoTypeless=[]', 'focused_paste_target_before_input', 'ws_sample_sent', 'review_visible_after_input=True', 'sent_alt_i_pynput', 'clicked_insert_button_fallback', 'target_contains_sample=True', \"captured='BEFORE\\\\nV3-00 基线回归\\\\nOpus 与 Image2\\\\n'\", 'review_hidden_after_close=True']",
+  "expected": "完整记录旧版实际结果，已知失败不能填通过",
+  "started_at": "2026-09-18T05:22:46.513664+00:00",
+  "commit_sha": "e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5",
+  "windows_insert_observed": true,
+  "phone_ime_observed": false,
+  "composer_observed": false,
+  "evidence_paths": [
+    "docs/evidence/baseline/AC3-002/environment.json",
+    "docs/evidence/baseline/AC3-002/after-input.png",
+    "docs/evidence/baseline/AC3-002/after-insert.png",
+    "docs/evidence/baseline/AC3-002/target-captured.txt",
+    "docs/evidence/baseline/AC3-002/phone-html-status.txt",
+    "docs/evidence/baseline/AC3-002/app-stdout.txt",
+    "docs/evidence/baseline/AC3-002/worktree-debug.log",
+    "docs/evidence/baseline/AC3-002/events.json",
+    "docs/evidence/baseline/prototype-prerequisite.md"
+  ]
+}

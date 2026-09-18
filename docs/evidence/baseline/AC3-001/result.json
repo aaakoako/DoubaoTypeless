@@ -1,0 +1,14 @@
+{
+  "case_id": "AC3-001",
+  "status": "PASS",
+  "observed": "HEAD=e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5 branch=v3/00-baseline review=e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5 reset_used=False name_status_lines=1 untracked_lines=111 repo_config_exists=False",
+  "expected": "不reset、不覆盖未提交改动；基线差异逐文件列出",
+  "started_at": "2026-09-18T05:23:25.190784+00:00",
+  "commit_sha": "e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5",
+  "evidence_paths": [
+    "docs/evidence/baseline/AC3-001/environment.json",
+    "docs/evidence/baseline/AC3-001/git-status.txt",
+    "docs/evidence/baseline/AC3-001/diff-name-status-vs-review-sha.txt",
+    "docs/evidence/baseline/AC3-001/untracked.txt"
+  ]
+}

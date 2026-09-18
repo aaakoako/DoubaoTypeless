@@ -1,0 +1,15 @@
+{
+  "events": [
+    "bridge_port_open",
+    "idle_visible_DoubaoTypeless=[]",
+    "focused_paste_target_before_input",
+    "ws_sample_sent",
+    "review_visible_after_input=True",
+    "sent_alt_i_pynput",
+    "clicked_insert_button_fallback",
+    "target_contains_sample=True",
+    "captured='BEFORE\\nV3-00 基线回归\\nOpus 与 Image2\\n'",
+    "review_hidden_after_close=True"
+  ],
+  "captured": "BEFORE\nV3-00 基线回归\nOpus 与 Image2\n"
+}

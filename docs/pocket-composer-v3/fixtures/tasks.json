@@ -1,0 +1,436 @@
+[
+  {
+    "id": "V3-00",
+    "title": "基线冻结与旧功能回归",
+    "depends_on": [],
+    "read": "AGENTS.md、README.md、main.py、phone.html、tests、两份.spec",
+    "paths": "docs/evidence/baseline/、tests/fixtures/legacy/",
+    "spec": "00_PRODUCT.md",
+    "cases": [
+      "AC3-001",
+      "AC3-002",
+      "AC3-003",
+      "AC3-004"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-01",
+    "title": "Windows薄样板：浮窗与真实投递",
+    "depends_on": [
+      "V3-00"
+    ],
+    "read": "gui.py::show_recording、typer.py、tray.py、hotkeys.py",
+    "paths": "experiments/native_spike/、requirements-spike.lock、docs/evidence/g0-native/",
+    "spec": "03_INSERT_AND_RECOVERY.md",
+    "cases": [
+      "AC3-005",
+      "AC3-006",
+      "AC3-007",
+      "AC3-008"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-02",
+    "title": "手机画布与输入法薄样板",
+    "depends_on": [
+      "V3-00"
+    ],
+    "read": "phone.html::compositionstart/compositionend",
+    "paths": "experiments/mobile_spike/、web/package-lock.json、docs/evidence/g0-mobile/",
+    "spec": "02_MOBILE_EDITOR.md",
+    "cases": [
+      "AC3-009",
+      "AC3-010",
+      "AC3-011",
+      "AC3-012"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-03",
+    "title": "不可变图文与投递状态合同",
+    "depends_on": [
+      "V3-00"
+    ],
+    "read": "main.py::_pending_*、_do_insert；bridge.py::notify_cleared",
+    "paths": "src/doubao_typeless/core/、contracts/、tests/test_bundle.py",
+    "spec": "04_ARCHITECTURE_AND_PROTOCOL.md",
+    "cases": [
+      "AC3-013",
+      "AC3-014",
+      "AC3-015",
+      "AC3-016"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-04",
+    "title": "配对鉴权与动作授权",
+    "depends_on": [
+      "V3-03"
+    ],
+    "read": "bridge.py路由与诊断、config.py",
+    "paths": "services/bridge.py、storage/credentials.py、tests/test_auth.py",
+    "spec": "05_SECURITY_PERFORMANCE_MIGRATION.md",
+    "cases": [
+      "AC3-017",
+      "AC3-018",
+      "AC3-019",
+      "AC3-020"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-05",
+    "title": "图片资产存储与原子接收",
+    "depends_on": [
+      "V3-03",
+      "V3-04"
+    ],
+    "read": "paths.py、现有data目录规则",
+    "paths": "storage/db.py、storage/asset_store.py、services/assets.py、tests/test_assets.py",
+    "spec": "04_ARCHITECTURE_AND_PROTOCOL.md",
+    "cases": [
+      "AC3-021",
+      "AC3-022",
+      "AC3-023",
+      "AC3-024"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-06",
+    "title": "草稿同步与网络恢复",
+    "depends_on": [
+      "V3-03",
+      "V3-04",
+      "V3-05"
+    ],
+    "read": "phone.html::autoSync/connect、bridge.py",
+    "paths": "web/src/composer/sync.ts、web/src/transport/、services/bridge.py",
+    "spec": "04_ARCHITECTURE_AND_PROTOCOL.md",
+    "cases": [
+      "AC3-025",
+      "AC3-026",
+      "AC3-027",
+      "AC3-028"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-07",
+    "title": "按需浮窗与详情",
+    "depends_on": [
+      "V3-01",
+      "V3-03",
+      "V3-06"
+    ],
+    "read": "gui.py::ReviewWindow、GUIManager；tray.py",
+    "paths": "ui/hud.py、ui/detail.py、ui/tokens.py、tests/test_hud.py",
+    "spec": "01_UX_AND_VISUAL.md",
+    "cases": [
+      "AC3-029",
+      "AC3-030",
+      "AC3-031",
+      "AC3-032"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-08",
+    "title": "焦点、热键与通用文字投递",
+    "depends_on": [
+      "V3-01",
+      "V3-03",
+      "V3-07"
+    ],
+    "read": "typer.py、hotkeys.py、main.py::_on_hotkey_insert",
+    "paths": "platform/windows/、adapters/generic_text.py、tests/test_focus_policy.py",
+    "spec": "03_INSERT_AND_RECOVERY.md",
+    "cases": [
+      "AC3-033",
+      "AC3-034",
+      "AC3-035",
+      "AC3-036"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-09",
+    "title": "手机单页Composer",
+    "depends_on": [
+      "V3-02",
+      "V3-06"
+    ],
+    "read": "phone.html、旧config默认行为",
+    "paths": "web/src/ui/composer.ts、web/src/composer/draft.ts、web/src/styles/",
+    "spec": "01_UX_AND_VISUAL.md",
+    "cases": [
+      "AC3-037",
+      "AC3-038",
+      "AC3-039",
+      "AC3-040"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-10",
+    "title": "电脑截图到手机",
+    "depends_on": [
+      "V3-01",
+      "V3-04",
+      "V3-05",
+      "V3-09"
+    ],
+    "read": "新增能力；借鉴paths和diagnostics",
+    "paths": "services/capture.py、platform/windows/capture.py、ui/capture.py、web/src/ui/",
+    "spec": "02_MOBILE_EDITOR.md",
+    "cases": [
+      "AC3-041",
+      "AC3-042",
+      "AC3-043",
+      "AC3-044"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-11",
+    "title": "相册导入与快速裁剪",
+    "depends_on": [
+      "V3-02",
+      "V3-05",
+      "V3-09"
+    ],
+    "read": "新增web图像处理模块",
+    "paths": "web/src/editor/document.ts、crop.ts、web/src/composer/attachments.ts",
+    "spec": "02_MOBILE_EDITOR.md",
+    "cases": [
+      "AC3-045",
+      "AC3-046",
+      "AC3-047",
+      "AC3-048"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-12",
+    "title": "笔刷、形状与触控工具",
+    "depends_on": [
+      "V3-02",
+      "V3-11"
+    ],
+    "read": "新增editor/tools、gestures",
+    "paths": "web/src/editor/tools.ts、gestures.ts、undo.ts、tests/editor/",
+    "spec": "02_MOBILE_EDITOR.md",
+    "cases": [
+      "AC3-049",
+      "AC3-050",
+      "AC3-051",
+      "AC3-052"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-13",
+    "title": "轻量白板与线框组件",
+    "depends_on": [
+      "V3-12"
+    ],
+    "read": "同一ImageDocument和工具引擎",
+    "paths": "web/src/editor/whiteboard.ts、wireframes.ts",
+    "spec": "02_MOBILE_EDITOR.md",
+    "cases": [
+      "AC3-053",
+      "AC3-054",
+      "AC3-055",
+      "AC3-056"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-14",
+    "title": "最终渲染、编号说明与保护区",
+    "depends_on": [
+      "V3-11",
+      "V3-12",
+      "V3-13"
+    ],
+    "read": "编辑器scene、export、Bundle合同",
+    "paths": "web/src/editor/export.ts、web/src/composer/captions.ts、tests/test_render.py",
+    "spec": "02_MOBILE_EDITOR.md",
+    "cases": [
+      "AC3-057",
+      "AC3-058",
+      "AC3-059",
+      "AC3-060"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-15",
+    "title": "图片先文字后完整投递",
+    "depends_on": [
+      "V3-08",
+      "V3-14"
+    ],
+    "read": "typer.py、main.py::_do_insert、V3-01观测报告",
+    "paths": "services/delivery.py、adapters/cursor_windows.py、tests/test_delivery.py",
+    "spec": "03_INSERT_AND_RECOVERY.md",
+    "cases": [
+      "AC3-061",
+      "AC3-062",
+      "AC3-063",
+      "AC3-064"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-16",
+    "title": "召回、补贴与重试防重复",
+    "depends_on": [
+      "V3-15"
+    ],
+    "read": "main.py旧清空、历史逻辑、Attempt日志",
+    "paths": "core/attempt.py、services/history.py、ui/recovery.py、web/src/ui/recovery.ts",
+    "spec": "03_INSERT_AND_RECOVERY.md",
+    "cases": [
+      "AC3-065",
+      "AC3-066",
+      "AC3-067",
+      "AC3-068"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-17",
+    "title": "最近图文与隐私落地",
+    "depends_on": [
+      "V3-05",
+      "V3-16"
+    ],
+    "read": "旧review_history.json、paths.py、config.py",
+    "paths": "storage/db.py、storage/credentials.py、services/history.py、ui/recent.py",
+    "spec": "05_SECURITY_PERFORMANCE_MIGRATION.md",
+    "cases": [
+      "AC3-069",
+      "AC3-070",
+      "AC3-071",
+      "AC3-072"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-18",
+    "title": "手动BYOK与术语旁路",
+    "depends_on": [
+      "V3-06",
+      "V3-09"
+    ],
+    "read": "config.py、polish.py、providers_registry.py、旧词库",
+    "paths": "services/byok.py、services/terms.py、ui/settings.py、tests/test_byok.py",
+    "spec": "05_SECURITY_PERFORMANCE_MIGRATION.md",
+    "cases": [
+      "AC3-073",
+      "AC3-074",
+      "AC3-075",
+      "AC3-076"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-19",
+    "title": "引导、设置与快捷键迁移",
+    "depends_on": [
+      "V3-07",
+      "V3-09",
+      "V3-10",
+      "V3-17",
+      "V3-18"
+    ],
+    "read": "config.py、gui.py、hotkeys.py、旧AGENTS.md",
+    "paths": "ui/pairing.py、ui/settings.py、web/src/ui/onboarding.ts、storage/migration.py",
+    "spec": "01_UX_AND_VISUAL.md",
+    "cases": [
+      "AC3-077",
+      "AC3-078",
+      "AC3-079",
+      "AC3-080"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-20",
+    "title": "轻量性能与长时间稳定性",
+    "depends_on": [
+      "V3-13",
+      "V3-15",
+      "V3-16",
+      "V3-17",
+      "V3-19"
+    ],
+    "read": "新旧启动路径、资源清单与线程模型",
+    "paths": "tools/benchmark.py、docs/evidence/performance/、前端bundle统计",
+    "spec": "05_SECURITY_PERFORMANCE_MIGRATION.md",
+    "cases": [
+      "AC3-081",
+      "AC3-082",
+      "AC3-083",
+      "AC3-084"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-21",
+    "title": "CI、候选打包和迁移回退",
+    "depends_on": [
+      "V3-19",
+      "V3-20"
+    ],
+    "read": ".github/workflows/*、两份.spec、scripts/preflight_release.py",
+    "paths": ".github/workflows/preview.yml、packaging/、tools/preflight_v3.py",
+    "spec": "05_SECURITY_PERFORMANCE_MIGRATION.md",
+    "cases": [
+      "AC3-085",
+      "AC3-086",
+      "AC3-087",
+      "AC3-088"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-22",
+    "title": "真机兼容矩阵和独立复核",
+    "depends_on": [
+      "V3-21"
+    ],
+    "read": "所有任务证据、contracts、acceptance.json",
+    "paths": "docs/evidence/compatibility/、release-readiness.md",
+    "spec": "07_VALIDATION.md",
+    "cases": [
+      "AC3-089",
+      "AC3-090",
+      "AC3-091",
+      "AC3-092"
+    ],
+    "status": "NOT_STARTED"
+  },
+  {
+    "id": "V3-23",
+    "title": "候选交付与日用切换说明",
+    "depends_on": [
+      "V3-22"
+    ],
+    "read": "release-readiness、构建产物与用户硬约束",
+    "paths": "docs/release/preview-notes.md、checksums.txt、使用说明",
+    "spec": "00_PRODUCT.md",
+    "cases": [
+      "AC3-093",
+      "AC3-094",
+      "AC3-095",
+      "AC3-096"
+    ],
+    "status": "NOT_STARTED"
+  }
+]

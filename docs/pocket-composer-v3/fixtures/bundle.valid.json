@@ -1,0 +1,23 @@
+{
+  "protocol": 3,
+  "bundle_id": "00000000-0000-4000-8000-000000000001",
+  "device_id": "00000000-0000-4000-8000-000000000002",
+  "draft_id": "00000000-0000-4000-8000-000000000003",
+  "epoch": "00000000-0000-4000-8000-000000000004",
+  "revision": 7,
+  "text": "  把图1①改成 Opus 面板。\n保留 Image2。🙂\n",
+  "assets": [
+    {
+      "asset_id": "00000000-0000-4000-8000-000000000005",
+      "render_revision": 2,
+      "sha256": "7cd9dcba675588c017b3ac3c60daf35dfe4caf384340c092168ee6c14223f07d",
+      "mime": "image/png",
+      "bytes": 79,
+      "width": 2,
+      "height": 2,
+      "role": "marked_screenshot"
+    }
+  ],
+  "auto_send": false,
+  "manifest_hash": "bccfa3c730f1195a03a7b207d994a2c29c7200d86474ce7e4d352566bf07214e"
+}

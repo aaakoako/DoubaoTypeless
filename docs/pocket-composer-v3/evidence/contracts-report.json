@@ -1,0 +1,133 @@
+{
+  "kind": "reference_contract_checks",
+  "passed": 25,
+  "total": 25,
+  "product_acceptance": "NOT_RUN",
+  "results": [
+    {
+      "name": "valid bundle",
+      "status": "PASS",
+      "detail": "accepted"
+    },
+    {
+      "name": "valid intent",
+      "status": "PASS",
+      "detail": "accepted"
+    },
+    {
+      "name": "valid attempt",
+      "status": "PASS",
+      "detail": "accepted"
+    },
+    {
+      "name": "extra path",
+      "status": "PASS",
+      "detail": "ValidationError: Additional properties are not allowed ('path' was unexpected)"
+    },
+    {
+      "name": "no automatic send",
+      "status": "PASS",
+      "detail": "ValidationError: False was expected"
+    },
+    {
+      "name": "reject boolean revision",
+      "status": "PASS",
+      "detail": "ValidationError: True is not of type 'integer'"
+    },
+    {
+      "name": "reject float revision",
+      "status": "PASS",
+      "detail": "ValidationError: 1.2 is not of type 'integer'"
+    },
+    {
+      "name": "reject unicode byte overflow",
+      "status": "PASS",
+      "detail": "ValueError: text byte limit"
+    },
+    {
+      "name": "empty images and text",
+      "status": "PASS",
+      "detail": "ValueError: empty bundle"
+    },
+    {
+      "name": "bad asset hash",
+      "status": "PASS",
+      "detail": "ValidationError: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' does not match '^[0-9a-f]{64}$'"
+    },
+    {
+      "name": "reject source mime",
+      "status": "PASS",
+      "detail": "ValidationError: 'image/svg+xml' is not one of ['image/png', 'image/jpeg']"
+    },
+    {
+      "name": "manifest stale",
+      "status": "PASS",
+      "detail": "ValueError: manifest mismatch"
+    },
+    {
+      "name": "image too big",
+      "status": "PASS",
+      "detail": "ValidationError: 8388609 is greater than the maximum of 8388608"
+    },
+    {
+      "name": "duplicate asset id",
+      "status": "PASS",
+      "detail": "ValueError: duplicate asset id"
+    },
+    {
+      "name": "more than six",
+      "status": "PASS",
+      "detail": "ValidationError: [{'asset_id': '00000000-0000-4000-8000-000000000005', 'render_revision': 2, 'sha256': '7cd9dcba675588c017b3ac3c60daf35dfe4caf384340c092168ee6c14223f07d', 'mime': 'image/png', 'bytes': 79, 'width': 2, 'height': 2, 'role': 'marked_screenshot'}, {'asset_id': '00000000-0000-4000-8000-000000000005', 'render_revision': 2, 'sha256': '7cd9dcba675588c017b3ac3c60daf35dfe4caf384340c092168ee6c14223f07d', 'mime': 'image/png', 'bytes': 79, 'width': 2, 'height': 2, 'role': 'marked_screenshot'}, {'asset_id': '00000000-0000-4000-8000-000000000005', 'render_revision': 2, 'sha256': '7cd9dcba675588c017b3ac3c60daf35dfe4caf384340c092168ee6c14223f07d', 'mime': 'image/png', 'bytes': 79, 'width': 2, 'height': 2, 'role': 'marked_screenshot'}, {'asset_id': '00000000-0000-4000-8000-000000000005', 'render_revision': 2, 'sha256': '7cd9dcba675588c017b3ac3c60daf35dfe4caf384340c092168ee6c14223f07d', 'mime': 'image/png', 'bytes': 79, 'width': 2, 'height': 2, 'role': 'marked_screenshot'}, {'asset_id': '00000000-0000-4000-8000-000000000005', 'render_revision': 2, 'sha256': '7cd9dcba675588c017b3ac3c60daf35dfe4caf384340c092168ee6c14223f07d', 'mime': 'image/png', 'bytes': 79, 'width': 2, 'height': 2, 'role': 'marked_screenshot'}, {'asset_id': '00000000-0000-4000-8000-000000000005', 'render_revision': 2, 'sha256': '7cd9dcba675588c017b3ac3c60daf35dfe4caf384340c092168ee6c14223f07d', 'mime': 'image/png', 'bytes': 79, 'width': 2, 'height': 2, 'role': 'marked_screenshot'}, {'asset_id': '00000000-0000-4000-8000-000000000005', 'render_revision': 2, 'sha256': '7cd9dcba675588c017b3ac3c60daf35dfe4caf384340c092168ee6c14223f07d', 'mime': 'image/png', 'bytes': 79, 'width': 2, 'height': 2, 'role': 'marked_screenshot'}] is too long"
+    },
+    {
+      "name": "unexpected source layer",
+      "status": "PASS",
+      "detail": "ValidationError: Additional properties are not allowed ('source_json' was unexpected)"
+    },
+    {
+      "name": "reject zero dimension",
+      "status": "PASS",
+      "detail": "ValidationError: 0 is less than the minimum of 1"
+    },
+    {
+      "name": "intent cannot contain keys",
+      "status": "PASS",
+      "detail": "ValidationError: Additional properties are not allowed ('keys' was unexpected)"
+    },
+    {
+      "name": "intent cannot contain coordinates",
+      "status": "PASS",
+      "detail": "ValidationError: Additional properties are not allowed ('x', 'y' were unexpected)"
+    },
+    {
+      "name": "intent unknown trigger",
+      "status": "PASS",
+      "detail": "ValidationError: 'network_reconnect' is not one of ['phone_click', 'desktop_hotkey', 'desktop_click']"
+    },
+    {
+      "name": "injection not confirmation",
+      "status": "PASS",
+      "detail": "ValueError: unproven confirmation"
+    },
+    {
+      "name": "unknown not confirmed",
+      "status": "PASS",
+      "detail": "ValueError: unproven confirmation"
+    },
+    {
+      "name": "reference asset bytes",
+      "status": "PASS",
+      "detail": "accepted"
+    },
+    {
+      "name": "golden canonical bytes",
+      "status": "PASS",
+      "detail": "accepted"
+    },
+    {
+      "name": "total24MiB business rule",
+      "status": "PASS",
+      "detail": "ValueError: total byte limit"
+    }
+  ]
+}

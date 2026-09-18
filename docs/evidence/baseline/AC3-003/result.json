@@ -1,0 +1,14 @@
+{
+  "case_id": "AC3-003",
+  "status": "PASS",
+  "observed": "idle_review=[]; after_input_visible=True; inserted=True; hidden=True; titles_idle_has_tray_only=True; 全局pynput合成Alt+I未触发插入，点击审阅窗「插入并复制」后目标窗可见中文/换行/英文术语；Alt+Shift+I skip-correction recorded in hotkey-migration.md",
+  "expected": "录像/截图能说明输入才显示的习惯；旧Alt+Shift+I局部跳过纠错语义已记入迁移",
+  "started_at": "2026-09-18T05:22:46.513664+00:00",
+  "commit_sha": "e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5",
+  "evidence_paths": [
+    "docs/evidence/baseline/AC3-003/idle.png",
+    "docs/evidence/baseline/AC3-003/input.png",
+    "docs/evidence/baseline/AC3-003/hidden.png",
+    "docs/evidence/baseline/AC3-003/hotkey-migration.md"
+  ]
+}

@@ -1,0 +1,27 @@
+[13:22:47.255] DoubaoTypeless 启动中… v0.4.2
+[13:22:47.255]   手机桥接端口: 18765
+[13:22:47.255]   全局快捷键: 2 个已配置
+[13:22:47.255]   前台建议: 关
+[13:22:47.255]   后台学习: 关
+[13:22:47.255]   纠错对照表: ./data/dictionary.txt (8 条) 学习后写对照表=off
+[13:22:47.255]   日志文件: G:\DoubaoTypeless\preview-v3-00\debug.log
+[13:22:47.255]   日志默认脱敏（不写输入正文）；调试请设环境变量 DT_VERBOSE_LOG=1
+[13:22:47.255]   审阅历史文件: ./data/review_history.json 学习队列: ./data/learn_pending.json 批量间隔: 立即
+[13:22:47.255] 
+[13:22:47.355] [history] 已加载 1 条审阅历史
+[13:22:47.367] [hotkey] 已注册 2 个全局快捷键
+[13:22:47.373] [bridge] 手机页面已启动: http://192.168.8.105:18765
+[13:22:47.373]   手机页面: http://192.168.8.105:18765
+[13:22:47.373]   手机浏览器打开上面的地址即可
+[13:22:47.373]   手机端输入会自动同步到 PC，稳定后自动进入审阅
+[13:22:47.373] 
+[13:22:47.373] 就绪！
+[13:22:49.050] [bridge] 手机已连接 (1 台)
+[13:22:49.051] [bridge.hello] client_version=v3-00-harness meta_enabled=None composition_support=None user_agent=''
+[13:22:49.051] [bridge.composition] phase=start len=0 composing=None since_comp_end_ms=None
+[13:22:49.051] [bridge.update] len=5 composing=None input_type=composition since_comp_end_ms=None
+[13:22:49.051] [bridge.composition] phase=end len=24 composing=None since_comp_end_ms=None
+[13:22:49.260] [bridge.stable] len=24 composing=None reason=v3-00-harness since_comp_end_ms=None
+[13:22:50.470] [bridge] 手机断开 (0 台)
+[13:22:55.228] [插入] final_len=24 accepted=0
+[13:22:55.459] [插入结果] attempted=True focus_restored=True paste_sent=True clipboard_kept=True

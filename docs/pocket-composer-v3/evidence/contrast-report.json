@@ -1,0 +1,41 @@
+{
+  "kind": "token_color_pairs_only_not_accessibility_certification",
+  "results": [
+    {
+      "pair": "正文",
+      "ratio": 15.176,
+      "target": 4.5,
+      "status": "PASS"
+    },
+    {
+      "pair": "次文",
+      "ratio": 5.105,
+      "target": 4.5,
+      "status": "PASS"
+    },
+    {
+      "pair": "主按钮",
+      "ratio": 4.993,
+      "target": 4.5,
+      "status": "PASS"
+    },
+    {
+      "pair": "深色正文",
+      "ratio": 12.638,
+      "target": 4.5,
+      "status": "PASS"
+    },
+    {
+      "pair": "深色次文",
+      "ratio": 7.0,
+      "target": 4.5,
+      "status": "PASS"
+    },
+    {
+      "pair": "非文字红色标记",
+      "ratio": 4.128,
+      "target": 3,
+      "status": "PASS"
+    }
+  ]
+}

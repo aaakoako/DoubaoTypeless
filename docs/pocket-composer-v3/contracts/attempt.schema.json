@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:doubaotypeless:v3:attempt",
+  "title": "Local delivery journal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "attempt_id",
+    "intent_id",
+    "bundle_id",
+    "adapter_id",
+    "result",
+    "steps"
+  ],
+  "properties": {
+    "attempt_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "intent_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "bundle_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "adapter_id": {
+      "type": "string",
+      "maxLength": 80
+    },
+    "result": {
+      "enum": [
+        "RUNNING",
+        "NO_STEPS",
+        "PARTIAL",
+        "UNKNOWN",
+        "CONFIRMED",
+        "CANCELLED"
+      ]
+    },
+    "steps": {
+      "type": "array",
+      "maxItems": 7,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "index",
+          "kind",
+          "asset_id",
+          "state",
+          "evidence"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "kind": {
+            "enum": [
+              "image",
+              "text"
+            ]
+          },
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "injecting",
+              "injected",
+              "observed",
+              "failed",
+              "unknown"
+            ]
+          },
+          "evidence": {
+            "enum": [
+              "none",
+              "os_input_count",
+              "target_attachment",
+              "target_text",
+              "user_confirmed"
+            ]
+          }
+        }
+      }
+    },
+    "error_code": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[A-Z_]*$"
+    }
+  }
+}

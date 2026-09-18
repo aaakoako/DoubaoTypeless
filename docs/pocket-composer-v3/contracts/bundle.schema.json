@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:doubaotypeless:v3:bundle",
+  "title": "Frozen DeliveryBundle v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "bundle_id",
+    "device_id",
+    "draft_id",
+    "epoch",
+    "revision",
+    "text",
+    "assets",
+    "auto_send",
+    "manifest_hash"
+  ],
+  "properties": {
+    "protocol": {
+      "const": 3
+    },
+    "bundle_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "device_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "draft_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "epoch": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "text": {
+      "type": "string",
+      "maxLength": 65536
+    },
+    "assets": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "asset_id",
+          "render_revision",
+          "sha256",
+          "mime",
+          "bytes",
+          "width",
+          "height",
+          "role"
+        ],
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "render_revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "mime": {
+            "enum": [
+              "image/png",
+              "image/jpeg"
+            ]
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8388608
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          },
+          "role": {
+            "enum": [
+              "marked_screenshot",
+              "photo",
+              "whiteboard"
+            ]
+          }
+        }
+      }
+    },
+    "auto_send": {
+      "const": false
+    },
+    "manifest_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
