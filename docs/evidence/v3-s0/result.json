@@ -1,0 +1,18 @@
+{
+  "slice": "S0",
+  "status": "LOCAL_COMPLETE_CI_PENDING_PUSH",
+  "head_at_evidence": "uncommitted-until-commit",
+  "commands": [
+    {"cmd": "python -m unittest discover -s docs/v3-delivery/tests -v", "exit_code": 0, "output": "Ran 18 tests OK"},
+    {"cmd": "npm run typecheck && npm run build", "exit_code": 0, "cwd": "web"},
+    {"cmd": "python -m pytest -q --tb=line", "exit_code": 0, "output": "85 passed in 1.65s"},
+    {"cmd": "python -m PyInstaller --noconfirm packaging/v3_preview.spec", "exit_code": 0},
+    {"cmd": "isolated start DoubaoTypelessV3Preview.exe 4s", "exit_code": 0, "observed": "[v3.bridge] http://127.0.0.1:8766; pair.txt and instance.lock written; DT_V3_DATA_DIR isolated"}
+  ],
+  "exe_sha256": "1178218f1bccbaa0b039756aa3ce9c4c32c0f0009f65f5cbb949cda45688d3c9",
+  "exe_bytes": 12569073,
+  "github_ci_this_sha": "NOT_RUN",
+  "cursor_probe": {"comtypes": "ModuleNotFoundError", "adb": null},
+  "not_product_pass": true,
+  "note": "S0 local foundation only. Not Cursor, not Android, not GitHub Release."
+}

@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import time
 import uuid
 from pathlib import Path
 from typing import Any, Callable, Optional
+from urllib.parse import urlparse
 
 from aiohttp import web, WSMsgType
 
@@ -32,6 +34,8 @@ def _web_dist() -> Path:
 
 WEB_DIST = _web_dist()
 AUTH_DEADLINE_S = 5.0
+WS_RATE_LIMIT = 40
+WS_RATE_WINDOW_S = 2.0
 
 
 def peer_host(request: web.Request) -> str:
@@ -47,6 +51,27 @@ def is_loopback_host(host: str) -> bool:
     if value.startswith("::ffff:"):
         value = value[7:]
     return value in {"127.0.0.1", "::1", "localhost"} or value.startswith("127.")
+
+
+def hostname_from_host_header(header: str) -> str:
+    value = (header or "").strip().lower()
+    if value.startswith("["):
+        end = value.find("]")
+        return value[1:end] if end > 1 else ""
+    return value.split(":")[0]
+
+
+def is_trusted_hostname(name: str | None) -> bool:
+    host = (name or "").strip().lower()
+    if not host:
+        return False
+    if host in {"localhost"} or is_loopback_host(host):
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return bool(ip.is_private or ip.is_loopback or ip.is_link_local)
 
 
 class V3Bridge:
@@ -78,9 +103,25 @@ class V3Bridge:
         self._runner: Optional[web.AppRunner] = None
         self._clients: set[web.WebSocketResponse] = set()
         self._ws_auth: dict[int, Any] = {}
+        self._ws_rate: dict[int, list[float]] = {}
+
+    @web.middleware
+    async def _origin_host_gate(self, request: web.Request, handler):
+        host = hostname_from_host_header(request.headers.get("Host", ""))
+        if not is_trusted_hostname(host):
+            return web.json_response({"error": "bad host"}, status=403)
+        origin = request.headers.get("Origin", "")
+        api = request.path == "/ws" or request.path.startswith("/v3/")
+        if origin:
+            parsed = urlparse(origin)
+            if parsed.scheme not in {"http", "https"} or not is_trusted_hostname(parsed.hostname):
+                return web.json_response({"error": "bad origin"}, status=403)
+        elif api and not is_loopback_host(peer_host(request)):
+            return web.json_response({"error": "origin required"}, status=403)
+        return await handler(request)
 
     def make_app(self) -> web.Application:
-        app = web.Application()
+        app = web.Application(middlewares=[self._origin_host_gate])
         app.router.add_get("/", self._index)
         app.router.add_get("/ws", self._ws)
         app.router.add_get("/v3/pair", self._pair_get)
@@ -92,8 +133,8 @@ class V3Bridge:
         app.router.add_post("/v3/assets/{upload_id}/complete", self._asset_complete)
         app.router.add_get("/v3/assets/{upload_id}/missing", self._asset_missing)
         app.router.add_get("/v3/assets/{asset_id}", self._asset_get)
-        if (WEB_DIST / "assets").is_dir():
-            app.router.add_static("/assets", WEB_DIST / "assets")
+        if (_web_dist() / "assets").is_dir():
+            app.router.add_static("/assets", _web_dist() / "assets")
         app.router.add_get("/v3/history", self._history)
         app.router.add_get("/v3/status", self._status)
         return app
@@ -111,7 +152,7 @@ class V3Bridge:
             self._runner = None
 
     async def _index(self, request: web.Request) -> web.Response:
-        dist_index = WEB_DIST / "index.html"
+        dist_index = _web_dist() / "index.html"
         path = dist_index if dist_index.is_file() else STATIC / "composer.html"
         return web.FileResponse(path)
 
@@ -272,11 +313,24 @@ class V3Bridge:
                 if looks_like_key_script(data):
                     await ws.send_json({"type": "error", "error": "forbidden payload"})
                     continue
+                if not self._rate_ok(ws):
+                    await ws.send_json({"type": "error", "error": "rate limited"})
+                    continue
                 authorized = await self._handle(ws, data, authorized)
         finally:
             self._clients.discard(ws)
             self._ws_auth.pop(id(ws), None)
+            self._ws_rate.pop(id(ws), None)
         return ws
+
+    def _rate_ok(self, ws: web.WebSocketResponse) -> bool:
+        now = time.monotonic()
+        bucket = self._ws_rate.setdefault(id(ws), [])
+        bucket.append(now)
+        cutoff = now - WS_RATE_WINDOW_S
+        while bucket and bucket[0] < cutoff:
+            bucket.pop(0)
+        return len(bucket) <= WS_RATE_LIMIT
 
     def _apply_draft_fields(self, data: dict[str, Any]) -> None:
         apply_draft_update(

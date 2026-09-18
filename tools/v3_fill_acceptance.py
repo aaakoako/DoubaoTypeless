@@ -74,9 +74,14 @@ MAP = {
         "旧证据仅授权表；本批禁止非环回 POST 自授 insert/capture，默认不再 True",
     ),
     "AC3-020": (
-        "FAIL",
-        ["tests/test_v3_bridge.py", "docs/evidence/v3-review/counterexamples.json"],
-        "旧证据只拒绝 keys 载荷；代码仍未校验伪造 Origin/Host 或空 Origin，也无消息限流",
+        "PASS",
+        [
+            "tests/test_v3_bridge.py",
+            "tests/test_v3_auth_isolation.py::test_forged_host_and_origin_are_rejected",
+            "tests/test_v3_auth_isolation.py::test_lan_api_without_origin_is_rejected",
+            "tests/test_v3_auth_isolation.py::test_ws_burst_is_rate_limited",
+        ],
+        "旧证据只拒绝 keys；本批补伪造 Origin/Host、空 Origin 非环回、WS 突发限流。HTTPS 不在本轮。",
     ),
     "AC3-021": ("PASS", ["tests/test_v3_assets.py::test_chunked_resume_completes_once", "tests/test_v3_chunk_http.py"]),
     "AC3-022": ("PASS", ["tests/test_v3_assets.py::test_bad_magic_and_path_traversal_leave_no_tmp"]),

@@ -66,6 +66,7 @@ def test_lan_pair_post_cannot_self_grant_insert_or_capture(tmp_path, monkeypatch
                 response = await session.post(
                     f"http://127.0.0.1:{port}/v3/pair",
                     json={"code": code, "allow_insert": True, "allow_capture": True},
+                    headers={"Origin": f"http://192.168.8.21:{port}"},
                 )
                 body = await response.json()
                 assert response.status == 200
@@ -139,3 +140,85 @@ def test_start_stops_without_writers_when_lock_held(tmp_path):
     assert app.bridge._runner is None
     assert not pair_note.exists()
     held.release()
+
+
+def test_forged_host_and_origin_are_rejected(tmp_path):
+    async def run():
+        _auth, _bridge, runner, port = await _serve(tmp_path)
+        try:
+            async with ClientSession() as session:
+                bad_host = await session.get(
+                    f"http://127.0.0.1:{port}/v3/pair",
+                    headers={"Host": "evil.example"},
+                )
+                assert bad_host.status == 403
+                bad_origin = await session.get(
+                    f"http://127.0.0.1:{port}/v3/pair",
+                    headers={"Origin": "http://evil.example"},
+                )
+                assert bad_origin.status == 403
+                body = await bad_origin.json()
+                assert body.get("error") == "bad origin"
+        finally:
+            await runner.cleanup()
+
+    asyncio.run(run())
+
+
+def test_lan_api_without_origin_is_rejected(tmp_path, monkeypatch):
+    monkeypatch.setattr(bridge_v3, "peer_host", lambda _request: "192.168.8.30")
+
+    async def run():
+        auth, _bridge, runner, port = await _serve(tmp_path)
+        try:
+            code = auth.new_pairing_challenge()
+            async with ClientSession() as session:
+                response = await session.post(
+                    f"http://127.0.0.1:{port}/v3/pair",
+                    json={"code": code},
+                )
+                assert response.status == 403
+                body = await response.json()
+                assert body.get("error") == "origin required"
+        finally:
+            await runner.cleanup()
+
+    asyncio.run(run())
+
+
+def test_ws_burst_is_rate_limited(tmp_path):
+    async def run():
+        auth, _bridge, runner, port = await _serve(tmp_path)
+        try:
+            code = auth.new_pairing_challenge()
+            async with ClientSession() as session:
+                creds = await (
+                    await session.post(
+                        f"http://127.0.0.1:{port}/v3/pair",
+                        json={"code": code, "allow_insert": True},
+                    )
+                ).json()
+                async with session.ws_connect(f"http://127.0.0.1:{port}/ws") as ws:
+                    await ws.send_json(
+                        {
+                            "type": "session.hello",
+                            "session_id": creds["session_id"],
+                            "token": creds["token"],
+                        }
+                    )
+                    ready = await ws.receive_json()
+                    assert ready["type"] == "session.ready"
+                    limited = False
+                    for _ in range(50):
+                        await ws.send_json({"type": "ping"})
+                    for _ in range(50):
+                        msg = await ws.receive_json()
+                        if msg.get("error") == "rate limited":
+                            limited = True
+                            break
+                    assert limited is True
+        finally:
+            await runner.cleanup()
+
+    asyncio.run(run())
+

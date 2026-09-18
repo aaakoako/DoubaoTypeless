@@ -292,12 +292,14 @@
     "expected": "按协议拒绝/节流，无shell/路径/按键任意执行入口",
     "layer": "自动",
     "severity": "P1",
-    "status": "FAIL",
+    "status": "PASS",
     "evidence": [
       "tests/test_v3_bridge.py",
-      "docs/evidence/v3-review/counterexamples.json"
+      "tests/test_v3_auth_isolation.py::test_forged_host_and_origin_are_rejected",
+      "tests/test_v3_auth_isolation.py::test_lan_api_without_origin_is_rejected",
+      "tests/test_v3_auth_isolation.py::test_ws_burst_is_rate_limited"
     ],
-    "note": "旧证据只拒绝 keys 载荷；代码仍未校验伪造 Origin/Host 或空 Origin，也无消息限流"
+    "note": "旧证据只拒绝 keys；本批补伪造 Origin/Host、空 Origin 非环回、WS 突发限流。HTTPS 不在本轮。"
   },
   {
     "id": "AC3-021",

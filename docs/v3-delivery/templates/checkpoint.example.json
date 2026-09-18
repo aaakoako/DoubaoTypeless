@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "product_goal": "V3完整范围R01-R10，达到可发布候选；实际公开发布另行批准",
+  "review_base": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
+  "current_head": null,
+  "last_completed_slice": null,
+  "active_slice": "S0_delivery_foundation",
+  "next_action": "检查真实工作区、读取复核，修CI与授权隔离，登记目标环境。不要将此示例当成最新仓库状态。",
+  "accepted_requirements": [],
+  "open_defects": [],
+  "environment_blockers": [],
+  "in_progress_files": [],
+  "last_commands": [],
+  "candidate_artifact": null,
+  "published": false
+}

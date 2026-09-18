@@ -21,7 +21,9 @@ CLAUDE.md
 # 工具与 IDE（个人环境不上传）
 .vscode/
 .idea/
-.cursor/
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
 
 # 系统垃圾文件
 Thumbs.db
@@ -42,6 +44,7 @@ doubao_diagnostics_*.json
 web/node_modules/
 docs/evidence/v3-soak/assets/
 docs/evidence/v3-soak/soak.sqlite
+docs/evidence/v3-ci/junit.xml
 docs/evidence/v3-idle/data/
 opus.dll
 *.spec.bak

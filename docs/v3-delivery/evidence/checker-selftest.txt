@@ -1,0 +1,23 @@
+test_blocked_not_ready (test_evidence_checker.EvidenceCheckerTests.test_blocked_not_ready) ... ok
+test_changed_artifact_rejected (test_evidence_checker.EvidenceCheckerTests.test_changed_artifact_rejected) ... ok
+test_changed_file_rejected (test_evidence_checker.EvidenceCheckerTests.test_changed_file_rejected) ... ok
+test_duplicate_case_rejected (test_evidence_checker.EvidenceCheckerTests.test_duplicate_case_rejected) ... ok
+test_missing_case_rejected (test_evidence_checker.EvidenceCheckerTests.test_missing_case_rejected) ... ok
+test_missing_file_rejected (test_evidence_checker.EvidenceCheckerTests.test_missing_file_rejected) ... ok
+test_naive_timestamp_rejected (test_evidence_checker.EvidenceCheckerTests.test_naive_timestamp_rejected) ... ok
+test_native_hash_must_match_candidate (test_evidence_checker.EvidenceCheckerTests.test_native_hash_must_match_candidate) ... ok
+test_nonzero_exit_rejected (test_evidence_checker.EvidenceCheckerTests.test_nonzero_exit_rejected) ... ok
+test_pass_without_receipt_rejected (test_evidence_checker.EvidenceCheckerTests.test_pass_without_receipt_rejected) ... ok
+test_path_escape_rejected (test_evidence_checker.EvidenceCheckerTests.test_path_escape_rejected) ... ok
+test_simulated_android_not_native (test_evidence_checker.EvidenceCheckerTests.test_simulated_android_not_native) ... ok
+test_skipped_test_rejected (test_evidence_checker.EvidenceCheckerTests.test_skipped_test_rejected) ... ok
+test_source_file_not_runtime_evidence (test_evidence_checker.EvidenceCheckerTests.test_source_file_not_runtime_evidence) ... ok
+test_stale_commit_rejected (test_evidence_checker.EvidenceCheckerTests.test_stale_commit_rejected) ... ok
+test_valid_fixture_only_checks_structure (test_evidence_checker.EvidenceCheckerTests.test_valid_fixture_only_checks_structure) ... ok
+test_wrong_evidence_layer_rejected (test_evidence_checker.EvidenceCheckerTests.test_wrong_evidence_layer_rejected) ... ok
+test_zero_test_suite_rejected (test_evidence_checker.EvidenceCheckerTests.test_zero_test_suite_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 18 tests in 0.011s
+
+OK

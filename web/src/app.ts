@@ -87,7 +87,7 @@ export function boot(root: HTMLElement): void {
   let editor: SharedEditor | null = null;
   let currentId = "";
   const $ = (id: string) => document.getElementById(id)!;
-  const headers = () =>
+  const headers = (): Record<string, string> =>
     state.session
       ? { "X-DT-Session": state.session.session_id, "X-DT-Token": state.session.token }
       : {};

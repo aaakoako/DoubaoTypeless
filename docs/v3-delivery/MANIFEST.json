@@ -1,0 +1,15 @@
+{
+  "EXECUTION_CONTRACT.md": "b0adaf559f5a87e420e5a7c25f1f9584f9cb190e419672dce6ee49fe8f6953cc",
+  "START_HERE.md": "7231f10f7614e9b66b6dd3b7e52895e19fe4fe061d850eff75730d86c89914b4",
+  "acceptance_catalog.json": "ddb675637f203fcf3aae6e409d2727d45110a7cd2e6519b23b97d20f9776e35a",
+  "acceptance_catalog.sha256": "b34dab99c8de2c9d680fccba729dfa4bbc24c4be8170ff7000e36d175561a8fd",
+  "evidence/DELIVERY_STATUS.md": "d3ee2286c376cb0bc21ba90f8896a1d5ddf07c0033d29bfcef0df6247c846050",
+  "evidence/checker-selftest.txt": "89b91782d947e7df592c1ce1701b3efeb73ff8ec6fec589f0ab56723590467b0",
+  "evidence/initial-candidate-rejection.json": "6e9dfa35dc9dbe2356b0f058bdd365b6fa8a101f3d6a6eff96f755cceda8c10d",
+  "rules/v3-delivery.mdc": "7fac025a72ec04885ff8b517f627d3c0b7a927ccae1e374071bf1addf17633a5",
+  "templates/candidate.example.json": "bdbea2976fc21115bc2688683344b3674012c44a71ff60da19aa97aba3822fe8",
+  "templates/checkpoint.example.json": "bc21dc3089850c83f35b8699f3c9355731a89fb473b39f031f535a8a055bb729",
+  "tests/test_evidence_checker.py": "d3174b36e7075a922e5867522e51329df69a06cc1a637e6640c277564ca3bd1d",
+  "tools/README.md": "360c7730c2d0ee2ee96bea8072d458f428610ec4ac2b67d26c8dcfb9b6ecb928",
+  "tools/check_release_evidence.py": "b01feb839a03ecc7538cd451b4aa633ca5ef2c7f6693e20d1f5bef4a1379e25d"
+}
