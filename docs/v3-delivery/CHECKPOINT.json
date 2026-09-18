@@ -2,7 +2,7 @@
   "schema_version": 1,
   "product_goal": "V3完整范围R01-R10，达到可发布候选；实际公开发布另行批准",
   "review_base": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
-  "current_head": "ed29fcb34107e4314a4bbd970ed3d8358047574e",
+  "current_head": "2aaa3a1526c9d4fcb7ceb43fdcbe74e17db91a9e",
   "last_completed_slice": "S2_image_then_text",
   "active_slice": "S3_multi_board_recovery",
   "next_action": "S3：多图顺序、白板撤销重做与再编辑、编号图序、召回不吞当前稿、中断/换目标/未知恢复、重启恢复真实图片。S2 已证实生产页选图→裁剪遮挡编号→分块上传→冻结→先图后文进入 DT-S2-PasteTarget；不是 Cursor。S2 独立复核 WAITING。",
