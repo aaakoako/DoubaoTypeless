@@ -64,10 +64,11 @@
   ],
   "candidate_artifact": {
     "path": "dist/DoubaoTypelessV3Preview/DoubaoTypelessV3Preview.exe",
-    "sha256": "1178218f1bccbaa0b039756aa3ce9c4c32c0f0009f65f5cbb949cda45688d3c9",
+    "sha256": "210f1c98f4c1619ae4665421ded97065b58031975d5653d2ad2714716822e2ff",
     "kind": "isolated_dev_onedir",
     "release": false,
-    "stale_vs_s4": true
+    "source_head": "988f3294dc47316e6cf36dc14b0e7ec325de2e42",
+    "stale_vs_s4": false
   },
   "published": false
 }

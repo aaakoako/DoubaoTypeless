@@ -1,0 +1,20 @@
+{
+  "case_id": "AC3-084/085-local",
+  "status": "PASS",
+  "source_head": "988f3294dc47316e6cf36dc14b0e7ec325de2e42",
+  "exe": "G:\\DoubaoTypeless\\DoubaoTypeless\\dist\\DoubaoTypelessV3Preview\\DoubaoTypelessV3Preview.exe",
+  "exe_sha256": "210f1c98f4c1619ae4665421ded97065b58031975d5653d2ad2714716822e2ff",
+  "exe_bytes": 12583483,
+  "onedir_files": 887,
+  "onedir_bytes": 190330995,
+  "pc_html": [
+    "_internal\\doubao_typeless\\static\\pc.html"
+  ],
+  "web_index": [
+    "_internal\\web\\dist\\index.html"
+  ],
+  "webengine": false,
+  "release": false,
+  "note": "local onedir from S4 tree; not a GitHub Release; no v* tag; not RELEASE_READY",
+  "started_at": "2026-09-18T15:55:16.918507+00:00"
+}
