@@ -1,7 +1,7 @@
 {
   "slice": "S0",
   "status": "LOCAL_COMPLETE_CI_PENDING_PUSH",
-  "head_at_evidence": "uncommitted-until-commit",
+  "head_at_evidence": "1a7a1adbec0f794922075365da0d895f779c6db2",
   "commands": [
     {"cmd": "python -m unittest discover -s docs/v3-delivery/tests -v", "exit_code": 0, "output": "Ran 18 tests OK"},
     {"cmd": "npm run typecheck && npm run build", "exit_code": 0, "cwd": "web"},

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "product_goal": "V3完整范围R01-R10，达到可发布候选；实际公开发布另行批准",
   "review_base": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
-  "current_head": "73258adac6653ac70a017df7f8ba48e20fbd92bd",
+  "current_head": "1a7a1adbec0f794922075365da0d895f779c6db2",
   "last_completed_slice": "S0_local_foundation",
   "active_slice": "S1_real_text_path",
   "next_action": "S1：生产前端→真实桥接→原生HUD→指定输入框纯文字；记录手机/Cursor真实能力，不用产品窗冒充Cursor。S0 GitHub Actions 需推送后才有干净云端执行。S0授权/隔离待独立复核，不扩大完成声明。",
