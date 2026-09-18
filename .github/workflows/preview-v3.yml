@@ -44,6 +44,7 @@ jobs:
 
   windows-min-pack:
     runs-on: windows-latest
+    needs: pytest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -66,6 +67,7 @@ jobs:
       - name: Build isolated onedir
         run: python -m PyInstaller --noconfirm packaging/v3_preview.spec
       - name: Resource check
+        shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -73,6 +75,9 @@ jobs:
           exe = root / "DoubaoTypelessV3Preview.exe"
           assert exe.is_file(), exe
           assert not any(root.rglob("*WebEngine*"))
+          assert any(root.rglob("pc.html")), "pc.html missing"
+          assert any(p.name == "LICENSE" for p in root.rglob("LICENSE")), "LICENSE missing"
+          assert any(root.rglob("index.html")), "web dist missing"
           print("min pack exe", exe, "bytes", exe.stat().st_size)
           PY
       - uses: actions/upload-artifact@v4

@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "product": "Pocket Composer v3 preview",
+  "release_ready": false,
+  "published": false,
+  "merge_to_master": false,
+  "create_v_star_tag": false,
+  "github_release": false,
+  "overwrite_daily_use": false,
+  "waiting_for": [
+    "independent review of S2 and S5",
+    "explicit approval of a specific SHA, package hash, and version"
+  ],
+  "approver": null,
+  "approved_sha": null,
+  "approved_exe_sha256": null,
+  "approved_version": null,
+  "note": "填写本单不等于已经发布。只有用户针对具体 SHA/包哈希/版本号明确批准后才能 merge/tag/Release。"
+}

@@ -360,6 +360,10 @@ class V3App:
         _log(f"[v3] 手机打开 {url}")
         _log(f"[v3] 配对码 {code} （2分钟内）")
         _log(f"[v3] 数据目录 {self.data_dir}")
+        from doubao_typeless.platform.windows.hotkeys import probe_hotkey_conflicts
+
+        probe = probe_hotkey_conflicts()
+        _log(f"[v3] 热键探测 {probe}；冲突时改键，语法合法不等于注册成功")
         _log("[v3] 空闲无浮窗；Alt+I 插入，Alt+Shift+I 召回；不发送 Enter")
 
     def start_background(self, *, start_hud: bool = False):

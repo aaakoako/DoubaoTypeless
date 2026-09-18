@@ -1,0 +1,23 @@
+{
+  "case_id": "AC3-089/090",
+  "cursor": {
+    "status": "BLOCKED_NATIVE",
+    "probed": "python 3.13 无 comtypes；Cursor UIA 不可观察",
+    "versions_tested": [],
+    "note": "不写泛支持所有 Agent。指定目标 DT-S2-PasteTarget 不是 Cursor。"
+  },
+  "android": {
+    "status": "BLOCKED_NATIVE",
+    "probed": "shutil.which('adb') is None",
+    "browsers": [],
+    "doubao_ime": false
+  },
+  "ios": {
+    "status": "NOT_RUN",
+    "note": "旁路检查：本轮不虚标与 Android 豆包相同能力；未测 Safari。"
+  },
+  "visual_independent": {
+    "status": "WAITING",
+    "note": "生产截图见 S1–S4 evidence。实现者不可把设计板或自比对写成独立视觉 PASS。"
+  }
+}
