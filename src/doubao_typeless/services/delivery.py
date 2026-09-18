@@ -34,16 +34,32 @@ class DeliveryService:
         self._send_key = send_key
         self.enter_count = 0
 
-    def run(self, attempt: Attempt, bundle: dict) -> Attempt:
+    def run(
+        self,
+        attempt: Attempt,
+        bundle: dict,
+        *,
+        mode: str = "full",
+        skip_asset_ids: set[str] | None = None,
+    ) -> Attempt:
         class_name, control = self._read_focus()
         kind = classify_focus(class_name, control)
-        wants_images = bool(bundle.get("assets"))
+        assets = list(bundle.get("assets") or [])
+        skip_asset_ids = skip_asset_ids or set()
+        if mode == "text_only":
+            assets = []
+        elif mode == "remaining_verified":
+            assets = [a for a in assets if a.get("asset_id") not in skip_asset_ids]
+        elif mode == "cancel":
+            attempt.result = "CANCELLED"
+            return attempt
+        wants_images = bool(assets)
         if not may_inject(kind, wants_images=wants_images):
             attempt.result = "NO_STEPS"
             attempt.error_code = "NEEDS_TARGET"
             return attempt
         index = 0
-        for asset in bundle.get("assets") or []:
+        for asset in assets:
             class_name, control = self._read_focus()
             if classify_focus(class_name, control) != kind:
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"

@@ -9,7 +9,8 @@ from pathlib import Path
 
 from doubao_typeless.core.attempt import Attempt
 from doubao_typeless.core.bundle import Draft, archive_if_match, freeze_bundle
-from doubao_typeless.runtime import lan_ip, v3_data_dir
+from doubao_typeless.core.intent import IntentLedger
+from doubao_typeless.runtime import lan_ip, pick_port, v3_data_dir
 from doubao_typeless.services.bridge_v3 import V3Bridge
 from doubao_typeless.services.byok import ByokService
 from doubao_typeless.services.capture import CaptureService
@@ -28,9 +29,10 @@ class V3App:
     def __init__(self, *, data_dir: Path | None = None, port: int = 8766):
         self.data_dir = Path(data_dir or v3_data_dir())
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.port = port
+        self.port = pick_port(port) if port else 0
         self.auth = AuthService()
         self.store = AssetStore(self.data_dir / "assets")
+        self.ledger = IntentLedger()
         self.draft = Draft(
             draft_id=str(uuid.uuid4()),
             epoch=str(uuid.uuid4()),
@@ -43,7 +45,7 @@ class V3App:
         self.hud = HudController(on_insert=self.insert_last)
         self._last_attempt: Attempt | None = None
         self.bridge = V3Bridge(
-            port=port,
+            port=self.port,
             auth=self.auth,
             store=self.store,
             draft=self.draft,
@@ -53,7 +55,7 @@ class V3App:
             history_list=self._history_public,
             logger=_log,
         )
-        self.capture = CaptureService(grab=self._grab)
+        self.capture = CaptureService(grab=self._grab, hide_surfaces=self.hud.hide)
         self.delivery = DeliveryService(
             paste=self._paste,
             set_clipboard_image=self._set_image,
@@ -84,11 +86,12 @@ class V3App:
 
         return grab_primary(scope)
 
-    def _on_capture(self, scope: str) -> dict:
+    def _on_capture(self, scope: str, request_id: str = "") -> dict:
         sessions = list(self.auth.sessions.values())
         if not sessions:
             raise ValueError("no session")
-        blob = self.capture.capture(sessions[-1], scope)
+        self.hud.hide()
+        blob = self.capture.capture(sessions[-1], scope, request_id=request_id or str(uuid.uuid4()))
         from PIL import Image
         import io
 
@@ -142,16 +145,29 @@ class V3App:
         hydrated["assets"] = assets
         return hydrated
 
-    def _on_intent(self, intent: dict, bundle: dict) -> None:
+    def _on_intent(self, intent: dict, bundle: dict) -> dict:
+        intent_id = str(intent.get("intent_id") or "")
+        decision = self.ledger.begin(intent_id)
+        if decision == "duplicate":
+            return {"result": self.ledger.status(intent_id) or "UNKNOWN", "duplicate": True}
+        if decision == "busy":
+            return {"result": "BUSY", "error_code": "BUSY"}
         attempt = Attempt(
             attempt_id=str(uuid.uuid4()),
-            intent_id=str(intent.get("intent_id") or uuid.uuid4()),
+            intent_id=intent_id,
             bundle_id=bundle["bundle_id"],
             adapter_id="cursor_windows",
         )
         hydrated = self._hydrate_bundle(bundle)
         frozen_text = hydrated.get("text")
-        result = self.delivery.run(attempt, hydrated)
+        mode = str(intent.get("recovery_mode") or "full")
+        skip = set(intent.get("skip_asset_ids") or [])
+        try:
+            result = self.delivery.run(attempt, hydrated, mode=mode, skip_asset_ids=skip)
+        except Exception:
+            self.ledger.finish(intent_id, "UNKNOWN")
+            raise
+        self.ledger.finish(intent_id, result.result)
         self._last_attempt = result
         self.history.record(bundle, attempt_result=result.result)
         if result.result == "CONFIRMED":
@@ -166,6 +182,9 @@ class V3App:
                 current_hash=bundle.get("manifest_hash") or "",
             )
         _log(f"[v3.delivery] {result.result} enter={self.delivery.enter_count} text_frozen={frozen_text == bundle.get('text')}")
+        payload = result.to_dict()
+        payload["result"] = result.result
+        return payload
 
     def insert_last(self) -> None:
         bundle = self.bridge.last_bundle

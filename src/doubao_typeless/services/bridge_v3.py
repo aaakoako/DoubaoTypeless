@@ -11,6 +11,7 @@ from aiohttp import web, WSMsgType
 from doubao_typeless.core.bundle import Draft, apply_draft_update, freeze_bundle
 from doubao_typeless.storage.asset_store import AssetStore
 from doubao_typeless.storage.credentials import AuthService, looks_like_key_script
+from doubao_typeless.ui.tokens import should_wake
 
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
@@ -26,7 +27,7 @@ class V3Bridge:
         draft: Draft,
         on_activity: Callable[[str, int], None] | None = None,
         on_intent: Callable[[dict, dict], None] | None = None,
-        on_capture: Callable[[str], dict] | None = None,
+        on_capture: Callable[[str, str], dict] | None = None,
         history_list: Callable[[], list] | None = None,
         logger: Callable[[str], None] | None = None,
     ):
@@ -184,7 +185,7 @@ class V3Bridge:
                     "assets": data.get("assets", self.draft.assets),
                 },
             )
-            if self._on_activity:
+            if self._on_activity and should_wake("draft.update"):
                 self._on_activity(self.draft.text, len(self.draft.assets))
             await ws.send_json(
                 {
@@ -196,7 +197,7 @@ class V3Bridge:
             )
             return
         if kind == "editor.activity":
-            if self._on_activity:
+            if self._on_activity and should_wake("editor.activity"):
                 self._on_activity(self.draft.text, len(self.draft.assets))
             return
         if kind == "bundle.commit":
@@ -211,16 +212,24 @@ class V3Bridge:
             if self.last_bundle is None:
                 self.last_bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
             frozen = dict(self.last_bundle)
+            status = {"result": "RUNNING"}
             if self._on_intent:
-                self._on_intent(data, frozen)
-            await ws.send_json({"type": "attempt.status", "result": "RUNNING"})
+                status = self._on_intent(data, frozen) or status
+            await ws.send_json({"type": "attempt.status", **status})
             return
         if kind == "capture.request":
-            session = self.auth.authorize(data["session_id"], data.get("token") or "", "capture")
+            self.auth.authorize(data["session_id"], data.get("token") or "", "capture")
             if not self._on_capture:
                 await ws.send_json({"type": "capture.result", "error": "unavailable"})
                 return
-            meta = self._on_capture(str(data.get("scope") or "primary"))
+            try:
+                meta = self._on_capture(
+                    str(data.get("scope") or "primary"),
+                    str(data.get("request_id") or uuid.uuid4()),
+                )
+            except ValueError as exc:
+                await ws.send_json({"type": "capture.result", "error": str(exc)})
+                return
             await ws.send_json({"type": "capture.result", "asset": meta})
             return
         if kind == "byok.request":

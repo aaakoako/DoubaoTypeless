@@ -179,7 +179,13 @@ function connect(){
   ws.onmessage=ev=>{
     const msg=JSON.parse(ev.data);
     if(msg.type==='draft.ack'){state.lastAck=msg;update()}
-    if(msg.type==='attempt.status'){state.busy=msg.result==='RUNNING';if(msg.result&&msg.result!=='RUNNING'){state.busy=false;toast('电脑：'+msg.result+' · 未发送Enter')}update()}
+    if(msg.type==='attempt.status'){
+      state.busy=msg.result==='RUNNING';
+      if(msg.duplicate){toast('同一意图不会再次发键');state.busy=false;update();return}
+      if(msg.result==='BUSY'){toast('正在插入，未接受第二个意图');update();return}
+      if(msg.result&&msg.result!=='RUNNING'){state.busy=false;toast('电脑：'+msg.result+' · 未发送Enter');if(['PARTIAL','UNKNOWN','NO_STEPS'].includes(msg.result))showRecovery(msg.result)}
+      update();
+    }
     if(msg.type==='capture.result'){
       if(msg.error){toast('截图失败：'+msg.error);return}
       const a={id:msg.asset.asset_id,asset_id:msg.asset.asset_id,kind:'截图',w:msg.asset.width,h:msg.asset.height,ops:[],crop:{x:0,y:0,w:msg.asset.width,h:msg.asset.height},preview:'/v3/assets/'+msg.asset.asset_id,bytes:msg.asset.bytes,sha256:msg.asset.sha256};
@@ -190,10 +196,10 @@ function connect(){
 }
 function needSession(fn){if(!state.session){showPair();return}fn()}
 function showPair(){
-  sheet('<h2>连接这台电脑</h2><p>在电脑控制台或配对窗口读取 2 分钟内有效的配对码。配对后才能同步和插入。</p><input id="pairCode" autocomplete="one-time-code" aria-label="配对码"><div class="sheet-buttons"><button class="primary" id="pairGo">配对</button></div>');
+  sheet('<h2>连接这台电脑</h2><p>三步上手：打开地址 → 输入一句测试 → 电脑按 Alt+I。不配 API Key。拒绝截图仍可同步文字。</p><input id="pairCode" autocomplete="one-time-code" aria-label="配对码"><label class="row"><span>允许插入电脑</span><input id="allowInsert" type="checkbox" checked></label><label class="row"><span>允许截电脑</span><input id="allowCapture" type="checkbox"></label><div class="sheet-buttons"><button class="primary" id="pairGo">配对</button></div>');
   $('pairGo').onclick=async()=>{
     const code=$('pairCode').value.trim();
-    const res=await fetch('/v3/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,allow_insert:true,allow_capture:true})});
+    const res=await fetch('/v3/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,allow_insert:$('allowInsert').checked,allow_capture:$('allowCapture').checked})});
     if(!res.ok){toast('配对失败');return}
     state.session=await res.json();
     sessionStorage.setItem('dt.v3.session',JSON.stringify(state.session));
@@ -306,7 +312,8 @@ async function uploadPending(){
     const meta=await res.json();a.asset_id=meta.asset_id;a.sha256=meta.sha256;a.bytes=meta.bytes;
   }
 }
-async function insert(){
+async function insert(mode){
+  mode=mode||'full';
   if(state.editor){toast('先完成当前标注');return}
   if(!state.session||!state.online){toast('未连接，草稿保留');return}
   if(!state.text.trim()&&!state.assets.length){toast('先输入文字或加入图片');return}
@@ -316,7 +323,13 @@ async function insert(){
   ws.send(JSON.stringify({protocol:3,type:'bundle.commit',session_id:state.session.session_id}));
   const nonceRes=await fetch('/v3/nonce',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(state.session)});
   const nonce=(await nonceRes.json()).nonce;
-  ws.send(JSON.stringify({protocol:3,type:'insert.intent',session_id:state.session.session_id,token:state.session.token,nonce,intent_id:crypto.randomUUID(),trigger:'phone'}));
+  ws.send(JSON.stringify({protocol:3,type:'insert.intent',session_id:state.session.session_id,token:state.session.token,nonce,intent_id:crypto.randomUUID(),trigger:'phone',recovery_mode:mode}));
+}
+function showRecovery(result){
+  sheet('<h2>找回上次图文</h2><p>'+result+'。不会自动 Ctrl+A/Delete，也不会在重连时重放按键。</p><div class="sheet-buttons"><button id="retryText">只补文字</button><button class="primary" id="retryFull">已清空或换新输入框，完整重贴</button><button id="cancelRetry">取消，继续保留</button></div>');
+  $('retryText').onclick=()=>{closeSheet();insert('text_only')};
+  $('retryFull').onclick=()=>{closeSheet();insert('full')};
+  $('cancelRetry').onclick=closeSheet;
 }
 $('sendBtn').onclick=()=>insert();
 $('historyBtn').onclick=async()=>{
@@ -326,7 +339,7 @@ $('historyBtn').onclick=async()=>{
   if(!data.items.length){sheet('<h2>最近图文</h2><p>还没有投递记录。最多 20 份 / 24 小时。</p>');return}
   sheet('<h2>最近图文</h2><p>召回上次不会覆盖当前草稿。电脑 Alt+Shift+I 也可召回。</p>'+data.items.map(i=>`<div class="row"><span>${i.asset_count} 图 · ${i.text_chars} 字</span><span>${i.attempt_result||''}</span></div>`).join('')+'<div class="sheet-buttons"><button class="primary" onclick="document.getElementById(\'shade\').classList.remove(\'show\')">回到输入</button></div>');
 };
-$('settingsBtn').onclick=()=>sheet('<h2>简单设置</h2><p>密钥只存在电脑；不配 Key 也能截图、画图和投递。</p><div class="row"><span>插入 / 召回</span><span>Alt I / Alt Shift I</span></div><div class="row"><span>最近图文</span><span>20份 · 24小时</span></div><div class="row"><span>AI 纠错</span><span>可选 · 电脑 BYOK</span></div>');
+$('settingsBtn').onclick=()=>sheet('<h2>简单设置</h2><p>密钥只存在电脑；不配 Key 也能画图和投递。拒绝截图仍可同步文字。Alt+Shift+I 是召回，不再是跳过纠错。</p><div class="row"><span>插入 / 召回</span><span>Alt I / Alt Shift I</span></div><div class="row"><span>最近图文</span><span>20份 · 24小时</span></div><div class="row"><span>AI 纠错</span><span>可选 · 电脑 BYOK</span></div>');
 window.addEventListener('resize',()=>{if(state.editor)sizeCanvas()});
 try{state.session=JSON.parse(sessionStorage.getItem('dt.v3.session')||'null')}catch{state.session=null}
 update();
