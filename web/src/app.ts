@@ -343,7 +343,7 @@ export function boot(root: HTMLElement): void {
 
   function showPair() {
     const sheet = $("sheet");
-    $("sheetCard").innerHTML = `<h2>连接这台电脑</h2><p>三步上手：打开地址 → 输入一句测试 → 电脑按 Alt+I。拒绝截图仍可同步文字。</p><input id="pairCode" /><label>允许插入<input id="allowInsert" type="checkbox" checked /></label><label>允许截电脑<input id="allowCapture" type="checkbox" /></label><button class="primary" id="pairGo">配对</button>`;
+    $("sheetCard").innerHTML = `<h2>连接这台电脑</h2><p>三步上手：打开地址 → 输入配对码 → 电脑确认插入/截图权限。手机不能自授按键或截屏。</p><input id="pairCode" /><button class="primary" id="pairGo">配对</button>`;
     sheet.classList.add("show");
     $("pairGo").onclick = async () => {
       const res = await fetch("/v3/pair", {
@@ -351,8 +351,6 @@ export function boot(root: HTMLElement): void {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code: (document.getElementById("pairCode") as HTMLInputElement).value,
-          allow_insert: (document.getElementById("allowInsert") as HTMLInputElement).checked,
-          allow_capture: (document.getElementById("allowCapture") as HTMLInputElement).checked,
         }),
       });
       if (!res.ok) return;

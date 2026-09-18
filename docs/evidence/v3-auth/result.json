@@ -1,0 +1,24 @@
+{
+  "batch": "acceptance-ci-auth-lock",
+  "commands": [
+    {
+      "cmd": "python -m pytest -q --tb=short",
+      "exit_code": 0,
+      "output": "81 passed in 0.91s"
+    }
+  ],
+  "regression": {
+    "input": "unauthenticated WS draft.update; LAN GET /v3/pair; LAN POST allow_insert=true; second start() while lock held",
+    "output": {
+      "ws": "error unauthorized; draft.text remains empty",
+      "pair_get": "403 without challenge; challenge not minted",
+      "pair_post": "session allow_insert=false allow_capture=false",
+      "lock": "RuntimeError instance lock held; bridge._runner is None; pair.txt absent"
+    }
+  },
+  "existing_protocol_tests_unchanged": [
+    "tests/test_v3_bridge.py::test_bridge_protocol",
+    "tests/test_v3_remaining.py::test_tail_flush_on_commit_keeps_last_character",
+    "tests/test_v3_remaining.py::test_instance_lock_does_not_kill_other"
+  ]
+}

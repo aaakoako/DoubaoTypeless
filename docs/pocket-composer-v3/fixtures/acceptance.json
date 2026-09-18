@@ -65,11 +65,12 @@
     "expected": "原键盘焦点不变；HUD隐藏不删除文字",
     "layer": "Windows",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "docs/evidence/v3-product/result.json",
       "tests/test_v3_runtime.py"
-    ]
+    ],
+    "note": "旧证据为产品窗空闲隐藏与插入，未测外部编辑器焦点保持与 360×88 实窗"
   },
   {
     "id": "AC3-006",
@@ -95,10 +96,11 @@
     "expected": "不因进程名相同而当Composer，不能发键到代码区",
     "layer": "Windows",
     "severity": "P0",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_core_services.py::test_code_focus_does_not_inject_images"
-    ]
+    ],
+    "note": "旧证据仅为 classify_focus 单测，未在 Cursor 代码区/终端切焦点"
   },
   {
     "id": "AC3-008",
@@ -165,11 +167,12 @@
     "expected": "只声明样板通过，保存包体和空闲资源，不扩大到全项目已完成",
     "layer": "Windows",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "src/doubao_typeless/static/composer.html",
       "web/src/app.ts"
-    ]
+    ],
+    "note": "旧证据仅为源码存在，未锁定依赖并生成可启动样板包"
   },
   {
     "id": "AC3-013",
@@ -194,10 +197,11 @@
     "expected": "拒绝冲突并要求重同步，不覆盖已ACK版本",
     "layer": "自动",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_bridge.py"
-    ]
+    ],
+    "note": "旧证据为协议配对/ACK，未发送同 revision 不同 hash 冲突"
   },
   {
     "id": "AC3-015",
@@ -208,10 +212,11 @@
     "expected": "序列化往返逐字一致，不trim/NFKC",
     "layer": "自动",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_runtime.py::test_frozen_bundle_ignores_later_draft_edits"
-    ]
+    ],
+    "note": "旧证据为冻结快照，不是前导空格/emoji 往返"
   },
   {
     "id": "AC3-016",
@@ -222,10 +227,11 @@
     "expected": "r4保留；只归档匹配r3，其他设备不清空",
     "layer": "自动",
     "severity": "P0",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_core_services.py"
-    ]
+    ],
+    "note": "旧证据为授权/投递单测，未覆盖 r3 归档回执与 r4 保留"
   },
   {
     "id": "AC3-017",
@@ -238,8 +244,12 @@
     "severity": "P0",
     "status": "PASS",
     "evidence": [
-      "tests/test_v3_core_services.py::test_pairing_mismatch_and_insert_grant"
-    ]
+      "tests/test_v3_core_services.py::test_pairing_mismatch_and_insert_grant",
+      "tests/test_v3_auth_isolation.py",
+      "docs/evidence/v3-review/counterexamples.json",
+      "docs/evidence/v3-auth/result.json"
+    ],
+    "note": "旧证据仅 AuthService mismatch；本批补未鉴权 WS 改稿/资源下载与非环回挑战隔离"
   },
   {
     "id": "AC3-018",
@@ -250,10 +260,11 @@
     "expected": "均失效；电脑状态和手机可操作提示一致",
     "layer": "自动",
     "severity": "P0",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_core_services.py::test_pairing_mismatch_and_insert_grant"
-    ]
+    ],
+    "note": "旧证据覆盖 mismatch 与 nonce 一次性，未测过期 token/撤销设备后继续发消息"
   },
   {
     "id": "AC3-019",
@@ -266,8 +277,11 @@
     "severity": "P0",
     "status": "PASS",
     "evidence": [
-      "tests/test_v3_runtime.py::test_capture_requires_grant"
-    ]
+      "tests/test_v3_runtime.py::test_capture_requires_grant",
+      "tests/test_v3_auth_isolation.py::test_lan_pair_post_cannot_self_grant_insert_or_capture",
+      "docs/evidence/v3-review/counterexamples.json"
+    ],
+    "note": "旧证据仅授权表；本批禁止非环回 POST 自授 insert/capture，默认不再 True"
   },
   {
     "id": "AC3-020",
@@ -278,10 +292,12 @@
     "expected": "按协议拒绝/节流，无shell/路径/按键任意执行入口",
     "layer": "自动",
     "severity": "P1",
-    "status": "PASS",
+    "status": "FAIL",
     "evidence": [
-      "tests/test_v3_bridge.py"
-    ]
+      "tests/test_v3_bridge.py",
+      "docs/evidence/v3-review/counterexamples.json"
+    ],
+    "note": "旧证据只拒绝 keys 载荷；代码仍未校验伪造 Origin/Host 或空 Origin，也无消息限流"
   },
   {
     "id": "AC3-021",
@@ -349,10 +365,11 @@
     "expected": "手机不能显示电脑已收到",
     "layer": "自动",
     "severity": "P0",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_bridge.py"
-    ]
+    ],
+    "note": "旧证据 ACK 恒为 durable=True，未阻断落地仍让 WS send 成功"
   },
   {
     "id": "AC3-026",
@@ -363,10 +380,11 @@
     "expected": "最终新版本一致，旧intent/capture不执行",
     "layer": "自动",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_bridge.py"
-    ]
+    ],
+    "note": "旧证据无断线重连与乱序重放"
   },
   {
     "id": "AC3-027",
@@ -391,10 +409,11 @@
     "expected": "心跳不唤HUD；编辑活动最多2s一次且不算资产已保存",
     "layer": "自动",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "src/doubao_typeless/ui/tokens.py"
-    ]
+    ],
+    "note": "旧证据为 should_wake 源码，未混合心跳/重播/editor.activity"
   },
   {
     "id": "AC3-029",
@@ -405,11 +424,12 @@
     "expected": "无HUD/吸附球/桌面卡片；不因心跳唤醒",
     "layer": "Windows",
     "severity": "P0",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "docs/evidence/v3-product/result.json",
       "tests/test_v3_runtime.py::test_hud_idle_is_hidden"
-    ]
+    ],
+    "note": "旧证据为空闲隐藏单测/产品截图，10 分钟连接静置见 AC3-081 BLOCKED_NATIVE"
   },
   {
     "id": "AC3-030",
@@ -420,10 +440,11 @@
     "expected": "尺寸遵守360×88/132；结果900ms隐藏；草稿仍可召回",
     "layer": "Windows",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "docs/evidence/v3-product/result.json"
-    ]
+    ],
+    "note": "旧证据有插入后 HUD，未测 6 秒静置隐藏与 900ms 结果窗"
   },
   {
     "id": "AC3-031",
@@ -434,10 +455,11 @@
     "expected": "外部编辑器收到Esc；本工具不全局吞键",
     "layer": "Windows",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_remaining.py::test_hotkeys_do_not_bind_escape"
-    ]
+    ],
+    "note": "旧证据为源码不含 Esc 绑定，未在 HUD 显示时把 Esc 交给外部编辑器"
   },
   {
     "id": "AC3-032",
@@ -448,10 +470,11 @@
     "expected": "位置在工作区内，不自动挡全屏；明确热键可召回",
     "layer": "Windows",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "docs/evidence/v3-capture/result.json"
-    ]
+    ],
+    "note": "旧证据为区域截图像素/DPR，不是 HUD 在 100/150/200% 与全屏下的位置"
   },
   {
     "id": "AC3-033",
@@ -462,10 +485,11 @@
     "expected": "只生成一次Attempt，释放后新动作才被接受",
     "layer": "Windows",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_remaining.py::test_hotkey_repeat_fires_once_until_release"
-    ]
+    ],
+    "note": "旧证据为 HotkeyGate 注入时钟，不是系统 Alt+I repeat"
   },
   {
     "id": "AC3-034",
@@ -476,10 +500,11 @@
     "expected": "等待释放再Ctrl+V，无菜单快捷键误触",
     "layer": "Windows",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_remaining.py::test_wait_modifiers_true_when_none_held"
-    ]
+    ],
+    "note": "旧证据为 get_async 桩，不是真实按住 Alt/Shift 再 Ctrl+V"
   },
   {
     "id": "AC3-035",
@@ -490,10 +515,11 @@
     "expected": "安全停止；不自动提权，不丢稿",
     "layer": "Windows",
     "severity": "P0",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_remaining.py::test_lock_and_elevated_do_not_drop_bundle"
-    ]
+    ],
+    "note": "旧证据为 is_locked/is_elevated 回调桩，不是真实锁屏或提权窗口"
   },
   {
     "id": "AC3-036",
@@ -504,10 +530,11 @@
     "expected": "检测后停止/有限重试，不覆写用户新内容，不无限等待",
     "layer": "Windows",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_remaining.py::test_clipboard_interference_stops_without_paste"
-    ]
+    ],
+    "note": "旧证据为剪贴板读回桩，不是其他程序中途改剪贴板"
   },
   {
     "id": "AC3-037",
@@ -547,11 +574,12 @@
     "expected": "禁用/准备/请求行为符合规范，不离线排队按键",
     "layer": "自动",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "web/src/app.ts",
       "tests/test_v3_web_source.py"
-    ]
+    ],
+    "note": "旧证据为源码关键字，未测空内容/失联/上传中按钮态"
   },
   {
     "id": "AC3-040",
@@ -592,11 +620,12 @@
     "expected": "取消无新图片；完成正确区域，HUD不出现在截图",
     "layer": "Windows",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "docs/evidence/v3-capture/result.json",
       "tests/test_v3_capture.py::test_region_cancel_does_not_grab"
-    ]
+    ],
+    "note": "旧证据为编程 bbox/取消不 grab，不是热键叠加层取消后再完成"
   },
   {
     "id": "AC3-043",
@@ -607,10 +636,11 @@
     "expected": "像素范围与选择一致，无缩放错位",
     "layer": "Windows",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "docs/evidence/v3-capture/result.json"
-    ]
+    ],
+    "note": "旧证据为单屏 DPR=2 色块，无负坐标显示器跨边界"
   },
   {
     "id": "AC3-044",
@@ -625,7 +655,8 @@
     "evidence": [
       "tests/test_v3_capture.py",
       "docs/evidence/v3-capture/result.json"
-    ]
+    ],
+    "note": "适用范围：过期 request/取消/限流单测；锁屏与 HWND 拒绝未在真实会话验证"
   },
   {
     "id": "AC3-045",
@@ -665,10 +696,11 @@
     "expected": "源图不被覆盖，历史操作一致",
     "layer": "自动",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "web/src/editor/canvas.ts"
-    ]
+    ],
+    "note": "旧证据为画布源码，未执行裁剪→撤销→恢复像素链"
   },
   {
     "id": "AC3-048",
@@ -737,10 +769,11 @@
     "expected": "新分支清redo，不清现有图；达到预算只丢旧Undo能力",
     "layer": "自动",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "web/src/editor/canvas.ts"
-    ]
+    ],
+    "note": "旧证据为源码，未跑 50 步混合撤销重做"
   },
   {
     "id": "AC3-053",
@@ -780,10 +813,11 @@
     "expected": "默认不导出网格，画布尺寸不随手机旋转改变",
     "layer": "自动",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "web/src/editor/canvas.ts"
-    ]
+    ],
+    "note": "旧证据为源码，未测网格开关/导出不含网格/旋转不改画布"
   },
   {
     "id": "AC3-056",
@@ -809,11 +843,12 @@
     "expected": "结果无被裁区域/原图层/EXIF；遮挡像素完全覆盖",
     "layer": "自动",
     "severity": "P0",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "web/src/editor/canvas.ts",
       "src/doubao_typeless/storage/asset_store.py"
-    ]
+    ],
+    "note": "旧证据为源码，未解码导出文件检查遮挡像素与 EXIF"
   },
   {
     "id": "AC3-058",
@@ -838,10 +873,11 @@
     "expected": "引用指向正确图片；没有注释不自动编造描述",
     "layer": "自动",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "docs/evidence/v3-web/whiteboard-number.png"
-    ]
+    ],
+    "note": "旧证据为桌面编号截图，未测两图重排后说明引用"
   },
   {
     "id": "AC3-060",
@@ -852,10 +888,11 @@
     "expected": "源图与已完成操作还在，可降分辨率重试",
     "layer": "自动+真机",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "web/src/app.ts"
-    ]
+    ],
+    "note": "旧证据为源码，层级含真机，未测导出失败保稿"
   },
   {
     "id": "AC3-061",
@@ -866,11 +903,12 @@
     "expected": "图1确认→图2确认→文字，整个过程0次Enter",
     "layer": "Windows",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "docs/evidence/v3-product/result.json",
       "docs/evidence/v3-soak/result.json"
-    ]
+    ],
+    "note": "旧证据为 V3ComposerTarget 产品窗先图后文与协议浸泡，不是已验证 Cursor Composer"
   },
   {
     "id": "AC3-062",
@@ -923,11 +961,12 @@
     "expected": "召回上次固定图文，以新目标完整重试",
     "layer": "Windows",
     "severity": "P0",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "src/doubao_typeless/app.py",
       "src/doubao_typeless/ui/recovery.py"
-    ]
+    ],
+    "note": "旧证据为源码路径，未在代码区失败后点 Composer 按 Alt+Shift+I"
   },
   {
     "id": "AC3-066",
@@ -938,10 +977,11 @@
     "expected": "提供只补文字，不再重复附件",
     "layer": "自动+Windows",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "src/doubao_typeless/core/policy.py"
-    ]
+    ],
+    "note": "旧证据为 policy 函数，未在真实目标做只补文字召回"
   },
   {
     "id": "AC3-067",
@@ -1023,10 +1063,11 @@
     "expected": "回到会话模式并说明；诊断无token/key/正文/图像",
     "layer": "自动",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "src/doubao_typeless/services/byok.py"
-    ]
+    ],
+    "note": "旧证据为源码，未模拟凭据库不可用并导出无 key 诊断包"
   },
   {
     "id": "AC3-073",
@@ -1108,10 +1149,11 @@
     "expected": "保留自定义；清楚说明新召回语义，不同时绑定两种动作",
     "layer": "Windows",
     "severity": "P0",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "docs/evidence/baseline/AC3-003/hotkey-migration.md"
-    ]
+    ],
+    "note": "旧证据为迁移说明文档，未导入自定义旧快捷键跑 Windows 注册"
   },
   {
     "id": "AC3-079",
@@ -1122,10 +1164,11 @@
     "expected": "失败提示改键，不把语法合法当注册成功",
     "layer": "Windows",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "src/doubao_typeless/platform/windows/hotkeys.py"
-    ]
+    ],
+    "note": "旧证据为源码，未在外部占用热键时观察失败提示"
   },
   {
     "id": "AC3-080",
@@ -1136,10 +1179,11 @@
     "expected": "功能边界准确、可改授权，不要求全权限才能用",
     "layer": "Windows+真机",
     "severity": "P0",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_runtime.py::test_capture_requires_grant"
-    ]
+    ],
+    "note": "旧证据为授权表单测，层级含真机，未在拒绝截图后继续文字同步"
   },
   {
     "id": "AC3-081",
@@ -1197,7 +1241,8 @@
     "evidence": [
       "docs/evidence/v3-pack/result.json",
       "web/dist/index.html"
-    ]
+    ],
+    "note": "适用范围：本地 onedir 统计；不是 GitHub Release 产物"
   },
   {
     "id": "AC3-085",
@@ -1209,7 +1254,11 @@
     "layer": "CI",
     "severity": "P1",
     "status": "NOT_RUN",
-    "evidence": []
+    "evidence": [
+      ".github/workflows/preview-v3.yml",
+      "docs/evidence/v3-ci/result.json"
+    ],
+    "note": "workflow 已补 Pillow；本 SHA 的 GitHub Actions 尚未跑绿"
   },
   {
     "id": "AC3-086",
@@ -1220,10 +1269,11 @@
     "expected": "原文件未损，凭据迁移幂等，旧learn不自启动",
     "layer": "自动+Windows",
     "severity": "P0",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_remaining.py::test_migration_invalid_json_does_not_write"
-    ]
+    ],
+    "note": "旧证据仅 invalid JSON 不写回，不是脱敏迁移失败后重跑再回退"
   },
   {
     "id": "AC3-087",
@@ -1236,8 +1286,11 @@
     "severity": "P1",
     "status": "PASS",
     "evidence": [
-      "tests/test_v3_remaining.py::test_instance_lock_does_not_kill_other"
-    ]
+      "tests/test_v3_remaining.py::test_instance_lock_does_not_kill_other",
+      "tests/test_v3_auth_isolation.py::test_start_stops_without_writers_when_lock_held",
+      "docs/evidence/v3-review/counterexamples.json"
+    ],
+    "note": "旧证据仅锁文件互斥；本批补 start() 失败即停且不写 pair.txt。不是稳定版 exe 与候选 exe 同机对打"
   },
   {
     "id": "AC3-088",
@@ -1302,11 +1355,12 @@
     "expected": "可复现结果和补救文案齐全，不隐藏高危失败",
     "layer": "自动+真机",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_core_services.py",
       "tests/test_v3_bridge.py"
-    ]
+    ],
+    "note": "旧证据不是乱序断线/过期 intent/插入中退出红队矩阵"
   },
   {
     "id": "AC3-093",
@@ -1331,10 +1385,11 @@
     "expected": "R01–R10无遗漏；R11明确后置不伪装已实现",
     "layer": "人工",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "docs/release/preview-notes.md"
-    ]
+    ],
+    "note": "旧证据为预览说明，不是 R01–R11 逐项追溯表"
   },
   {
     "id": "AC3-095",
@@ -1348,8 +1403,11 @@
     "status": "PASS",
     "evidence": [
       "docs/release/preview-notes.md",
-      "docs/evidence/v3-runtime/BLOCKED_NATIVE.md"
-    ]
+      "docs/evidence/v3-runtime/BLOCKED_NATIVE.md",
+      "docs/evidence/v3-review/counterexamples.json",
+      "docs/pocket-composer-v3/fixtures/acceptance.json"
+    ],
+    "note": "本批已把缺少步骤证据或与代码矛盾的 PASS 降级并保留旧证据范围说明"
   },
   {
     "id": "AC3-096",

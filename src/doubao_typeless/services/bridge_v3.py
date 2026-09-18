@@ -1,7 +1,9 @@
 """V3 aiohttp bridge: draft sync, assets, insert intent. Data messages never inject."""
 from __future__ import annotations
 
+import asyncio
 import json
+import time
 import uuid
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -29,6 +31,22 @@ def _web_dist() -> Path:
 
 
 WEB_DIST = _web_dist()
+AUTH_DEADLINE_S = 5.0
+
+
+def peer_host(request: web.Request) -> str:
+    return str(request.remote or "")
+
+
+def is_loopback_host(host: str) -> bool:
+    value = (host or "").strip().lower()
+    if value.startswith("[") and value.endswith("]"):
+        value = value[1:-1]
+    if "%" in value:
+        value = value.split("%", 1)[0]
+    if value.startswith("::ffff:"):
+        value = value[7:]
+    return value in {"127.0.0.1", "::1", "localhost"} or value.startswith("127.")
 
 
 class V3Bridge:
@@ -59,6 +77,7 @@ class V3Bridge:
         self._log = logger or (lambda _m: None)
         self._runner: Optional[web.AppRunner] = None
         self._clients: set[web.WebSocketResponse] = set()
+        self._ws_auth: dict[int, Any] = {}
 
     def make_app(self) -> web.Application:
         app = web.Application()
@@ -108,20 +127,30 @@ class V3Bridge:
         )
 
     async def _pair_get(self, request: web.Request) -> web.Response:
+        if not is_loopback_host(peer_host(request)):
+            return web.json_response({"pairing": True}, status=403)
         return web.json_response({"challenge": self.auth.new_pairing_challenge()})
 
     async def _pair_post(self, request: web.Request) -> web.Response:
         body = await request.json()
-        session = self.auth.complete_pairing(
-            str(body.get("code") or ""),
-            allow_insert=bool(body.get("allow_insert", True)),
-            allow_capture=bool(body.get("allow_capture")),
-        )
+        loopback = is_loopback_host(peer_host(request))
+        allow_insert = bool(body.get("allow_insert", False)) if loopback else False
+        allow_capture = bool(body.get("allow_capture", False)) if loopback else False
+        try:
+            session = self.auth.complete_pairing(
+                str(body.get("code") or ""),
+                allow_insert=allow_insert,
+                allow_capture=allow_capture,
+            )
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
         return web.json_response(
             {
                 "session_id": session.session_id,
                 "device_id": session.device_id,
                 "token": session.token,
+                "allow_insert": session.allow_insert,
+                "allow_capture": session.allow_capture,
             }
         )
 
@@ -133,7 +162,10 @@ class V3Bridge:
     def _session_from(self, request: web.Request):
         session_id = request.headers.get("X-DT-Session", "")
         token = request.headers.get("X-DT-Token", "")
-        return self.auth.authorize(session_id, token, "sync")
+        try:
+            return self.auth.authorize(session_id, token, "sync")
+        except ValueError as exc:
+            raise web.HTTPUnauthorized(text=str(exc)) from exc
 
     async def _asset_post(self, request: web.Request) -> web.Response:
         self._session_from(request)
@@ -216,27 +248,63 @@ class V3Bridge:
         ws = web.WebSocketResponse(max_msg_size=256 * 1024)
         await ws.prepare(request)
         self._clients.add(ws)
+        authorized = False
+        deadline = time.monotonic() + AUTH_DEADLINE_S
         try:
-            async for msg in ws:
+            while True:
+                timeout = None if authorized else max(0.0, deadline - time.monotonic())
+                if not authorized and timeout == 0.0:
+                    await ws.send_json({"type": "error", "error": "auth timeout"})
+                    await ws.close()
+                    break
+                try:
+                    msg = await asyncio.wait_for(ws.receive(), timeout=timeout)
+                except asyncio.TimeoutError:
+                    if not authorized:
+                        await ws.send_json({"type": "error", "error": "auth timeout"})
+                        await ws.close()
+                    break
+                if msg.type in {WSMsgType.CLOSED, WSMsgType.CLOSING, WSMsgType.ERROR}:
+                    break
                 if msg.type != WSMsgType.TEXT:
                     continue
                 data = json.loads(msg.data)
                 if looks_like_key_script(data):
                     await ws.send_json({"type": "error", "error": "forbidden payload"})
                     continue
-                await self._handle(ws, data)
+                authorized = await self._handle(ws, data, authorized)
         finally:
             self._clients.discard(ws)
+            self._ws_auth.pop(id(ws), None)
         return ws
 
-    async def _handle(self, ws: web.WebSocketResponse, data: dict[str, Any]) -> None:
+    def _apply_draft_fields(self, data: dict[str, Any]) -> None:
+        apply_draft_update(
+            self.draft,
+            {
+                "text": data.get("text", self.draft.text),
+                "revision": int(data.get("revision") or self.draft.revision + 1),
+                "asset_refs": data.get("asset_refs", [a["asset_id"] for a in self.draft.assets]),
+                "assets": data.get("assets", self.draft.assets),
+            },
+        )
+
+    async def _handle(self, ws: web.WebSocketResponse, data: dict[str, Any], authorized: bool) -> bool:
         kind = data.get("type")
         if kind == "ping":
             await ws.send_json({"type": "pong"})
-            return
+            return authorized
         if kind == "session.hello":
-            if data.get("session_id"):
-                self.auth.authorize(data["session_id"], data.get("token") or "", "sync")
+            try:
+                session = self.auth.authorize(
+                    str(data.get("session_id") or ""),
+                    str(data.get("token") or ""),
+                    "sync",
+                )
+            except ValueError as exc:
+                await ws.send_json({"type": "error", "error": str(exc)})
+                return False
+            self._ws_auth[id(ws)] = session
             await ws.send_json(
                 {
                     "type": "session.ready",
@@ -246,84 +314,69 @@ class V3Bridge:
                     "revision": self.draft.revision,
                 }
             )
-            return
-        if kind == "draft.update":
-            apply_draft_update(
-                self.draft,
-                {
-                    "text": data.get("text", self.draft.text),
-                    "revision": int(data.get("revision") or self.draft.revision + 1),
-                    "asset_refs": data.get("asset_refs", [a["asset_id"] for a in self.draft.assets]),
-                    "assets": data.get("assets", self.draft.assets),
-                },
-            )
-            if self._on_activity and should_wake("draft.update"):
-                self._on_activity(self.draft.text, len(self.draft.assets))
-            await ws.send_json(
-                {
-                    "type": "draft.ack",
-                    "revision": self.draft.revision,
-                    "durable": True,
-                    "hash": self.draft.acked_hash,
-                }
-            )
-            return
-        if kind == "editor.activity":
-            if self._on_activity and should_wake("editor.activity"):
-                self._on_activity(self.draft.text, len(self.draft.assets))
-            return
-        if kind == "bundle.commit":
-            if "text" in data or "revision" in data:
-                apply_draft_update(
-                    self.draft,
+            return True
+        if not authorized:
+            await ws.send_json({"type": "error", "error": "unauthorized"})
+            return False
+        try:
+            if kind == "draft.update":
+                self._apply_draft_fields(data)
+                if self._on_activity and should_wake("draft.update"):
+                    self._on_activity(self.draft.text, len(self.draft.assets))
+                await ws.send_json(
                     {
-                        "text": data.get("text", self.draft.text),
-                        "revision": int(data.get("revision") or self.draft.revision + 1),
-                        "asset_refs": data.get("asset_refs", [a["asset_id"] for a in self.draft.assets]),
-                        "assets": data.get("assets", self.draft.assets),
-                    },
+                        "type": "draft.ack",
+                        "revision": self.draft.revision,
+                        "durable": True,
+                        "hash": self.draft.acked_hash,
+                    }
                 )
-            bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
-            self.last_bundle = bundle
-            public = {k: v for k, v in bundle.items() if k != "bytes_data"}
-            await ws.send_json({"type": "bundle.ready", "bundle": public})
-            return
-        if kind == "insert.intent":
-            if "text" in data or "revision" in data:
-                apply_draft_update(
-                    self.draft,
-                    {
-                        "text": data.get("text", self.draft.text),
-                        "revision": int(data.get("revision") or self.draft.revision + 1),
-                        "asset_refs": data.get("asset_refs", [a["asset_id"] for a in self.draft.assets]),
-                        "assets": data.get("assets", self.draft.assets),
-                    },
-                )
-            session = self.auth.authorize(data["session_id"], data.get("token") or "", "insert")
-            self.auth.consume_nonce(session, str(data.get("nonce") or ""))
-            if self.last_bundle is None or int(self.last_bundle.get("revision") or -1) != self.draft.revision:
-                self.last_bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
-            frozen = dict(self.last_bundle)
-            status = {"result": "RUNNING"}
-            if self._on_intent:
-                status = self._on_intent(data, frozen) or status
-            await ws.send_json({"type": "attempt.status", **status})
-            return
-        if kind == "capture.request":
-            self.auth.authorize(data["session_id"], data.get("token") or "", "capture")
-            if not self._on_capture:
-                await ws.send_json({"type": "capture.result", "error": "unavailable"})
-                return
-            try:
-                meta = self._on_capture(
-                    str(data.get("scope") or "primary"),
-                    str(data.get("request_id") or uuid.uuid4()),
-                )
-            except ValueError as exc:
-                await ws.send_json({"type": "capture.result", "error": str(exc)})
-                return
-            await ws.send_json({"type": "capture.result", "asset": meta})
-            return
-        if kind == "byok.request":
-            await ws.send_json({"type": "error", "error": "byok stays on desktop"})
-            return
+                return True
+            if kind == "editor.activity":
+                if self._on_activity and should_wake("editor.activity"):
+                    self._on_activity(self.draft.text, len(self.draft.assets))
+                return True
+            if kind == "bundle.commit":
+                if "text" in data or "revision" in data:
+                    self._apply_draft_fields(data)
+                bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
+                self.last_bundle = bundle
+                public = {k: v for k, v in bundle.items() if k != "bytes_data"}
+                await ws.send_json({"type": "bundle.ready", "bundle": public})
+                return True
+            if kind == "insert.intent":
+                session = self.auth.authorize(data["session_id"], data.get("token") or "", "insert")
+                self.auth.consume_nonce(session, str(data.get("nonce") or ""))
+                if "text" in data or "revision" in data:
+                    self._apply_draft_fields(data)
+                if self.last_bundle is None or int(self.last_bundle.get("revision") or -1) != self.draft.revision:
+                    self.last_bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
+                frozen = dict(self.last_bundle)
+                status = {"result": "RUNNING"}
+                if self._on_intent:
+                    status = self._on_intent(data, frozen) or status
+                await ws.send_json({"type": "attempt.status", **status})
+                return True
+            if kind == "capture.request":
+                self.auth.authorize(data["session_id"], data.get("token") or "", "capture")
+                if not self._on_capture:
+                    await ws.send_json({"type": "capture.result", "error": "unavailable"})
+                    return True
+                try:
+                    meta = self._on_capture(
+                        str(data.get("scope") or "primary"),
+                        str(data.get("request_id") or uuid.uuid4()),
+                    )
+                except ValueError as exc:
+                    await ws.send_json({"type": "capture.result", "error": str(exc)})
+                    return True
+                await ws.send_json({"type": "capture.result", "asset": meta})
+                return True
+            if kind == "byok.request":
+                await ws.send_json({"type": "error", "error": "byok stays on desktop"})
+                return True
+        except ValueError as exc:
+            await ws.send_json({"type": "error", "error": str(exc)})
+            return authorized
+        return authorized
+

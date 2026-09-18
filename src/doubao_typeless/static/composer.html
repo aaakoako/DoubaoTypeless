@@ -196,10 +196,10 @@ function connect(){
 }
 function needSession(fn){if(!state.session){showPair();return}fn()}
 function showPair(){
-  sheet('<h2>连接这台电脑</h2><p>三步上手：打开地址 → 输入一句测试 → 电脑按 Alt+I。不配 API Key。拒绝截图仍可同步文字。</p><input id="pairCode" autocomplete="one-time-code" aria-label="配对码"><label class="row"><span>允许插入电脑</span><input id="allowInsert" type="checkbox" checked></label><label class="row"><span>允许截电脑</span><input id="allowCapture" type="checkbox"></label><div class="sheet-buttons"><button class="primary" id="pairGo">配对</button></div>');
+  sheet('<h2>连接这台电脑</h2><p>打开地址后输入电脑上的配对码。拒绝截图仍可同步文字。插入和截图权限由电脑确认，手机不能自授。</p><input id="pairCode" autocomplete="one-time-code" aria-label="配对码"><input id="allowCapture" type="hidden" value="0"><div class="sheet-buttons"><button class="primary" id="pairGo">配对</button></div>');
   $('pairGo').onclick=async()=>{
     const code=$('pairCode').value.trim();
-    const res=await fetch('/v3/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,allow_insert:$('allowInsert').checked,allow_capture:$('allowCapture').checked})});
+    const res=await fetch('/v3/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
     if(!res.ok){toast('配对失败');return}
     state.session=await res.json();
     sessionStorage.setItem('dt.v3.session',JSON.stringify(state.session));

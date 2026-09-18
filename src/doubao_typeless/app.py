@@ -293,12 +293,19 @@ class V3App:
         meta = self._on_capture(f"region:{x},{y},{w},{h}", str(uuid.uuid4()))
         _log(f"[v3.capture] region {meta.get('width')}x{meta.get('height')}")
 
-    async def start(self) -> None:
+    def _acquire_instance_lock(self) -> None:
         from doubao_typeless.runtime_lock import InstanceLock
 
+        lock = getattr(self, "_lock", None)
+        if lock is not None and getattr(lock, "owned", False):
+            return
         self._lock = InstanceLock(self.data_dir / "instance.lock")
         if not self._lock.acquire():
             _log("[v3] 另一个预览实例已在运行，不强杀、不抢锁")
+            raise RuntimeError("instance lock held")
+
+    async def start(self) -> None:
+        self._acquire_instance_lock()
         await self.bridge.start()
         code = self.auth.new_pairing_challenge()
         url = f"http://{lan_ip()}:{self.port}/"
@@ -326,7 +333,15 @@ class V3App:
 
 
 def main() -> None:
-    app = V3App()
+    from doubao_typeless.runtime_lock import InstanceLock
+
+    data_dir = v3_data_dir()
+    lock = InstanceLock(Path(data_dir) / "instance.lock")
+    if not lock.acquire():
+        _log("[v3] 另一个预览实例已在运行，不强杀、不抢锁")
+        raise SystemExit(1)
+    app = V3App(data_dir=data_dir)
+    app._lock = lock
     app.hud.start()
     try:
         from doubao_typeless.platform.windows.hotkeys import start_hotkeys
