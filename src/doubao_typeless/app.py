@@ -54,6 +54,15 @@ class V3App:
         self.hud = HudController(on_insert=self.insert_last)
         self._observer = observer_from_env()
         self._last_attempt: Attempt | None = None
+        self._recovery_needed = False
+        from doubao_typeless.storage.draft_snapshot import load_draft, save_draft
+
+        restored, missing = load_draft(self.data_dir, self.store)
+        if restored is not None:
+            self.draft = restored
+            if missing:
+                _log(f"[v3.draft] 快照缺图 {len(missing)}，不造假像素")
+        self._save_draft = lambda: save_draft(self.data_dir, self.draft)
         self.bridge = V3Bridge(
             port=self.port,
             auth=self.auth,
@@ -62,6 +71,7 @@ class V3App:
             on_activity=self._on_activity,
             on_intent=self._on_intent,
             on_capture=self._on_capture,
+            on_recall=self.recall_last,
             history_list=self._history_public,
             uploads=self.uploads,
             logger=_log,
@@ -81,6 +91,7 @@ class V3App:
         )
 
     def _on_activity(self, text: str, image_count: int) -> None:
+        self._save_draft()
         if text or image_count:
             self.hud.show_receiving(text, image_count)
 
@@ -236,9 +247,10 @@ class V3App:
         _log(f"[v3.delivery] {result.result} enter={self.delivery.enter_count} text_frozen={frozen_text == bundle.get('text')}")
         payload = result.to_dict()
         payload["result"] = result.result
+        self._save_draft()
         return payload
 
-    def insert_last(self) -> None:
+    def insert_last(self, user_mode: str | None = None) -> None:
         from doubao_typeless.ui.recovery import plan_retry
 
         bundle = self.bridge.last_bundle
@@ -259,14 +271,26 @@ class V3App:
                 images_observed=images_obs,
                 images_total=images_total,
                 text_sent=text_sent,
+                user_mode=user_mode,
             )
+            if plan["mode"] == "ask":
+                self._recovery_needed = True
+                self.hud.show_receiving("上次结果未知，请选择恢复方式", len(bundle.get("assets") or []))
+                _log("[v3.recovery] ask; 不自动重放、不Ctrl+A")
+                return
+            if plan["mode"] == "cancel":
+                return
             if plan["mode"] in {"text_only", "remaining_verified", "full"}:
                 intent["recovery_mode"] = plan["mode"]
+        self._recovery_needed = False
         if sessions:
             intent["session_id"] = sessions[-1].session_id
             intent["token"] = sessions[-1].token
             intent["nonce"] = self.auth.issue_nonce(sessions[-1])
         self._on_intent(intent, bundle)
+
+    def confirm_recovery(self, mode: str) -> None:
+        self.insert_last(user_mode=mode)
 
     def recall_last(self) -> None:
         from doubao_typeless.ui.recovery import plan_retry
@@ -274,6 +298,8 @@ class V3App:
         last = self.history.last_bundle()
         if last is None:
             return
+        kept_text = self.draft.text
+        kept_assets = [a.get("asset_id") for a in self.draft.assets]
         plan = plan_retry(
             previous_result=(self._last_attempt.result if self._last_attempt else "UNKNOWN"),
             same_target=False,
@@ -281,9 +307,15 @@ class V3App:
             images_total=len(last.get("assets") or []),
             text_sent=False,
         )
-        _log(f"[v3.recall] mode={plan['mode']} auto_replay={plan['auto_replay']} ctrl_a_delete={plan['ctrl_a_delete']}")
+        _log(
+            f"[v3.recall] mode={plan['mode']} auto_replay={plan['auto_replay']} "
+            f"ctrl_a_delete={plan['ctrl_a_delete']} current_kept={self.draft.text == kept_text}"
+        )
         self.hud.show_receiving(last.get("text") or "上次图文", len(last.get("assets") or []))
         self.bridge.last_bundle = last
+        if self.draft.text != kept_text or [a.get("asset_id") for a in self.draft.assets] != kept_assets:
+            raise RuntimeError("recall must not swallow current draft")
+        self._save_draft()
 
     def capture_region(self) -> None:
         from doubao_typeless.ui.region import select_region

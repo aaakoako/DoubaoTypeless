@@ -14,10 +14,14 @@ def test_vite_konva_sources_exist():
     assert "crop" in canvas
     assert "applyCrop" in canvas
     assert "addMask" in canvas
+    assert "addStroke" in canvas
+    assert "exportScene" in canvas
     app = (WEB / "src" / "app.ts").read_text(encoding="utf-8")
     assert "uploadPng" in app
     assert "插入电脑" in app
     assert "白板" in app
+    assert "captionHint" in app
+    assert "recall.last" in app
     upload = (WEB / "src" / "transport" / "upload.ts").read_text(encoding="utf-8")
     assert "/v3/assets/init" in upload
     assert "chunks" in upload

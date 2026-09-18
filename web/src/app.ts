@@ -10,6 +10,7 @@ type Asset = {
   asset_id?: string;
   w?: number;
   h?: number;
+  scene?: string;
 };
 
 export function boot(root: HTMLElement): void {
@@ -25,6 +26,7 @@ export function boot(root: HTMLElement): void {
         <div class="attach" id="attachments"></div>
         <textarea id="text" placeholder="点这里，用手机输入法说话…&#10;&#10;也可以圈出问题，或画个草图。" aria-label="本次图文说明"></textarea>
         <div class="writehint"><span>用你习惯的输入法，不需要 API Key</span><span id="charCount">0 字</span></div>
+        <div class="writehint"><span id="captionHint"></span></div>
         <div class="tools">
           <button id="captureBtn">截电脑</button>
           <button id="photoBtn">相册</button>
@@ -69,6 +71,7 @@ export function boot(root: HTMLElement): void {
           <button data-tool="text">文字</button>
           <button data-tool="eraser">橡皮</button>
           <button data-tool="mask">遮挡</button>
+          <button data-tool="select">选择</button>
           <button id="wire">线框按钮</button>
         </div>
       </section>
@@ -110,6 +113,7 @@ export function boot(root: HTMLElement): void {
   function update() {
     ($("text") as HTMLTextAreaElement).value = state.text;
     $("charCount").textContent = `${[...state.text].length} 字`;
+    $("captionHint").textContent = state.assets.map((a, i) => `${i + 1}·${a.kind}`).join(" ");
     $("connText").textContent = state.online ? "已连接电脑" : "正在连接电脑";
     const btn = $("sendBtn") as HTMLButtonElement;
     btn.textContent = sendLabel();
@@ -127,7 +131,11 @@ export function boot(root: HTMLElement): void {
       wrap.innerHTML = `<img alt="${i + 1} · ${a.kind}" /><label>${i + 1} · ${a.kind}</label><button class="left">←</button><button class="right">→</button><button class="remove">删</button>`;
       const img = wrap.querySelector("img") as HTMLImageElement;
       img.src = a.preview;
-      wrap.querySelector(".left")!.addEventListener("click", () => move(i, -1));
+      img.addEventListener("click", () => openEditor(a.kind === "白板" ? "快速白板" : "图片标注", a));
+      wrap.querySelector(".left")!.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        move(i, -1);
+      });
       wrap.querySelector(".right")!.addEventListener("click", () => move(i, 1));
       wrap.querySelector(".remove")!.addEventListener("click", () => removeAt(i));
       strip.append(wrap);
@@ -166,6 +174,7 @@ export function boot(root: HTMLElement): void {
       if (looksLikeKeyScript(msg)) return;
       if (msg.type === "draft.ack") toast("电脑已收到 · 不自动发送");
       if (msg.type === "attempt.status") toast(`电脑：${msg.result} · 未发送Enter`);
+      if (msg.type === "recall.ready") toast(msg.text_unchanged ? "已召回上次待插入，当前草稿未改" : "召回异常");
       if (msg.type === "capture.result") {
         if (msg.error) {
           toast(String(msg.error));
@@ -261,7 +270,9 @@ export function boot(root: HTMLElement): void {
     const host = $("stage") as HTMLDivElement;
     host.replaceChildren();
     editor = new SharedEditor(host, asset.w || 1600, asset.h || 1000);
-    if (title === "快速白板") {
+    if (title === "快速白板" && asset.scene) {
+      editor.importScene(asset.scene);
+    } else if (title === "快速白板") {
       editor.addBlankBoard(asset.w || 1600, asset.h || 1000);
       host.dataset.ready = "1";
     } else if (asset.preview) editor.loadImage(asset.preview, asset.w || 1600, asset.h || 1000);
@@ -315,6 +326,7 @@ export function boot(root: HTMLElement): void {
           item.w = bmp.width;
           item.h = bmp.height;
           bmp.close();
+          item.scene = editor.exportScene();
           const meta = await uploadPng(blob, headers(), item.w || 1, item.h || 1, item.kind === "白板" ? "whiteboard" : "markup");
           item.asset_id = meta.asset_id;
         } catch {
@@ -400,8 +412,16 @@ export function boot(root: HTMLElement): void {
     }
     const res = await fetch("/v3/history", { headers: headers() });
     const data = await res.json();
-    $("sheetCard").innerHTML = "<h2>最近图文</h2><p>召回上次不会覆盖当前草稿。Alt+Shift+I 是召回，不是跳过纠错。</p>" + (data.items || []).map((i: { asset_count: number; text_chars: number }) => `<div>${i.asset_count} 图 · ${i.text_chars} 字</div>`).join("");
+    $("sheetCard").innerHTML =
+      "<h2>最近图文</h2><p>召回上次不会覆盖当前草稿。Alt+Shift+I 是召回，不是跳过纠错。</p>" +
+      (data.items || []).map((i: { asset_count: number; text_chars: number }) => `<div>${i.asset_count} 图 · ${i.text_chars} 字</div>`).join("") +
+      '<button class="primary" id="recallLast">召回上次（保留当前草稿）</button>';
     $("sheet").classList.add("show");
+    $("recallLast").onclick = () => {
+      if (!ws || ws.readyState !== 1) return;
+      ws.send(JSON.stringify({ protocol: 3, type: "recall.last" }));
+      $("sheet").classList.remove("show");
+    };
   };
   $("settingsBtn").onclick = () => {
     $("sheetCard").innerHTML = "<h2>简单设置</h2><p>不配 Key 也能画图和投递。密钥只存在电脑。</p>";

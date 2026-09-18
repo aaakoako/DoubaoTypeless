@@ -2,10 +2,10 @@
   "schema_version": 1,
   "product_goal": "V3完整范围R01-R10，达到可发布候选；实际公开发布另行批准",
   "review_base": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
-  "current_head": "2aaa3a1526c9d4fcb7ceb43fdcbe74e17db91a9e",
-  "last_completed_slice": "S2_image_then_text",
-  "active_slice": "S3_multi_board_recovery",
-  "next_action": "S3：多图顺序、白板撤销重做与再编辑、编号图序、召回不吞当前稿、中断/换目标/未知恢复、重启恢复真实图片。S2 已证实生产页选图→裁剪遮挡编号→分块上传→冻结→先图后文进入 DT-S2-PasteTarget；不是 Cursor。S2 独立复核 WAITING。",
+  "current_head": "55181942f37069cffa41e5b383522eb55d126ee0",
+  "last_completed_slice": "S3_multi_board_recovery",
+  "active_slice": "S4_product_ux_soak",
+  "next_action": "S4：BYOK 真实配置/错误反馈、首次连接与设置可达、视觉逐屏、2小时200轮与性能预算、R01–R10接通。S3 已证实生产页两图+白板、重排、空白板拒绝、撤销重做、再编辑、先三图后文、召回不吞当前稿、快照字节可恢复。不是 Cursor。S2 独立复核仍 WAITING。",
   "accepted_requirements": [
     "R01-R10 原义全部保留",
     "96 项验收定义不改",
@@ -17,10 +17,10 @@
     {
       "missing": "真实 Android + 豆包输入法",
       "probed": "shutil.which('adb') is None",
-      "blocks": ["AC3-002", "AC3-009", "AC3-010", "AC3-011", "AC3-037", "AC3-041", "AC3-045", "AC3-048", "J1 真机", "J3 真机相册"],
+      "blocks": ["AC3-002", "AC3-009", "AC3-010", "AC3-011", "AC3-037", "AC3-041", "AC3-045", "AC3-048", "AC3-049", "AC3-053", "J1 真机", "J3 真机相册", "J4 真机白板"],
       "who": "设备持有者",
-      "min_action": "真机打开候选页，相册选图/截电脑/豆包输入法；可录屏",
-      "unblocked_work": "S3 桌面多图、白板、召回与恢复"
+      "min_action": "真机打开候选页，相册选两张、白板三笔、豆包输入法；可录屏",
+      "unblocked_work": "S4 设置/BYOK 错误路径、协议浸泡、PC 可达性"
     },
     {
       "missing": "Cursor Composer 可观察 UIA",
@@ -28,7 +28,7 @@
       "blocks": ["AC3-006", "AC3-008", "AC3-061", "主目标一键图文"],
       "who": "本机探测或用户确认半自动路径",
       "min_action": "安装/探测 UIAutomation 并对真实 Cursor Composer 列出可验证字段",
-      "unblocked_work": "S3 对非 Cursor 指定目标；不得冒充 Cursor"
+      "unblocked_work": "S4 不冒充 Cursor"
     },
     {
       "missing": "S2 独立复核签署",
@@ -36,28 +36,28 @@
       "blocks": ["S2 完成声明扩大", "RELEASE_READY"],
       "who": "独立审阅者",
       "min_action": "按 docs/evidence/v3-s2/result.json 与截图复核生产入口、像素与目标观察",
-      "unblocked_work": "S3 无依赖切片可继续"
+      "unblocked_work": "S4 无依赖切片可继续"
     },
     {
       "missing": "GitHub Actions 对本分支最新 SHA",
-      "probed": "workflow 已接好；尚未推送本批 S2 提交",
+      "probed": "workflow 已接好；尚未推送本批 S3 提交",
       "blocks": ["AC3-085 云端"],
       "who": "推送 v3/00-baseline（禁止 tag/Release）",
       "min_action": "用户若允许推送隔离分支",
-      "unblocked_work": "本地 pytest；S2 脚本退出码 0"
+      "unblocked_work": "本地 pytest 93 passed；S3 脚本退出码 0"
     }
   ],
   "in_progress_files": [],
   "last_commands": [
-    {"cmd": "python -m pytest -q --tb=line", "exit_code": 0, "output": "88 passed then nonce test added"},
-    {"cmd": "python tools/v3_s2_image_text_path.py", "exit_code": 0, "output": "ok true; chunked_upload; image_then_text; secret_covered; cropped; CONFIRMED s2_paste_target"}
+    {"cmd": "python -m pytest -q --tb=line", "exit_code": 0, "output": "93 passed"},
+    {"cmd": "python tools/v3_s3_multi_board_recovery.py", "exit_code": 0, "output": "ok true; empty_board_blocked; undo_redo; current_kept; restart_bytes; CONFIRMED"}
   ],
   "candidate_artifact": {
     "path": "dist/DoubaoTypelessV3Preview/DoubaoTypelessV3Preview.exe",
     "sha256": "1178218f1bccbaa0b039756aa3ce9c4c32c0f0009f65f5cbb949cda45688d3c9",
     "kind": "isolated_dev_onedir",
     "release": false,
-    "stale_vs_s2": true
+    "stale_vs_s3": true
   },
   "published": false
 }

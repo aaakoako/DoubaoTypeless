@@ -85,6 +85,7 @@ class V3Bridge:
         on_activity: Callable[[str, int], None] | None = None,
         on_intent: Callable[[dict, dict], None] | None = None,
         on_capture: Callable[[str, str], dict] | None = None,
+        on_recall: Callable[[], None] | None = None,
         history_list: Callable[[], list] | None = None,
         uploads: UploadService | None = None,
         logger: Callable[[str], None] | None = None,
@@ -97,6 +98,7 @@ class V3Bridge:
         self._on_activity = on_activity
         self._on_intent = on_intent
         self._on_capture = on_capture
+        self._on_recall = on_recall
         self._history_list = history_list
         self.uploads = uploads
         self._log = logger or (lambda _m: None)
@@ -436,6 +438,20 @@ class V3Bridge:
                     await ws.send_json({"type": "capture.result", "error": str(exc)})
                     return True
                 await ws.send_json({"type": "capture.result", "asset": meta})
+                return True
+            if kind == "recall.last":
+                before = (self.draft.text, [a.get("asset_id") for a in self.draft.assets])
+                if self._on_recall:
+                    self._on_recall()
+                await ws.send_json(
+                    {
+                        "type": "recall.ready",
+                        "current_kept": True,
+                        "draft_revision": self.draft.revision,
+                        "text_unchanged": self.draft.text == before[0],
+                        "assets_unchanged": [a.get("asset_id") for a in self.draft.assets] == before[1],
+                    }
+                )
                 return True
             if kind == "byok.request":
                 await ws.send_json({"type": "error", "error": "byok stays on desktop"})

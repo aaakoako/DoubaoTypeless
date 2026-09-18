@@ -38,6 +38,7 @@ export class SharedEditor {
   private bg: Konva.Image | null = null;
   private source = { w: 1600, h: 1000 };
   cropTemp: Crop | null = null;
+  private moving: { node: Konva.Node; x: number; y: number; px: number; py: number } | null = null;
 
   constructor(container: HTMLDivElement, width = 1600, height = 1000) {
     this.source = { w: width, h: height };
@@ -148,6 +149,52 @@ export class SharedEditor {
     this.stage.batchDraw();
   }
 
+  get undoDepth(): number {
+    return this.undoStack.length;
+  }
+
+  get redoDepth(): number {
+    return this.redoStack.length;
+  }
+
+  addStroke(points: number[]): void {
+    this.pushUndo();
+    const stroke = this.strokeForTool();
+    this.layer.add(
+      new Konva.Line({
+        stroke: stroke.color,
+        strokeWidth: stroke.width,
+        opacity: stroke.opacity,
+        lineCap: "round",
+        lineJoin: "round",
+        points,
+      })
+    );
+    this.ops += 1;
+    this.layer.draw();
+  }
+
+  moveNode(name: string, dx: number, dy: number): boolean {
+    const node = this.layer.findOne(`.${name}`);
+    if (!node) return false;
+    this.pushUndo();
+    node.x(node.x() + dx);
+    node.y(node.y() + dy);
+    this.layer.draw();
+    return true;
+  }
+
+  renameWireTitle(text: string): boolean {
+    const group = this.layer.findOne(".wire");
+    if (!(group instanceof Konva.Group)) return false;
+    const label = group.findOne("Text");
+    if (!(label instanceof Konva.Text)) return false;
+    this.pushUndo();
+    label.text(text);
+    this.layer.draw();
+    return true;
+  }
+
   private strokeForTool(): { color: string; width: number; opacity: number } {
     if (this.tool === "highlight") return { color: this.color, width: this.width * 3, opacity: 0.25 };
     if (this.tool === "marker") return { color: this.color, width: this.width * 2, opacity: 1 };
@@ -174,6 +221,18 @@ export class SharedEditor {
     }
     const p = this.world(ev);
     this.start = p;
+    if (this.tool === "select") {
+      const hit = this.layer.getIntersection(p);
+      if (hit) {
+        const node = hit.getParent() instanceof Konva.Group ? hit.getParent()! : hit;
+        this.moving = { node, x: node.x(), y: node.y(), px: p.x, py: p.y };
+        this.pushUndo();
+      }
+      return;
+    }
+    if (this.tool === "pan") {
+      return;
+    }
     if (this.tool === "number") {
       this.pushUndo();
       this.numbers += 1;
@@ -253,6 +312,13 @@ export class SharedEditor {
       this.stage.batchDraw();
       return;
     }
+    if (this.moving) {
+      const p = this.world(ev);
+      this.moving.node.x(this.moving.x + p.x - this.moving.px);
+      this.moving.node.y(this.moving.y + p.y - this.moving.py);
+      this.layer.batchDraw();
+      return;
+    }
     if (!this.drawing) return;
     const p = this.world(ev);
     if (this.drawing instanceof Konva.Line && !(this.drawing instanceof Konva.Arrow)) {
@@ -274,6 +340,12 @@ export class SharedEditor {
     this.pointers.delete(ev.pointerId);
     if (this.pinch) {
       if (!this.pointers.size) this.pinch = null;
+      this.drawing = null;
+      this.moving = null;
+      return;
+    }
+    if (this.moving) {
+      this.moving = null;
       this.drawing = null;
       return;
     }
@@ -341,15 +413,61 @@ export class SharedEditor {
 
   addWireframe(): void {
     this.pushUndo();
-    this.layer.add(
-      new Konva.Rect({ x: this.source.w * 0.2, y: this.source.h * 0.3, width: this.source.w * 0.6, height: this.source.h * 0.14, stroke: "#167D71", strokeWidth: 5, cornerRadius: 8 })
+    const g = new Konva.Group({ name: "wire", x: 0, y: 0 });
+    g.add(
+      new Konva.Rect({
+        x: this.source.w * 0.2,
+        y: this.source.h * 0.3,
+        width: this.source.w * 0.6,
+        height: this.source.h * 0.14,
+        stroke: "#167D71",
+        strokeWidth: 5,
+        cornerRadius: 8,
+      })
     );
-    this.layer.add(new Konva.Text({ x: this.source.w * 0.38, y: this.source.h * 0.34, text: "确认按钮", fill: "#167D71", fontSize: 32 }));
+    g.add(new Konva.Text({ x: this.source.w * 0.38, y: this.source.h * 0.34, text: "确认按钮", fill: "#167D71", fontSize: 32 }));
+    this.layer.add(g);
     this.ops += 1;
     this.layer.draw();
   }
 
+  exportScene(): string {
+    return JSON.stringify({
+      crop: this.crop,
+      numbers: this.numbers,
+      ops: this.ops,
+      source: this.source,
+      image: this.imageLayer.toJSON(),
+      layer: this.layer.toJSON(),
+    });
+  }
+
+  importScene(raw: string): void {
+    const snap = JSON.parse(raw) as {
+      crop: Crop;
+      numbers: number;
+      ops: number;
+      source: { w: number; h: number };
+      image: string;
+      layer: string;
+    };
+    this.source = snap.source;
+    this.crop = snap.crop;
+    this.numbers = snap.numbers;
+    this.ops = snap.ops;
+    this.imageLayer.destroy();
+    this.layer.destroy();
+    this.imageLayer = Konva.Node.create(snap.image, this.stage.container());
+    this.layer = Konva.Node.create(snap.layer, this.stage.container());
+    this.stage.add(this.imageLayer);
+    this.stage.add(this.layer);
+    this.fit();
+    this.stage.container().dataset.ready = "1";
+  }
+
   exportBlob(): Promise<Blob> {
+    const grids = this.imageLayer.find(".grid");
+    grids.forEach((node) => node.visible(false));
     const scale = this.stage.scaleX() || 1;
     const canvas = this.stage.toCanvas({
       x: this.stage.x() + this.crop.x * scale,
@@ -358,6 +476,8 @@ export class SharedEditor {
       height: Math.max(1, this.crop.h * scale),
       pixelRatio: 1 / scale,
     });
+    grids.forEach((node) => node.visible(true));
+    this.stage.batchDraw();
     return new Promise((resolve, reject) => {
       canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("export failed"))), "image/png");
     });
