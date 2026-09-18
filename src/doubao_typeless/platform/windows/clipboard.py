@@ -34,6 +34,20 @@ def send_paste() -> None:
     user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
 
 
+def read_clipboard_text() -> str | None:
+    if sys.platform != "win32":
+        return None
+    win32clipboard.OpenClipboard()
+    try:
+        if win32clipboard.IsClipboardFormatAvailable(win32con.CF_UNICODETEXT):
+            return str(win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT))
+        return None
+    except Exception:
+        return None
+    finally:
+        win32clipboard.CloseClipboard()
+
+
 def set_clipboard_text(text: str) -> None:
     if sys.platform != "win32":
         return

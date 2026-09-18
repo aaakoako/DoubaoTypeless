@@ -1,0 +1,40 @@
+{
+  "case_id": "AC3-038/040/045",
+  "status": "PASS",
+  "shots": [
+    {
+      "width": 360,
+      "overflow": false,
+      "hit44": {
+        "ok": true,
+        "bad": [],
+        "count": 6
+      },
+      "path": "G:\\DoubaoTypeless\\DoubaoTypeless\\docs\\evidence\\v3-web\\composer-360.png"
+    },
+    {
+      "width": 390,
+      "overflow": false,
+      "hit44": {
+        "ok": true,
+        "bad": [],
+        "count": 6
+      },
+      "path": "G:\\DoubaoTypeless\\DoubaoTypeless\\docs\\evidence\\v3-web\\composer-390.png"
+    },
+    {
+      "width": 430,
+      "overflow": false,
+      "hit44": {
+        "ok": true,
+        "bad": [],
+        "count": 6
+      },
+      "path": "G:\\DoubaoTypeless\\DoubaoTypeless\\docs\\evidence\\v3-web\\composer-430.png"
+    }
+  ],
+  "crop_tool": true,
+  "konva": true,
+  "note": "桌面 Chromium 对 Vite+Konva 产品页的证据，不是 Android 真机触控/豆包输入法。",
+  "started_at": "2026-09-18T08:00:57.448434+00:00"
+}

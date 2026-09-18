@@ -1,13 +1,16 @@
 """Screen capture. Only enumerated scopes; never a raw HWND from the network."""
 from __future__ import annotations
 
+import re
 import time
 from typing import Callable
 
 from doubao_typeless.storage.credentials import Session
 
 REQUEST_TTL_S = 15.0
-MIN_INTERVAL_S = 1.0
+MIN_INTERVAL_S = 2.0
+REGION_RE = re.compile(r"^region:-?\d+,-?\d+,\d+,\d+$")
+DISPLAY_RE = re.compile(r"^display:\d+$")
 
 
 class CaptureService:
@@ -28,12 +31,19 @@ class CaptureService:
     def begin(self, session: Session, scope: str, request_id: str, *, now: float | None = None) -> None:
         if not session.allow_capture:
             raise ValueError("capture not granted")
-        if scope.startswith("hwnd:") or scope.startswith("0x"):
-            raise ValueError("unknown capture scope")
-        if scope not in self.allowed_scopes:
+        if not self._valid_scope(scope):
             raise ValueError("unknown capture scope")
         now = time.monotonic() if now is None else now
         self._requests[request_id] = (now + REQUEST_TTL_S, scope)
+
+    def _valid_scope(self, scope: str) -> bool:
+        if scope.startswith("hwnd:") or scope.startswith("0x"):
+            return False
+        if scope in self.allowed_scopes or scope == "primary":
+            return True
+        if REGION_RE.match(scope) or DISPLAY_RE.match(scope):
+            return True
+        return False
 
     def cancel(self, request_id: str) -> None:
         self.cancelled.add(request_id)
@@ -45,7 +55,7 @@ class CaptureService:
             return self.complete(request_id, session, now=now)
         if not session.allow_capture:
             raise ValueError("capture not granted")
-        if scope not in self.allowed_scopes:
+        if not self._valid_scope(scope):
             raise ValueError("unknown capture scope")
         return self._do_grab(scope, now=now)
 

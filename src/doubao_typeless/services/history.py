@@ -12,11 +12,14 @@ MAX_BYTES = 256 * 1024 * 1024
 
 
 class HistoryService:
-    def __init__(self, path: Path, *, persist: bool = True):
+    def __init__(self, path: Path, *, persist: bool = True, db=None):
         self.path = Path(path)
         self.persist = persist
+        self.db = db
         self.items: list[dict[str, Any]] = []
-        if persist and self.path.is_file():
+        if db is not None:
+            self.items = db.list_history()
+        elif persist and self.path.is_file():
             raw = json.loads(self.path.read_text(encoding="utf-8"))
             self.items = list(raw.get("items") or [])
 
@@ -36,6 +39,9 @@ class HistoryService:
         }
         self.items.append(entry)
         self.gc()
+        if self.db is not None:
+            self.db.record_bundle(bundle, attempt_result=attempt_result)
+            return
         self._flush()
 
     def last_bundle(self) -> dict[str, Any] | None:

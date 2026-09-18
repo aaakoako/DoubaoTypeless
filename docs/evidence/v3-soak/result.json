@@ -1,0 +1,11 @@
+{
+  "case_id": "AC3-083",
+  "status": "PASS",
+  "rounds": 200,
+  "failures": [],
+  "failure_count": 0,
+  "elapsed_s": 2.21717179999996,
+  "sqlite": "G:\\DoubaoTypeless\\DoubaoTypeless\\docs\\evidence\\v3-soak\\soak.sqlite",
+  "note": "Windows 协议浸泡：分块上传+冻结+先图后文。不是真机 2 小时语音/截屏矩阵。",
+  "started_at": "2026-09-18T07:59:22.135316+00:00"
+}

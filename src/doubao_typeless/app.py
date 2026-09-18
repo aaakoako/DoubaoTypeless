@@ -33,6 +33,11 @@ class V3App:
         self.port = pick_port(port) if port else 0
         self.auth = AuthService()
         self.store = AssetStore(self.data_dir / "assets")
+        from doubao_typeless.storage.db import V3DB
+        from doubao_typeless.services.assets import UploadService
+
+        self.db = V3DB(self.data_dir / "v3.sqlite")
+        self.uploads = UploadService(self.store, self.db)
         self.ledger = IntentLedger()
         self.draft = Draft(
             draft_id=str(uuid.uuid4()),
@@ -41,7 +46,7 @@ class V3App:
             editor_device_id="pc",
             text="",
         )
-        self.history = HistoryService(self.data_dir / "history.json", persist=True)
+        self.history = HistoryService(self.data_dir / "history.json", persist=True, db=self.db)
         self.byok = ByokService()
         self.hud = HudController(on_insert=self.insert_last)
         self._observer = observer_from_env()
@@ -55,6 +60,7 @@ class V3App:
             on_intent=self._on_intent,
             on_capture=self._on_capture,
             history_list=self._history_public,
+            uploads=self.uploads,
             logger=_log,
         )
         self.capture = CaptureService(grab=self._grab, hide_surfaces=self.hud.hide)
@@ -65,6 +71,10 @@ class V3App:
             read_focus=self._read_focus,
             observe_image=self._observe_image,
             observe_text=self._observe_text,
+            wait_modifiers=self._wait_modifiers,
+            is_locked=self._session_locked,
+            is_elevated=self._target_elevated,
+            read_clipboard_text=self._read_clipboard_text,
         )
 
     def _on_activity(self, text: str, image_count: int) -> None:
@@ -86,7 +96,7 @@ class V3App:
     def _grab(self, scope: str) -> bytes:
         from doubao_typeless.platform.windows.capture import grab_primary
 
-        return grab_primary(scope)
+        return grab_primary(scope, hide=self.hud.hide)
 
     def _on_capture(self, scope: str, request_id: str = "") -> dict:
         sessions = list(self.auth.sessions.values())
@@ -103,6 +113,27 @@ class V3App:
         self.draft.revision += 1
         self._on_activity(self.draft.text, len(self.draft.assets))
         return meta
+
+    def _wait_modifiers(self) -> bool:
+        from doubao_typeless.platform.windows.guards import wait_modifiers_up
+
+        return wait_modifiers_up()
+
+    def _session_locked(self) -> bool:
+        from doubao_typeless.platform.windows.guards import session_locked
+
+        return session_locked()
+
+    def _target_elevated(self) -> bool:
+        return False
+
+    def _read_clipboard_text(self) -> str | None:
+        try:
+            from doubao_typeless.platform.windows.clipboard import read_clipboard_text
+
+            return read_clipboard_text()
+        except Exception:
+            return None
 
     def _read_focus(self):
         from doubao_typeless.platform.windows.clipboard import read_focus
@@ -200,6 +231,8 @@ class V3App:
         return payload
 
     def insert_last(self) -> None:
+        from doubao_typeless.ui.recovery import plan_retry
+
         bundle = self.bridge.last_bundle
         if bundle is None and (self.draft.text or self.draft.assets):
             bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
@@ -208,6 +241,19 @@ class V3App:
             return
         sessions = list(self.auth.sessions.values())
         intent = {"intent_id": str(uuid.uuid4()), "trigger": "hotkey"}
+        if self._last_attempt is not None:
+            images_total = len(bundle.get("assets") or [])
+            images_obs = sum(1 for s in self._last_attempt.steps if s.kind == "image" and s.state == "observed")
+            text_sent = any(s.kind == "text" for s in self._last_attempt.steps)
+            plan = plan_retry(
+                previous_result=self._last_attempt.result,
+                same_target=True,
+                images_observed=images_obs,
+                images_total=images_total,
+                text_sent=text_sent,
+            )
+            if plan["mode"] in {"text_only", "remaining_verified", "full"}:
+                intent["recovery_mode"] = plan["mode"]
         if sessions:
             intent["session_id"] = sessions[-1].session_id
             intent["token"] = sessions[-1].token
@@ -215,13 +261,44 @@ class V3App:
         self._on_intent(intent, bundle)
 
     def recall_last(self) -> None:
+        from doubao_typeless.ui.recovery import plan_retry
+
         last = self.history.last_bundle()
         if last is None:
             return
+        plan = plan_retry(
+            previous_result=(self._last_attempt.result if self._last_attempt else "UNKNOWN"),
+            same_target=False,
+            images_observed=0,
+            images_total=len(last.get("assets") or []),
+            text_sent=False,
+        )
+        _log(f"[v3.recall] mode={plan['mode']} auto_replay={plan['auto_replay']} ctrl_a_delete={plan['ctrl_a_delete']}")
         self.hud.show_receiving(last.get("text") or "上次图文", len(last.get("assets") or []))
         self.bridge.last_bundle = last
 
+    def capture_region(self) -> None:
+        from doubao_typeless.ui.region import select_region
+
+        self.hud.hide()
+        box = select_region()
+        if box is None:
+            _log("[v3.capture] region cancelled; no new image")
+            return
+        x, y, w, h = box
+        sessions = list(self.auth.sessions.values())
+        if not sessions or not sessions[-1].allow_capture:
+            _log("[v3.capture] region needs capture grant")
+            return
+        meta = self._on_capture(f"region:{x},{y},{w},{h}", str(uuid.uuid4()))
+        _log(f"[v3.capture] region {meta.get('width')}x{meta.get('height')}")
+
     async def start(self) -> None:
+        from doubao_typeless.runtime_lock import InstanceLock
+
+        self._lock = InstanceLock(self.data_dir / "instance.lock")
+        if not self._lock.acquire():
+            _log("[v3] 另一个预览实例已在运行，不强杀、不抢锁")
         await self.bridge.start()
         code = self.auth.new_pairing_challenge()
         url = f"http://{lan_ip()}:{self.port}/"
@@ -243,6 +320,9 @@ class V3App:
 
     async def stop(self) -> None:
         await self.bridge.stop()
+        lock = getattr(self, "_lock", None)
+        if lock:
+            lock.release()
 
 
 def main() -> None:
@@ -251,7 +331,11 @@ def main() -> None:
     try:
         from doubao_typeless.platform.windows.hotkeys import start_hotkeys
 
-        start_hotkeys(on_insert=app.insert_last, on_recall=app.recall_last)
+        start = start_hotkeys(on_insert=app.insert_last, on_recall=app.recall_last, on_region=app.capture_region)
+        if start.get("failures"):
+            _log(f"[v3] 热键注册失败，不会把语法合法当成成功: {start['failures']}")
+        if start.get("esc_bound"):
+            _log("[v3] HUD 不应绑定 Esc")
     except Exception as exc:
         _log(f"[v3] 热键未启动: {exc}")
 

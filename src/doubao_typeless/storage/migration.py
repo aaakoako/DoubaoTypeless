@@ -25,7 +25,20 @@ def inspect_legacy_config(path: Path) -> dict[str, Any]:
     if not path.is_file():
         return {"present": False, "learn_enabled": False, "hotkeys": migrate_hotkeys({})}
     before = path.read_bytes()
-    data = json.loads(before.decode("utf-8"))
+    try:
+        data = json.loads(before.decode("utf-8"))
+    except json.JSONDecodeError:
+        after = path.read_bytes()
+        if after != before:
+            raise RuntimeError("migration must not write the legacy file")
+        return {
+            "present": True,
+            "learn_enabled": False,
+            "start_learn": False,
+            "hotkeys": migrate_hotkeys({}),
+            "api_key_present": False,
+            "error": "invalid json",
+        }
     after = path.read_bytes()
     if after != before:
         raise RuntimeError("migration must not write the legacy file")

@@ -8,8 +8,10 @@
     "expected": "不reset、不覆盖未提交改动；基线差异逐文件列出",
     "layer": "静态",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "docs/evidence/baseline/AC3-001/result.json"
+    ]
   },
   {
     "id": "AC3-002",
@@ -20,8 +22,11 @@
     "expected": "完整记录旧版实际结果，已知失败不能填通过",
     "layer": "Windows+手机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/baseline/AC3-002/result.json",
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-003",
@@ -32,8 +37,10 @@
     "expected": "录像/截图能说明输入才显示的习惯；旧Alt+Shift+I局部跳过纠错语义已记入迁移",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "docs/evidence/baseline/AC3-003/result.json"
+    ]
   },
   {
     "id": "AC3-004",
@@ -44,8 +51,10 @@
     "expected": "真实Key/正文不进fixtures；旧日用目录保持原样",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "docs/evidence/baseline/AC3-004/result.json"
+    ]
   },
   {
     "id": "AC3-005",
@@ -56,8 +65,11 @@
     "expected": "原键盘焦点不变；HUD隐藏不删除文字",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "docs/evidence/v3-product/result.json",
+      "tests/test_v3_runtime.py"
+    ]
   },
   {
     "id": "AC3-006",
@@ -68,8 +80,11 @@
     "expected": "附件实际可见且顺序正确；不按Enter；记录Cursor版本/所选图像模型",
     "layer": "Windows",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-cursor/result.json",
+      "docs/evidence/v3-product/ACCEPTANCE.md"
+    ]
   },
   {
     "id": "AC3-007",
@@ -80,8 +95,10 @@
     "expected": "不因进程名相同而当Composer，不能发键到代码区",
     "layer": "Windows",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_core_services.py::test_code_focus_does_not_inject_images"
+    ]
   },
   {
     "id": "AC3-008",
@@ -92,8 +109,10 @@
     "expected": "列出可验证字段；看不到则UNKNOWN并阻塞全自动能力通过",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-cursor/result.json"
+    ]
   },
   {
     "id": "AC3-009",
@@ -104,8 +123,10 @@
     "expected": "无重复、无截尾、不抢输入法麦克风",
     "layer": "真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-010",
@@ -116,8 +137,10 @@
     "expected": "无额外墨点；变换后的笔画命中位置准确",
     "layer": "真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-011",
@@ -128,8 +151,10 @@
     "expected": "完成/撤销按钮可达，画布不重置，不丢已有笔画",
     "layer": "真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-012",
@@ -140,8 +165,11 @@
     "expected": "只声明样板通过，保存包体和空闲资源，不扩大到全项目已完成",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "src/doubao_typeless/static/composer.html",
+      "web/src/app.ts"
+    ]
   },
   {
     "id": "AC3-013",
@@ -152,8 +180,10 @@
     "expected": "Attempt仍只读取r3图文；r4未被污染",
     "layer": "自动",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_runtime.py::test_frozen_bundle_ignores_later_draft_edits"
+    ]
   },
   {
     "id": "AC3-014",
@@ -164,8 +194,10 @@
     "expected": "拒绝冲突并要求重同步，不覆盖已ACK版本",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_bridge.py"
+    ]
   },
   {
     "id": "AC3-015",
@@ -176,8 +208,10 @@
     "expected": "序列化往返逐字一致，不trim/NFKC",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_runtime.py::test_frozen_bundle_ignores_later_draft_edits"
+    ]
   },
   {
     "id": "AC3-016",
@@ -188,8 +222,10 @@
     "expected": "r4保留；只归档匹配r3，其他设备不清空",
     "layer": "自动",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_core_services.py"
+    ]
   },
   {
     "id": "AC3-017",
@@ -200,8 +236,10 @@
     "expected": "均拒绝；不计为连接设备，不执行任何平台操作",
     "layer": "自动",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_core_services.py::test_pairing_mismatch_and_insert_grant"
+    ]
   },
   {
     "id": "AC3-018",
@@ -212,8 +250,10 @@
     "expected": "均失效；电脑状态和手机可操作提示一致",
     "layer": "自动",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_core_services.py::test_pairing_mismatch_and_insert_grant"
+    ]
   },
   {
     "id": "AC3-019",
@@ -224,8 +264,10 @@
     "expected": "拒绝，不能默认提升为截图/按键权限",
     "layer": "自动",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_runtime.py::test_capture_requires_grant"
+    ]
   },
   {
     "id": "AC3-020",
@@ -236,8 +278,10 @@
     "expected": "按协议拒绝/节流，无shell/路径/按键任意执行入口",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_bridge.py"
+    ]
   },
   {
     "id": "AC3-021",
@@ -248,8 +292,11 @@
     "expected": "只补缺块，SHA256吻合后ready；不重复资产",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_assets.py::test_chunked_resume_completes_once",
+      "tests/test_v3_chunk_http.py"
+    ]
   },
   {
     "id": "AC3-022",
@@ -260,8 +307,10 @@
     "expected": "拒绝并删除临时残留；没有内存失控/任意路径写入",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_assets.py::test_bad_magic_and_path_traversal_leave_no_tmp"
+    ]
   },
   {
     "id": "AC3-023",
@@ -272,8 +321,10 @@
     "expected": "无durable ACK，手机仍保留素材，可重试",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_assets.py::test_complete_failure_is_not_durable"
+    ]
   },
   {
     "id": "AC3-024",
@@ -284,8 +335,10 @@
     "expected": "旧图不替换新图，有引用图不被删除",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_assets.py::test_gc_skips_attempt_referenced_assets"
+    ]
   },
   {
     "id": "AC3-025",
@@ -296,8 +349,10 @@
     "expected": "手机不能显示电脑已收到",
     "layer": "自动",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_bridge.py"
+    ]
   },
   {
     "id": "AC3-026",
@@ -308,8 +363,10 @@
     "expected": "最终新版本一致，旧intent/capture不执行",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_bridge.py"
+    ]
   },
   {
     "id": "AC3-027",
@@ -320,8 +377,10 @@
     "expected": "最终快照含最后一字，不能只读上次防抖值",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_remaining.py::test_tail_flush_on_commit_keeps_last_character"
+    ]
   },
   {
     "id": "AC3-028",
@@ -332,8 +391,10 @@
     "expected": "心跳不唤HUD；编辑活动最多2s一次且不算资产已保存",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "src/doubao_typeless/ui/tokens.py"
+    ]
   },
   {
     "id": "AC3-029",
@@ -344,8 +405,11 @@
     "expected": "无HUD/吸附球/桌面卡片；不因心跳唤醒",
     "layer": "Windows",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "docs/evidence/v3-product/result.json",
+      "tests/test_v3_runtime.py::test_hud_idle_is_hidden"
+    ]
   },
   {
     "id": "AC3-030",
@@ -356,8 +420,10 @@
     "expected": "尺寸遵守360×88/132；结果900ms隐藏；草稿仍可召回",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "docs/evidence/v3-product/result.json"
+    ]
   },
   {
     "id": "AC3-031",
@@ -368,8 +434,10 @@
     "expected": "外部编辑器收到Esc；本工具不全局吞键",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_remaining.py::test_hotkeys_do_not_bind_escape"
+    ]
   },
   {
     "id": "AC3-032",
@@ -380,8 +448,10 @@
     "expected": "位置在工作区内，不自动挡全屏；明确热键可召回",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "docs/evidence/v3-capture/result.json"
+    ]
   },
   {
     "id": "AC3-033",
@@ -392,8 +462,10 @@
     "expected": "只生成一次Attempt，释放后新动作才被接受",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_remaining.py::test_hotkey_repeat_fires_once_until_release"
+    ]
   },
   {
     "id": "AC3-034",
@@ -404,8 +476,10 @@
     "expected": "等待释放再Ctrl+V，无菜单快捷键误触",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_remaining.py::test_wait_modifiers_true_when_none_held"
+    ]
   },
   {
     "id": "AC3-035",
@@ -416,8 +490,10 @@
     "expected": "安全停止；不自动提权，不丢稿",
     "layer": "Windows",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_remaining.py::test_lock_and_elevated_do_not_drop_bundle"
+    ]
   },
   {
     "id": "AC3-036",
@@ -428,8 +504,10 @@
     "expected": "检测后停止/有限重试，不覆写用户新内容，不无限等待",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_remaining.py::test_clipboard_interference_stops_without_paste"
+    ]
   },
   {
     "id": "AC3-037",
@@ -440,8 +518,10 @@
     "expected": "无必须打包/发送页面，无空附件占位栏",
     "layer": "真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-038",
@@ -452,8 +532,11 @@
     "expected": "预览与投递顺序一致；撤销恢复原图序",
     "layer": "自动+真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-web/result.json",
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-039",
@@ -464,8 +547,11 @@
     "expected": "禁用/准备/请求行为符合规范，不离线排队按键",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "web/src/app.ts",
+      "tests/test_v3_web_source.py"
+    ]
   },
   {
     "id": "AC3-040",
@@ -476,8 +562,11 @@
     "expected": "44px命中区域、主按钮不被遮挡、无整页水平溢出",
     "layer": "真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-web/result.json",
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-041",
@@ -488,8 +577,11 @@
     "expected": "只有指定显示器当前帧进入手机，不截全部屏幕",
     "layer": "Windows+真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-capture/result.json",
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-042",
@@ -500,8 +592,11 @@
     "expected": "取消无新图片；完成正确区域，HUD不出现在截图",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "docs/evidence/v3-capture/result.json",
+      "tests/test_v3_capture.py::test_region_cancel_does_not_grab"
+    ]
   },
   {
     "id": "AC3-043",
@@ -512,8 +607,10 @@
     "expected": "像素范围与选择一致，无缩放错位",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "docs/evidence/v3-capture/result.json"
+    ]
   },
   {
     "id": "AC3-044",
@@ -524,8 +621,11 @@
     "expected": "拒绝/限流；无周期截图，恢复前台不补拍",
     "layer": "自动+Windows",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_capture.py",
+      "docs/evidence/v3-capture/result.json"
+    ]
   },
   {
     "id": "AC3-045",
@@ -536,8 +636,10 @@
     "expected": "方向正确；未支持明确拒绝，不空白图误成功",
     "layer": "真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-046",
@@ -548,8 +650,11 @@
     "expected": "导出只含所选范围，坐标不漂移",
     "layer": "自动+真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-web/result.json",
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-047",
@@ -560,8 +665,10 @@
     "expected": "源图不被覆盖，历史操作一致",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "web/src/editor/canvas.ts"
+    ]
   },
   {
     "id": "AC3-048",
@@ -572,8 +679,10 @@
     "expected": "44px命中；选区不超图；取消恢复进入前矩形",
     "layer": "真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-049",
@@ -584,8 +693,10 @@
     "expected": "线宽/不透明度符合，荧光笔一笔内部不叠加变黑",
     "layer": "真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-050",
@@ -596,8 +707,11 @@
     "expected": "底图不被擦除；对象可恢复；文字中文正常",
     "layer": "自动+真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-web/result.json",
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-051",
@@ -608,8 +722,11 @@
     "expected": "无幽灵笔画，无卡死；下次单指仍能画",
     "layer": "自动+真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "web/src/editor/canvas.ts",
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-052",
@@ -620,8 +737,10 @@
     "expected": "新分支清redo，不清现有图；达到预算只丢旧Undo能力",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "web/src/editor/canvas.ts"
+    ]
   },
   {
     "id": "AC3-053",
@@ -632,8 +751,11 @@
     "expected": "无项目选择页，空白白板不能加附件",
     "layer": "真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-web/whiteboard-number.png",
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-054",
@@ -644,8 +766,10 @@
     "expected": "组件是可改对象，不是不可编辑整张图片",
     "layer": "自动+真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-055",
@@ -656,8 +780,10 @@
     "expected": "默认不导出网格，画布尺寸不随手机旋转改变",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "web/src/editor/canvas.ts"
+    ]
   },
   {
     "id": "AC3-056",
@@ -668,8 +794,11 @@
     "expected": "两图顺序清晰，轻量白板属于首轮范围",
     "layer": "Windows+真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-product/result.json",
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-057",
@@ -680,8 +809,11 @@
     "expected": "结果无被裁区域/原图层/EXIF；遮挡像素完全覆盖",
     "layer": "自动",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "web/src/editor/canvas.ts",
+      "src/doubao_typeless/storage/asset_store.py"
+    ]
   },
   {
     "id": "AC3-058",
@@ -692,8 +824,10 @@
     "expected": "不静默丢图，不覆盖原图；有缩图/拆分提示",
     "layer": "真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-059",
@@ -704,8 +838,10 @@
     "expected": "引用指向正确图片；没有注释不自动编造描述",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "docs/evidence/v3-web/whiteboard-number.png"
+    ]
   },
   {
     "id": "AC3-060",
@@ -716,8 +852,10 @@
     "expected": "源图与已完成操作还在，可降分辨率重试",
     "layer": "自动+真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "web/src/app.ts"
+    ]
   },
   {
     "id": "AC3-061",
@@ -728,8 +866,11 @@
     "expected": "图1确认→图2确认→文字，整个过程0次Enter",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "docs/evidence/v3-product/result.json",
+      "docs/evidence/v3-soak/result.json"
+    ]
   },
   {
     "id": "AC3-062",
@@ -740,8 +881,10 @@
     "expected": "不盲sleep后续贴；超时/不可观测返回UNKNOWN",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_core_services.py::test_delivery_unknown_image_does_not_paste_text_or_enter"
+    ]
   },
   {
     "id": "AC3-063",
@@ -752,8 +895,10 @@
     "expected": "停止剩余图片和文字，不自动把新目标当原目标",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_runtime.py::test_delivery_stops_remaining_when_target_changes"
+    ]
   },
   {
     "id": "AC3-064",
@@ -764,8 +909,10 @@
     "expected": "本次仍是原Bundle，下一稿保留，不混图",
     "layer": "自动+Windows",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_runtime.py::test_frozen_bundle_ignores_later_draft_edits"
+    ]
   },
   {
     "id": "AC3-065",
@@ -776,8 +923,11 @@
     "expected": "召回上次固定图文，以新目标完整重试",
     "layer": "Windows",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "src/doubao_typeless/app.py",
+      "src/doubao_typeless/ui/recovery.py"
+    ]
   },
   {
     "id": "AC3-066",
@@ -788,8 +938,10 @@
     "expected": "提供只补文字，不再重复附件",
     "layer": "自动+Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "src/doubao_typeless/core/policy.py"
+    ]
   },
   {
     "id": "AC3-067",
@@ -800,8 +952,10 @@
     "expected": "不自动重放；显示恢复选择，不自动Ctrl+A/Delete",
     "layer": "Windows",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_remaining.py::test_unknown_recovery_never_ctrl_a_delete"
+    ]
   },
   {
     "id": "AC3-068",
@@ -812,8 +966,10 @@
     "expected": "不产生第二次发键；新用户重试需新intent",
     "layer": "自动",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_core_services.py"
+    ]
   },
   {
     "id": "AC3-069",
@@ -824,8 +980,11 @@
     "expected": "得到A的图文，B不丢不覆盖A",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_runtime.py::test_history_last_is_not_current_draft",
+      "tests/test_v3_sqlite_history.py"
+    ]
   },
   {
     "id": "AC3-070",
@@ -836,8 +995,10 @@
     "expected": "图片真实字节仍在；缺图明确缺失，不造假成功",
     "layer": "Windows",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_sqlite_history.py"
+    ]
   },
   {
     "id": "AC3-071",
@@ -848,8 +1009,10 @@
     "expected": "无引用清理正确；活动包受保护，磁盘满停止新增",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_runtime.py::test_history_gc_keeps_protected_and_caps"
+    ]
   },
   {
     "id": "AC3-072",
@@ -860,8 +1023,10 @@
     "expected": "回到会话模式并说明；诊断无token/key/正文/图像",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "src/doubao_typeless/services/byok.py"
+    ]
   },
   {
     "id": "AC3-073",
@@ -872,8 +1037,11 @@
     "expected": "所有核心功能可用，网络不自动请求模型",
     "layer": "Windows+真机",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-product/result.json",
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-074",
@@ -884,8 +1052,10 @@
     "expected": "原文可插入；提示区别明确，无Key泄露",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_runtime.py::test_byok_skips_without_key_and_rejects_images"
+    ]
   },
   {
     "id": "AC3-075",
@@ -896,8 +1066,10 @@
     "expected": "危险词仅提示；不因为用过一次就永久替换",
     "layer": "自动",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_runtime.py::test_terms_hint_never_auto_replaces"
+    ]
   },
   {
     "id": "AC3-076",
@@ -908,8 +1080,10 @@
     "expected": "旧返回不覆盖新文字；默认不上传图与历史",
     "layer": "自动",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_runtime.py::test_byok_stale_revision_does_not_overwrite"
+    ]
   },
   {
     "id": "AC3-077",
@@ -920,8 +1094,10 @@
     "expected": "引导后空闲无窗口，知道召回快捷键",
     "layer": "Windows+真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-078",
@@ -932,8 +1108,10 @@
     "expected": "保留自定义；清楚说明新召回语义，不同时绑定两种动作",
     "layer": "Windows",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "docs/evidence/baseline/AC3-003/hotkey-migration.md"
+    ]
   },
   {
     "id": "AC3-079",
@@ -944,8 +1122,10 @@
     "expected": "失败提示改键，不把语法合法当注册成功",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "src/doubao_typeless/platform/windows/hotkeys.py"
+    ]
   },
   {
     "id": "AC3-080",
@@ -956,8 +1136,10 @@
     "expected": "功能边界准确、可改授权，不要求全权限才能用",
     "layer": "Windows+真机",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_runtime.py::test_capture_requires_grant"
+    ]
   },
   {
     "id": "AC3-081",
@@ -968,8 +1150,10 @@
     "expected": "报告CPU/P95/Private bytes，隐藏无rAF循环/持续截屏",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-idle/result.json"
+    ]
   },
   {
     "id": "AC3-082",
@@ -980,8 +1164,10 @@
     "expected": "记录帧时间与导出；未达标按资源策略处理而非删笔画",
     "layer": "真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-083",
@@ -992,8 +1178,11 @@
     "expected": "无丢稿/错误清空/双重投递；逐轮留证据",
     "layer": "Windows+真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-soak/result.json",
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-084",
@@ -1004,8 +1193,11 @@
     "expected": "无WebEngine/开发依赖；预算超限列阻塞与剖析",
     "layer": "构建",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "docs/evidence/v3-pack/result.json",
+      "web/dist/index.html"
+    ]
   },
   {
     "id": "AC3-085",
@@ -1028,8 +1220,10 @@
     "expected": "原文件未损，凭据迁移幂等，旧learn不自启动",
     "layer": "自动+Windows",
     "severity": "P0",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_remaining.py::test_migration_invalid_json_does_not_write"
+    ]
   },
   {
     "id": "AC3-087",
@@ -1040,8 +1234,10 @@
     "expected": "不强杀、不抢热键/端口且有说明",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_remaining.py::test_instance_lock_does_not_kill_other"
+    ]
   },
   {
     "id": "AC3-088",
@@ -1064,8 +1260,10 @@
     "expected": "逐组合PASS/FAIL/BLOCKED；不写泛泛支持所有Agent",
     "layer": "Windows",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-cursor/result.json"
+    ]
   },
   {
     "id": "AC3-090",
@@ -1076,8 +1274,10 @@
     "expected": "核心Android路径通过；iOS不虚标豆包相同能力",
     "layer": "真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-ime/result.json"
+    ]
   },
   {
     "id": "AC3-091",
@@ -1088,8 +1288,10 @@
     "expected": "非设计外壳当产品；按钮/尺寸/隐藏行为一致",
     "layer": "Windows+真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "BLOCKED_NATIVE",
+    "evidence": [
+      "docs/evidence/v3-review/INDEPENDENT_REVIEW.md"
+    ]
   },
   {
     "id": "AC3-092",
@@ -1100,8 +1302,11 @@
     "expected": "可复现结果和补救文案齐全，不隐藏高危失败",
     "layer": "自动+真机",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "tests/test_v3_core_services.py",
+      "tests/test_v3_bridge.py"
+    ]
   },
   {
     "id": "AC3-093",
@@ -1113,7 +1318,9 @@
     "layer": "人工",
     "severity": "P1",
     "status": "NOT_RUN",
-    "evidence": []
+    "evidence": [
+      "docs/evidence/v3-review/INDEPENDENT_REVIEW.md"
+    ]
   },
   {
     "id": "AC3-094",
@@ -1124,8 +1331,10 @@
     "expected": "R01–R10无遗漏；R11明确后置不伪装已实现",
     "layer": "人工",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "docs/release/preview-notes.md"
+    ]
   },
   {
     "id": "AC3-095",
@@ -1136,8 +1345,11 @@
     "expected": "无证据项BLOCKED/NOT_RUN；不将原型通过当产品通过",
     "layer": "人工",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "docs/release/preview-notes.md",
+      "docs/evidence/v3-runtime/BLOCKED_NATIVE.md"
+    ]
   },
   {
     "id": "AC3-096",
@@ -1148,7 +1360,9 @@
     "expected": "没有自动merge/tag/release或覆盖稳定安装",
     "layer": "人工",
     "severity": "P1",
-    "status": "NOT_RUN",
-    "evidence": []
+    "status": "PASS",
+    "evidence": [
+      "docs/release/daily-use-switch.md"
+    ]
   }
 ]

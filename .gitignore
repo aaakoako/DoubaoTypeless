@@ -4,7 +4,7 @@ __pycache__/
 *.so
 .Python
 build/
-dist/
+/dist/
 *.egg-info/
 .eggs/
 *.egg
@@ -38,6 +38,11 @@ debug.log
 doubao_diagnostics_*.json
 
 # PyInstaller / 杂项
+/dist/
+web/node_modules/
+docs/evidence/v3-soak/assets/
+docs/evidence/v3-soak/soak.sqlite
+docs/evidence/v3-idle/data/
 opus.dll
 *.spec.bak
 _DoubaoTypeless_update.bat

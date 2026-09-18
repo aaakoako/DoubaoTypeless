@@ -12,9 +12,23 @@ from doubao_typeless.core.bundle import Draft, apply_draft_update, freeze_bundle
 from doubao_typeless.storage.asset_store import AssetStore
 from doubao_typeless.storage.credentials import AuthService, looks_like_key_script
 from doubao_typeless.ui.tokens import should_wake
+from doubao_typeless.services.assets import UploadService
 
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
+def _web_dist() -> Path:
+    here = Path(__file__).resolve()
+    candidates = [
+        here.parents[3] / "web" / "dist",
+        here.parents[2] / "web" / "dist",
+    ]
+    for path in candidates:
+        if (path / "index.html").is_file():
+            return path
+    return candidates[0]
+
+
+WEB_DIST = _web_dist()
 
 
 class V3Bridge:
@@ -29,6 +43,7 @@ class V3Bridge:
         on_intent: Callable[[dict, dict], None] | None = None,
         on_capture: Callable[[str, str], dict] | None = None,
         history_list: Callable[[], list] | None = None,
+        uploads: UploadService | None = None,
         logger: Callable[[str], None] | None = None,
     ):
         self.port = port
@@ -40,6 +55,7 @@ class V3Bridge:
         self._on_intent = on_intent
         self._on_capture = on_capture
         self._history_list = history_list
+        self.uploads = uploads
         self._log = logger or (lambda _m: None)
         self._runner: Optional[web.AppRunner] = None
         self._clients: set[web.WebSocketResponse] = set()
@@ -52,7 +68,13 @@ class V3Bridge:
         app.router.add_post("/v3/pair", self._pair_post)
         app.router.add_post("/v3/nonce", self._nonce)
         app.router.add_post("/v3/assets", self._asset_post)
+        app.router.add_post("/v3/assets/init", self._asset_init)
+        app.router.add_put("/v3/assets/{upload_id}/chunks/{index}", self._asset_chunk)
+        app.router.add_post("/v3/assets/{upload_id}/complete", self._asset_complete)
+        app.router.add_get("/v3/assets/{upload_id}/missing", self._asset_missing)
         app.router.add_get("/v3/assets/{asset_id}", self._asset_get)
+        if (WEB_DIST / "assets").is_dir():
+            app.router.add_static("/assets", WEB_DIST / "assets")
         app.router.add_get("/v3/history", self._history)
         app.router.add_get("/v3/status", self._status)
         return app
@@ -70,7 +92,8 @@ class V3Bridge:
             self._runner = None
 
     async def _index(self, request: web.Request) -> web.Response:
-        path = STATIC / "composer.html"
+        dist_index = WEB_DIST / "index.html"
+        path = dist_index if dist_index.is_file() else STATIC / "composer.html"
         return web.FileResponse(path)
 
     async def _status(self, request: web.Request) -> web.Response:
@@ -122,6 +145,57 @@ class V3Bridge:
         if self._on_activity and should_wake("draft.update"):
             self._on_activity(self.draft.text, max(1, len(self.draft.assets)))
         return web.json_response(meta)
+
+    async def _asset_init(self, request: web.Request) -> web.Response:
+        self._session_from(request)
+        if self.uploads is None:
+            raise web.HTTPNotImplemented()
+        body = await request.json()
+        try:
+            session = self.uploads.init(
+                mime=str(body.get("mime") or "image/png"),
+                total_bytes=int(body["bytes"]),
+                sha256=str(body["sha256"]),
+                width=int(body.get("width") or 1),
+                height=int(body.get("height") or 1),
+                chunk_size=int(body["chunk_size"]) if body.get("chunk_size") else None,
+            )
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        return web.json_response(session)
+
+    async def _asset_chunk(self, request: web.Request) -> web.Response:
+        self._session_from(request)
+        if self.uploads is None:
+            raise web.HTTPNotImplemented()
+        data = await request.read()
+        try:
+            self.uploads.put_chunk(request.match_info["upload_id"], int(request.match_info["index"]), data)
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        return web.json_response({"ok": True})
+
+    async def _asset_complete(self, request: web.Request) -> web.Response:
+        self._session_from(request)
+        if self.uploads is None:
+            raise web.HTTPNotImplemented()
+        try:
+            meta = self.uploads.complete(request.match_info["upload_id"])
+        except ValueError as exc:
+            return web.json_response({"error": str(exc), "durable": False}, status=400)
+        except OSError as exc:
+            return web.json_response({"error": str(exc), "durable": False}, status=507)
+        return web.json_response(meta)
+
+    async def _asset_missing(self, request: web.Request) -> web.Response:
+        self._session_from(request)
+        if self.uploads is None:
+            raise web.HTTPNotImplemented()
+        try:
+            missing = self.uploads.missing_chunks(request.match_info["upload_id"])
+        except ValueError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        return web.json_response({"missing": missing})
 
     async def _asset_get(self, request: web.Request) -> web.StreamResponse:
         self._session_from(request)
@@ -199,15 +273,35 @@ class V3Bridge:
                 self._on_activity(self.draft.text, len(self.draft.assets))
             return
         if kind == "bundle.commit":
+            if "text" in data or "revision" in data:
+                apply_draft_update(
+                    self.draft,
+                    {
+                        "text": data.get("text", self.draft.text),
+                        "revision": int(data.get("revision") or self.draft.revision + 1),
+                        "asset_refs": data.get("asset_refs", [a["asset_id"] for a in self.draft.assets]),
+                        "assets": data.get("assets", self.draft.assets),
+                    },
+                )
             bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
             self.last_bundle = bundle
             public = {k: v for k, v in bundle.items() if k != "bytes_data"}
             await ws.send_json({"type": "bundle.ready", "bundle": public})
             return
         if kind == "insert.intent":
+            if "text" in data or "revision" in data:
+                apply_draft_update(
+                    self.draft,
+                    {
+                        "text": data.get("text", self.draft.text),
+                        "revision": int(data.get("revision") or self.draft.revision + 1),
+                        "asset_refs": data.get("asset_refs", [a["asset_id"] for a in self.draft.assets]),
+                        "assets": data.get("assets", self.draft.assets),
+                    },
+                )
             session = self.auth.authorize(data["session_id"], data.get("token") or "", "insert")
             self.auth.consume_nonce(session, str(data.get("nonce") or ""))
-            if self.last_bundle is None:
+            if self.last_bundle is None or int(self.last_bundle.get("revision") or -1) != self.draft.revision:
                 self.last_bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
             frozen = dict(self.last_bundle)
             status = {"result": "RUNNING"}

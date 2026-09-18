@@ -1,25 +1,34 @@
 # V3 preview onedir — does NOT publish a GitHub Release.
-# pyinstaller --noconfirm packaging/v3_preview.spec
+# python -m PyInstaller --noconfirm packaging/v3_preview.spec
 # -*- mode: python ; coding: utf-8 -*-
 
 from pathlib import Path
 
 block_cipher = None
-icon_path = Path("assets/icon.ico")
+ROOT = Path(SPECPATH).resolve().parent
+icon_path = ROOT / "assets" / "icon.ico"
 icon_arg = str(icon_path) if icon_path.is_file() else None
+web_dist = ROOT / "web" / "dist"
+asset_dir = ROOT / "assets"
+
+datas = [
+    (str(ROOT / "src/doubao_typeless/static/composer.html"), "doubao_typeless/static"),
+]
+if web_dist.is_dir():
+    datas.append((str(web_dist), "web/dist"))
+if asset_dir.is_dir():
+    datas.append((str(asset_dir), "assets"))
 
 a = Analysis(
-    ["tools/run_v3.py"],
-    pathex=["src"],
+    [str(ROOT / "tools/run_v3.py")],
+    pathex=[str(ROOT / "src")],
     binaries=[],
-    datas=[
-        ("src/doubao_typeless/static/composer.html", "doubao_typeless/static"),
-        ("assets", "assets"),
-    ],
+    datas=datas,
     hiddenimports=[
         "doubao_typeless",
         "aiohttp",
         "PIL",
+        "PySide6",
         "pynput.keyboard._win32",
         "pynput.mouse._win32",
     ],

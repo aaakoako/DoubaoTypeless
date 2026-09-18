@@ -10,6 +10,10 @@ ROOT = Path(__file__).resolve().parent.parent
 REQUIRED = [
     "src/doubao_typeless/static/composer.html",
     "src/doubao_typeless/app.py",
+    "src/doubao_typeless/storage/db.py",
+    "web/package.json",
+    "web/src/app.ts",
+    "web/src/editor/canvas.ts",
     "scripts/启动-v3.bat",
     "docs/release/preview-notes.md",
     "docs/evidence/v3-runtime/BLOCKED_NATIVE.md",
