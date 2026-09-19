@@ -1,4 +1,5 @@
 """Product Composer is TypeScript + Vite + Konva, not only the HTML fallback."""
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,7 +22,19 @@ def test_vite_konva_sources_exist():
     assert "插入电脑" in app
     assert "白板" in app
     assert "captionHint" in app
+    assert "captionDrawer" in app
+    assert "openNextQueued" in app
+    assert "dt.v3.device" in app
+    assert "resumeRemembered" in app
+    assert "if (asset.scene)" in app
     assert "recall.last" in app
     upload = (WEB / "src" / "transport" / "upload.ts").read_text(encoding="utf-8")
     assert "/v3/assets/init" in upload
     assert "chunks" in upload
+
+
+def test_image_queue_and_finish_policy_scripts():
+    root = Path(__file__).resolve().parents[1]
+    for name in ("test_v3_image_queue.mjs", "test_v3_finish_editor.mjs"):
+        out = subprocess.check_output(["node", str(root / "tests" / name)], text=True)
+        assert "ok" in out

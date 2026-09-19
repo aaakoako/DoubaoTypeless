@@ -62,7 +62,7 @@ class V3App:
         self.data_dir = Path(data_dir or v3_data_dir())
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.port = pick_port(port) if port else 0
-        self.auth = AuthService()
+        self.auth = AuthService(store_path=self.data_dir / "trusted_devices.json")
         self.store = AssetStore(self.data_dir / "assets")
         from doubao_typeless.storage.db import V3DB
         from doubao_typeless.services.assets import CHUNK, UploadService
@@ -143,6 +143,15 @@ class V3App:
             is_elevated=self._target_elevated,
             read_clipboard_text=self._read_clipboard_text,
         )
+
+    def remember_connected(self) -> int:
+        count = 0
+        for session in list(self.auth.sessions.values()):
+            if time.time() > session.expires_at:
+                continue
+            self.auth.remember_device(session)
+            count += 1
+        return count
 
     def _notify_ui(self, event: str, **kwargs) -> None:
         hook = getattr(self, "ui_hook", None)

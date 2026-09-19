@@ -46,6 +46,20 @@ jobs:
           print("preview workflow does not create tags or GitHub Releases")
           PY
 
+  windows-pytest:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install native test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest httpx aiohttp Pillow PySide6 qrcode pynput pywin32
+      - name: Native and unit tests on Windows
+        run: python -m pytest -q --tb=short
+
   windows-min-pack:
     runs-on: windows-latest
     needs: pytest

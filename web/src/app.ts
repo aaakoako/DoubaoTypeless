@@ -3,6 +3,7 @@ import { looksLikeKeyScript, newId } from "./transport/protocol";
 import { uploadPng } from "./transport/upload";
 
 type Session = { session_id: string; token: string; device_id?: string };
+type AssetStatus = "queued" | "editing" | "ready" | "failed";
 type Asset = {
   id: string;
   kind: string;
@@ -11,6 +12,9 @@ type Asset = {
   w?: number;
   h?: number;
   scene?: string;
+  source?: string;
+  caption?: string;
+  status?: AssetStatus;
 };
 
 export function boot(root: HTMLElement): void {
@@ -18,8 +22,8 @@ export function boot(root: HTMLElement): void {
     <div class="page">
       <header class="head" id="mobileHead">
         <div class="pc-name"><i class="dot" id="connDot"></i>Pocket Composer<small id="connText">正在连接电脑</small></div>
-        <button id="historyBtn" aria-label="最近图文">近</button>
-        <button id="settingsBtn" aria-label="设置">设</button>
+        <button id="historyBtn" aria-label="最近图文">最近</button>
+        <button id="settingsBtn" aria-label="设置">设置</button>
       </header>
       <section class="composer" id="composer">
         <div class="composer-heading">这次想做什么？</div>
@@ -74,6 +78,9 @@ export function boot(root: HTMLElement): void {
           <button data-tool="select">选择</button>
           <button id="wire">线框按钮</button>
         </div>
+        <div class="caption-drawer" id="captionDrawer">
+          <textarea id="captionInput" placeholder="给这张图补一句说明，不发Enter"></textarea>
+        </div>
       </section>
     </div>
     <input id="file" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden />
@@ -123,6 +130,9 @@ export function boot(root: HTMLElement): void {
             w: a.w,
             h: a.h,
             scene: a.scene,
+            source: a.source,
+            caption: a.caption,
+            status: a.status,
             preview: a.asset_id ? `/v3/assets/${a.asset_id}` : a.preview,
           })),
         })
@@ -172,7 +182,8 @@ export function boot(root: HTMLElement): void {
     state.assets.forEach((a, i) => {
       const wrap = document.createElement("div");
       wrap.className = "attach-card";
-      wrap.innerHTML = `<img alt="${i + 1} · ${a.kind}" /><label>${i + 1} · ${a.kind}</label><button class="left">←</button><button class="right">→</button><button class="remove">删</button>`;
+      const status = a.status === "queued" ? "排队" : a.status === "editing" ? "编辑中" : a.status === "failed" ? "未传完" : "就绪";
+      wrap.innerHTML = `<img alt="${i + 1} · ${a.kind}" /><label>${i + 1} · ${a.kind} · ${status}</label><button class="left">←</button><button class="right">→</button><button class="remove">删</button>`;
       const img = wrap.querySelector("img") as HTMLImageElement;
       img.src = a.preview;
       img.addEventListener("click", () => {
@@ -219,6 +230,7 @@ export function boot(root: HTMLElement): void {
       const msg = JSON.parse(ev.data);
       if (looksLikeKeyScript(msg)) return;
       if (msg.type === "session.ready") {
+        void pullRememberedSecret();
         const same =
           state.draft_id &&
           state.draft_id === String(msg.draft_id || "") &&
@@ -267,9 +279,11 @@ export function boot(root: HTMLElement): void {
           w: msg.asset.width,
           h: msg.asset.height,
         };
+        a.status = "queued";
+        a.source = a.preview;
         state.assets.push(a);
-        void openEditor("图片标注", a);
         update();
+        void openNextQueued();
       }
     };
   }
@@ -322,9 +336,10 @@ export function boot(root: HTMLElement): void {
     if (data.hints && data.hints.length) toast(String(data.hints[0].hint));
   }
   $("boardBtn").onclick = () => {
-    const a: Asset = { id: "board-" + Date.now(), kind: "白板", preview: "", w: 1600, h: 1000 };
+    const a: Asset = { id: "board-" + Date.now(), kind: "白板", preview: "", w: 1600, h: 1000, status: "queued" };
     state.assets.push(a);
-    void openEditor("快速白板", a);
+    update();
+    void openNextQueued();
   };
   $("photoBtn").onclick = () => $("file").click();
   $("captureBtn").onclick = () => {
@@ -357,34 +372,50 @@ export function boot(root: HTMLElement): void {
       }
       a.w = image.naturalWidth || 1;
       a.h = image.naturalHeight || 1;
+      a.status = "queued";
+      a.source = preview;
       state.assets.push(a);
-      void openEditor("图片标注", a);
     }
     (e.target as HTMLInputElement).value = "";
     update();
+    void openNextQueued();
   });
+
+  function editorOpen(): boolean {
+    return $("editor").classList.contains("show");
+  }
+
+  async function openNextQueued() {
+    if (editorOpen()) return;
+    const next = state.assets.find((a) => a.status === "queued");
+    if (!next) return;
+    await openEditor(next.kind === "白板" ? "快速白板" : "图片标注", next);
+  }
 
   async function openEditor(title: string, asset: Asset) {
     currentId = asset.id;
+    asset.status = "editing";
     state.editorKind = title;
     $("composer").style.display = "none";
     $("mobileHead").style.display = "none";
     $("editor").classList.add("show");
     $("editTitle").textContent = title;
+    ($("captionInput") as HTMLTextAreaElement).value = asset.caption || "";
     const host = $("stage") as HTMLDivElement;
     host.replaceChildren();
     editor = new SharedEditor(host, asset.w || 1600, asset.h || 1000);
-    if (title === "快速白板" && asset.scene) {
+    if (asset.scene) {
       editor.importScene(asset.scene);
     } else if (title === "快速白板") {
       editor.addBlankBoard(asset.w || 1600, asset.h || 1000);
       host.dataset.ready = "1";
-    } else if (asset.preview) {
-      let src = asset.preview;
+    } else if (asset.source || asset.preview) {
+      let src = asset.source || asset.preview;
       if (src.startsWith("/v3/assets/") && state.session) {
         const res = await fetch(src, { headers: headers() });
         if (!res.ok) {
           toast("图片需要登录后才能看");
+          asset.status = "failed";
           return;
         }
         src = URL.createObjectURL(await res.blob());
@@ -392,6 +423,7 @@ export function boot(root: HTMLElement): void {
       editor.loadImage(src, asset.w || 1600, asset.h || 1000);
     }
     requestAnimationFrame(() => editor?.resize());
+    update();
     if (ws?.readyState === 1) ws.send(JSON.stringify({ protocol: 3, type: "editor.activity", kind: "edit" }));
   }
 
@@ -432,6 +464,7 @@ export function boot(root: HTMLElement): void {
     const preview = URL.createObjectURL(blob);
     const item = state.assets.find((a) => a.id === currentId);
     if (item) {
+      item.caption = ($("captionInput") as HTMLTextAreaElement).value.trim();
       item.preview = preview;
       item.asset_id = undefined;
       if (state.session) {
@@ -448,15 +481,20 @@ export function boot(root: HTMLElement): void {
         } catch {
           toast("图片未同步，不会沿用原图");
           item.asset_id = undefined;
+          item.status = "failed";
           state.uploading = false;
           $("editor").classList.remove("show");
           $("composer").style.display = "flex";
           $("mobileHead").style.display = "flex";
           editor = null;
           update();
+          void openNextQueued();
           return;
         }
         state.uploading = false;
+        item.status = "ready";
+      } else {
+        item.status = "ready";
       }
     }
     $("editor").classList.remove("show");
@@ -465,6 +503,7 @@ export function boot(root: HTMLElement): void {
     editor = null;
     sendDraft();
     update();
+    void openNextQueued();
   }
 
   $("done").onclick = () => {
@@ -526,6 +565,50 @@ export function boot(root: HTMLElement): void {
     } catch {
       return "";
     }
+  }
+
+  const DEVICE_KEY = "dt.v3.device";
+
+  function storeDevice(deviceId: string, secret: string) {
+    try {
+      localStorage.setItem(DEVICE_KEY, JSON.stringify({ device_id: deviceId, device_secret: secret }));
+    } catch {
+      /* private mode */
+    }
+  }
+
+  async function pullRememberedSecret() {
+    if (!state.session) return;
+    try {
+      const res = await fetch("/v3/device/secret", { headers: headers() });
+      if (!res.ok) return;
+      const body = await res.json();
+      if (body.device_id && body.device_secret) storeDevice(String(body.device_id), String(body.device_secret));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function resumeRemembered(): Promise<boolean> {
+    let stored: { device_id?: string; device_secret?: string } | null = null;
+    try {
+      stored = JSON.parse(localStorage.getItem(DEVICE_KEY) || "null");
+    } catch {
+      stored = null;
+    }
+    if (!stored?.device_id || !stored.device_secret) return false;
+    const res = await fetch("/v3/pair", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ device_id: stored.device_id, device_secret: stored.device_secret }),
+    });
+    if (!res.ok) return false;
+    state.session = await res.json();
+    sessionStorage.setItem("dt.v3.session", JSON.stringify(state.session));
+    connect();
+    update();
+    toast("已用记住的设备续接");
+    return true;
   }
 
   async function submitPair(code: string): Promise<boolean> {
@@ -599,5 +682,9 @@ export function boot(root: HTMLElement): void {
   restoreDraft();
   update();
   if (state.session) connect();
-  else showPair();
+  else {
+    void resumeRemembered().then((ok) => {
+      if (!ok) showPair();
+    });
+  }
 }

@@ -143,6 +143,8 @@ class V3Bridge:
         app.router.add_get("/ws", self._ws)
         app.router.add_get("/v3/pair", self._pair_get)
         app.router.add_post("/v3/pair", self._pair_post)
+        app.router.add_get("/v3/device/secret", self._device_secret)
+        app.router.add_post("/v3/device/remember", self._device_remember)
         app.router.add_post("/v3/nonce", self._nonce)
         app.router.add_post("/v3/assets", self._asset_post)
         app.router.add_post("/v3/assets/init", self._asset_init)
@@ -389,11 +391,14 @@ class V3Bridge:
         allow_insert = bool(body.get("allow_insert", False)) if loopback else False
         allow_capture = bool(body.get("allow_capture", False)) if loopback else False
         try:
-            session = self.auth.complete_pairing(
-                str(body.get("code") or ""),
-                allow_insert=allow_insert,
-                allow_capture=allow_capture,
-            )
+            if body.get("device_id") and body.get("device_secret"):
+                session = self.auth.resume_trusted(str(body.get("device_id") or ""), str(body.get("device_secret") or ""))
+            else:
+                session = self.auth.complete_pairing(
+                    str(body.get("code") or ""),
+                    allow_insert=allow_insert,
+                    allow_capture=allow_capture,
+                )
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
         return web.json_response(
@@ -403,6 +408,34 @@ class V3Bridge:
                 "token": session.token,
                 "allow_insert": session.allow_insert,
                 "allow_capture": session.allow_capture,
+                "remembered": session.remembered,
+            }
+        )
+
+    async def _device_remember(self, request: web.Request) -> web.Response:
+        if not is_loopback_host(peer_host(request)):
+            return web.json_response({"error": "remember on desktop"}, status=403)
+        session = self._session_from(request)
+        secret = self.auth.remember_device(session)
+        return web.json_response(
+            {
+                "device_id": session.device_id,
+                "device_secret": secret,
+                "expires_at": session.expires_at,
+                "remembered": True,
+            }
+        )
+
+    async def _device_secret(self, request: web.Request) -> web.Response:
+        session = self._session_from(request)
+        secret = self.auth.take_device_secret(session)
+        if not secret:
+            return web.json_response({"remembered": session.remembered, "device_id": session.device_id})
+        return web.json_response(
+            {
+                "device_id": session.device_id,
+                "device_secret": secret,
+                "remembered": True,
             }
         )
 

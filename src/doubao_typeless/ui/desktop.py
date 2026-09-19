@@ -48,14 +48,29 @@ def _result_label(code: object) -> str:
 STYLESHEET = f"""
 QWidget {{ background: {TOKENS['surface']}; color: {TOKENS['ink']}; font-size: 13px; font-family: "Microsoft YaHei UI","Microsoft YaHei","Segoe UI"; }}
 QTabWidget::pane {{ border: 0; }}
-QTabBar::tab {{ padding: 8px 16px; }}
-QTabBar::tab:selected {{ color: {TOKENS['accent']}; font-weight: 600; }}
+QTabBar::tab {{ padding: 8px 16px; color: {TOKENS['muted']}; border-bottom: 2px solid transparent; }}
+QTabBar::tab:hover {{ color: {TOKENS['ink']}; background: #E7EEEC; }}
+QTabBar::tab:selected {{ color: {TOKENS['accent']}; font-weight: 600; border-bottom: 2px solid {TOKENS['accent']}; }}
+QTabBar::tab:focus {{ outline: 2px solid {TOKENS['accent']}; }}
 QFrame#card {{ background: {TOKENS['card']}; border-radius: 12px; }}
 QPushButton {{ border: 0; border-radius: 9px; padding: 8px 12px; }}
+QPushButton:hover {{ background: #D8E4E1; }}
+QPushButton:pressed {{ background: #C5D6D2; }}
+QPushButton:disabled {{ color: #9AA6A3; background: #EEF1F0; }}
+QPushButton:focus {{ outline: 2px solid {TOKENS['accent']}; }}
 QPushButton#primary {{ background: {TOKENS['accent']}; color: white; }}
+QPushButton#primary:hover {{ background: #12655B; }}
+QPushButton#primary:pressed {{ background: #0E524A; }}
+QPushButton#primary:disabled {{ background: #8BB8B2; color: #F4F7F6; }}
 QPushButton#ghost {{ background: #E7EEEC; color: {TOKENS['ink']}; }}
+QPushButton#ghost:hover {{ background: #D5E0DD; }}
 QPushButton#danger {{ background: #F4E4E1; color: {TOKENS['danger']}; }}
+QPushButton#danger:hover {{ background: #EED3CE; }}
 QLineEdit, QPlainTextEdit {{ background: white; border: 1px solid #D5DDDA; border-radius: 8px; padding: 6px; }}
+QLineEdit:focus, QPlainTextEdit:focus {{ border: 1px solid {TOKENS['accent']}; }}
+QLineEdit:disabled, QPlainTextEdit:disabled {{ background: #EEF1F0; color: #9AA6A3; }}
+QListWidget::item:selected {{ background: #E3F2EF; color: {TOKENS['ink']}; }}
+QListWidget::item:hover {{ background: #F0F5F3; }}
 QLabel#muted {{ color: {TOKENS['muted']}; }}
 QLabel#error {{ color: {TOKENS['danger']}; }}
 """
@@ -478,6 +493,9 @@ class ClientWindow:
         cl.addWidget(self.device_name)
         self.grant_row = QHBoxLayout()
         cl.addLayout(self.grant_row)
+        self.remember_box = QCheckBox("记住这台设备 30 天（需明确勾选，不是默认）")
+        self.remember_box.clicked.connect(self._toggle_remember)
+        cl.addWidget(self.remember_box)
         cl.addWidget(QLabel("本机练习框（引导用，不是 Cursor）"))
         self.practice = QPlainTextEdit()
         self.practice.setPlaceholderText("点这里，再按 Alt+I 练习插入并复制。")
@@ -612,8 +630,9 @@ class ClientWindow:
         self.widget = w
         self._clipboard = QGuiApplication.clipboard()
         self._hist_sig = None
+        self._pairing_url = ""
         self.timer = QTimer(w)
-        self.timer.timeout.connect(self.refresh)
+        self.timer.timeout.connect(self._tick_countdown)
         self.timer.start(1000)
         self.refresh()
 
@@ -718,19 +737,37 @@ class ClientWindow:
             if widget is not None:
                 widget.deleteLater()
 
+    def _pair_caption(self) -> str:
+        short = self.app.auth.current_short_code() or ""
+        remain = int(self.app.auth.pairing_remaining_s())
+        return f"扫码即连。备用短码 {short}  （{remain}s）"
+
+    def _tick_countdown(self) -> None:
+        if not self.widget.isVisible() or self.qr.isHidden():
+            return
+        self.code_label.setText(self._pair_caption())
+
+    def _toggle_remember(self) -> None:
+        if not self.remember_box.isChecked():
+            return
+        count = self.app.remember_connected()
+        self.device_box.setText(
+            (self.device_box.text() + "\n" if self.device_box.text() else "")
+            + (f"已记住 {count} 台设备，30 天内可直接续接。" if count else "还没有已连接的手机可记住。")
+        )
+
     def refresh(self) -> None:
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QListWidgetItem, QPushButton
 
         url = self.pairing_url()
-        self.url_label.setText(url)
-        code = self.app.auth.current_pairing_challenge() or ""
-        short = self.app.auth.current_short_code() or ""
-        remain = int(self.app.auth.pairing_remaining_s())
-        self.code_label.setText(f"扫码即连。备用短码 {short}  （{remain}s）")
-        pix = qr_pixmap(url)
-        if not pix.isNull():
-            self.qr.setPixmap(pix)
+        if url != getattr(self, "_pairing_url", ""):
+            self._pairing_url = url
+            self.url_label.setText(url)
+            pix = qr_pixmap(url)
+            if not pix.isNull():
+                self.qr.setPixmap(pix)
+        self.code_label.setText(self._pair_caption())
         sessions = self.app.auth.public_sessions()
         sig = tuple((s["session_id"], s["allow_insert"], s["allow_capture"]) for s in sessions)
         if sig != self._session_sig:
@@ -771,20 +808,33 @@ class ClientWindow:
                 if not self.device_name.hasFocus():
                     self.device_name.setText(device_label(sessions[0]["device_id"], nicks, 1))
                 self.device_box.setText("\n".join(lines))
+                if any(item.get("remembered") for item in sessions):
+                    self.remember_box.blockSignals(True)
+                    self.remember_box.setChecked(True)
+                    self.remember_box.blockSignals(False)
         hist_sig = tuple(
             (item["bundle"].get("bundle_id"), item.get("attempt_result"))
             for item in self.app.history.items[-20:]
         )
         if hist_sig != self._hist_sig:
+            selected = None
+            current = self.recent_list.currentItem()
+            if current is not None:
+                selected = (current.data(Qt.UserRole) or {}).get("bundle_id")
             self._hist_sig = hist_sig
             self.recent_list.clear()
+            restore_row = None
             for item in reversed(self.app.history.items[-20:]):
                 bundle = item["bundle"]
                 preview = (bundle.get("text") or "").replace("\n", " ")[:48] or "（无文字）"
                 result = _result_label(item.get("attempt_result"))
                 row = QListWidgetItem(f"{result}  {len(bundle.get('assets') or [])}图  {preview}")
                 row.setData(Qt.UserRole, bundle)
+                if selected and bundle.get("bundle_id") == selected:
+                    restore_row = row
                 self.recent_list.addItem(row)
+            if restore_row is not None:
+                self.recent_list.setCurrentItem(restore_row)
 
     def set_insert(self, session_id: str, value: bool) -> None:
         self.app.auth.set_grants(session_id, allow_insert=value)

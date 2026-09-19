@@ -3,10 +3,14 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import secrets
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from urllib.parse import quote
+
+REMEMBER_TTL_S = 30 * 24 * 3600
 
 
 @dataclass
@@ -20,6 +24,17 @@ class Session:
     allow_insert: bool = False
     used_nonces: dict[str, float] = field(default_factory=dict)
     token: str = ""
+    remembered: bool = False
+    device_secret_once: str = ""
+
+
+@dataclass
+class TrustedDevice:
+    device_id: str
+    secret_hash: str
+    expires_at: float
+    allow_insert: bool = False
+    allow_capture: bool = False
 
 
 @dataclass
@@ -40,11 +55,61 @@ def pairing_page_url(base_url: str, code: str) -> str:
 
 
 class AuthService:
-    def __init__(self, *, pairing_ttl_s: float = 120, session_ttl_s: float = 8 * 3600):
+    def __init__(
+        self,
+        *,
+        pairing_ttl_s: float = 120,
+        session_ttl_s: float = 8 * 3600,
+        store_path: Path | None = None,
+    ):
         self.pairing_ttl_s = pairing_ttl_s
         self.session_ttl_s = session_ttl_s
+        self.store_path = Path(store_path) if store_path else None
         self._challenge: PairingChallenge | None = None
         self.sessions: dict[str, Session] = {}
+        self.trusted: dict[str, TrustedDevice] = {}
+        self._load_trusted()
+
+    def _load_trusted(self) -> None:
+        if self.store_path is None or not self.store_path.is_file():
+            return
+        try:
+            raw = json.loads(self.store_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return
+        now = time.time()
+        for item in raw if isinstance(raw, list) else []:
+            if not isinstance(item, dict):
+                continue
+            expires = float(item.get("expires_at") or 0)
+            device_id = str(item.get("device_id") or "")
+            secret_hash = str(item.get("secret_hash") or "")
+            if not device_id or not secret_hash or expires <= now:
+                continue
+            self.trusted[device_id] = TrustedDevice(
+                device_id=device_id,
+                secret_hash=secret_hash,
+                expires_at=expires,
+                allow_insert=bool(item.get("allow_insert")),
+                allow_capture=bool(item.get("allow_capture")),
+            )
+
+    def _save_trusted(self) -> None:
+        if self.store_path is None:
+            return
+        self.store_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = [
+            {
+                "device_id": item.device_id,
+                "secret_hash": item.secret_hash,
+                "expires_at": item.expires_at,
+                "allow_insert": item.allow_insert,
+                "allow_capture": item.allow_capture,
+            }
+            for item in self.trusted.values()
+            if time.time() <= item.expires_at
+        ]
+        self.store_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
     def current_pairing_challenge(self) -> str | None:
         challenge = self._live_challenge()
@@ -108,6 +173,47 @@ class AuthService:
         self.sessions[session.session_id] = session
         return session
 
+    def remember_device(self, session: Session) -> str:
+        secret = secrets.token_urlsafe(24)
+        session.remembered = True
+        session.expires_at = time.time() + REMEMBER_TTL_S
+        session.device_secret_once = secret
+        self.trusted[session.device_id] = TrustedDevice(
+            device_id=session.device_id,
+            secret_hash=hashlib.sha256(secret.encode("utf-8")).hexdigest(),
+            expires_at=session.expires_at,
+            allow_insert=session.allow_insert,
+            allow_capture=session.allow_capture,
+        )
+        self._save_trusted()
+        return secret
+
+    def take_device_secret(self, session: Session) -> str:
+        secret = session.device_secret_once
+        session.device_secret_once = ""
+        return secret
+
+    def resume_trusted(self, device_id: str, device_secret: str) -> Session:
+        item = self.trusted.get(str(device_id or ""))
+        if item is None or time.time() > item.expires_at:
+            raise ValueError("device expired")
+        digest = hashlib.sha256(str(device_secret or "").encode("utf-8")).hexdigest()
+        if not hmac.compare_digest(item.secret_hash, digest):
+            raise ValueError("device mismatch")
+        token = secrets.token_urlsafe(24)
+        session = Session(
+            device_id=item.device_id,
+            session_id=secrets.token_hex(8),
+            token_hash=hashlib.sha256(token.encode("utf-8")).hexdigest(),
+            expires_at=item.expires_at,
+            allow_insert=item.allow_insert,
+            allow_capture=item.allow_capture,
+            token=token,
+            remembered=True,
+        )
+        self.sessions[session.session_id] = session
+        return session
+
     def authorize(self, session_id: str, token: str, action: str) -> Session:
         session = self.sessions.get(session_id)
         if not session or time.time() > session.expires_at:
@@ -138,6 +244,11 @@ class AuthService:
             session.allow_insert = bool(allow_insert)
         if allow_capture is not None:
             session.allow_capture = bool(allow_capture)
+        trusted = self.trusted.get(session.device_id)
+        if trusted is not None:
+            trusted.allow_insert = session.allow_insert
+            trusted.allow_capture = session.allow_capture
+            self._save_trusted()
         return session
 
     def public_sessions(self) -> list[dict]:
@@ -148,13 +259,19 @@ class AuthService:
                 "allow_insert": s.allow_insert,
                 "allow_capture": s.allow_capture,
                 "allow_sync": s.allow_sync,
+                "remembered": s.remembered,
             }
             for s in self.sessions.values()
             if time.time() <= s.expires_at
         ]
 
     def revoke(self, session_id: str) -> bool:
-        return self.sessions.pop(session_id, None) is not None
+        session = self.sessions.pop(session_id, None)
+        if session is None:
+            return False
+        self.trusted.pop(session.device_id, None)
+        self._save_trusted()
+        return True
 
     def issue_nonce(self, session: Session) -> str:
         nonce = secrets.token_urlsafe(24)

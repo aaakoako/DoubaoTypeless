@@ -5,6 +5,7 @@ from doubao_typeless.app import V3App
 from doubao_typeless.services.byok import ByokService
 from doubao_typeless.storage.credentials import device_label
 from doubao_typeless.storage.settings_store import load_settings, save_settings
+from doubao_typeless.ui.desktop import STYLESHEET
 
 
 def test_device_label_uses_nickname_or_index():
@@ -84,3 +85,16 @@ def test_byok_extra_prompt_enters_payload():
     assert seen["model"] == "chosen"
     assert seen["temperature"] == 0.2
     assert seen["messages"][0] == {"role": "system", "content": "保持术语"}
+
+
+def test_native_stylesheet_covers_interactive_states():
+    for token in (
+        "QPushButton:hover",
+        "QPushButton:pressed",
+        "QPushButton:disabled",
+        "QPushButton:focus",
+        "QTabBar::tab:selected",
+        "border-bottom: 2px solid",
+        "QListWidget::item:selected",
+    ):
+        assert token in STYLESHEET
