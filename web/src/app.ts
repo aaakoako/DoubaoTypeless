@@ -105,6 +105,47 @@ export function boot(root: HTMLElement): void {
     $("sync").textContent = t;
   }
 
+  const DRAFT_KEY = "dt.v3.draft";
+
+  function persistDraft() {
+    try {
+      sessionStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({
+          text: state.text,
+          revision: state.revision,
+          draft_id: state.draft_id,
+          epoch: state.epoch,
+          assets: state.assets.map((a) => ({
+            id: a.id,
+            kind: a.kind,
+            asset_id: a.asset_id,
+            w: a.w,
+            h: a.h,
+            scene: a.scene,
+            preview: a.asset_id ? `/v3/assets/${a.asset_id}` : a.preview,
+          })),
+        })
+      );
+    } catch {
+      /* quota or private mode */
+    }
+  }
+
+  function restoreDraft() {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "null");
+      if (!saved || typeof saved !== "object") return;
+      state.text = String(saved.text || "");
+      state.revision = Number(saved.revision || 0);
+      state.draft_id = String(saved.draft_id || "");
+      state.epoch = String(saved.epoch || "");
+      state.assets = Array.isArray(saved.assets) ? saved.assets : [];
+    } catch {
+      /* ignore broken snapshot */
+    }
+  }
+
   function sendLabel(): string {
     if (!state.online || !state.session) return "未连接";
     if (state.uploading) return "上传中";
@@ -120,6 +161,7 @@ export function boot(root: HTMLElement): void {
     const btn = $("sendBtn") as HTMLButtonElement;
     btn.textContent = sendLabel();
     btn.disabled = !state.online || !state.session || state.uploading || (!state.text.trim() && !state.assets.length);
+    persistDraft();
     const strip = $("attachments");
     strip.replaceChildren();
     if (!state.assets.length) {
@@ -177,9 +219,16 @@ export function boot(root: HTMLElement): void {
       const msg = JSON.parse(ev.data);
       if (looksLikeKeyScript(msg)) return;
       if (msg.type === "session.ready") {
+        const same =
+          state.draft_id &&
+          state.draft_id === String(msg.draft_id || "") &&
+          state.epoch === String(msg.epoch || "");
         state.draft_id = String(msg.draft_id || state.draft_id);
         state.epoch = String(msg.epoch || state.epoch);
         if (typeof msg.revision === "number") state.revision = msg.revision;
+        if (!same && (state.text || state.assets.length)) {
+          sendDraft();
+        }
       }
       if (msg.type === "draft.ack") toast("电脑已收到 · 不自动发送");
       if (msg.type === "attempt.status") toast(`电脑：${msg.result} · 未发送Enter`);
@@ -547,6 +596,7 @@ export function boot(root: HTMLElement): void {
   } catch {
     state.session = null;
   }
+  restoreDraft();
   update();
   if (state.session) connect();
   else showPair();

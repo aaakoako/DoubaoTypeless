@@ -210,6 +210,17 @@ class ReviewPanel:
         row.addWidget(insert)
         layout.addLayout(row)
         self.widget = w
+        from PySide6.QtCore import QEvent, QObject
+
+        class _HideRelease(QObject):
+            def eventFilter(inner, _obj, ev):
+                if ev.type() == QEvent.Hide:
+                    self.app.review_editing = False
+                    self._editing = False
+                return False
+
+        self._hide_filter = _HideRelease(w)
+        w.installEventFilter(self._hide_filter)
         self.reload()
 
     def _mark_editing(self) -> None:
