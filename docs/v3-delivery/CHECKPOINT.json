@@ -3,11 +3,11 @@
   "product_goal": "完整 V3 可发布候选。规范入口 docs/v3-product/MASTER_PLAN.md。",
   "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
   "review_sha": "8326bb475707cc4d3f2948379b67a5397226709e",
-  "current_head": "b1fbb6106c1528e5033a9b69996723aa1e060ab2",
-  "working_tree": "dirty: F12 persist + review hide release",
-  "last_completed_slice": "REVIEW_8326BB4_PHONE_PERSIST",
-  "active_slice": "REBUILD_PACK_AND_NATIVE_GATES",
-  "next_action": "源码已变，隔离重建 onedir/ZIP 并记录新哈希。真机 Android+豆包、真实 Cursor、视觉像素仍待设备/人类。不要自签 RELEASE_READY。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
+  "current_head": "74600da87627b7b739df8326dba4b88774256f27",
+  "working_tree": "clean after pack-hash commit pending",
+  "last_completed_slice": "REVIEW_8326BB4_REBUILD",
+  "active_slice": "NATIVE_AND_DEVICE_GATES",
+  "next_action": "用隔离新包做原生窗口/长文像素核对；真机 Android+豆包与真实 Cursor 仍 BLOCKED_NATIVE。不要自签 RELEASE_READY。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
   "accepted_requirements": [
     "MASTER_PLAN 为唯一产品/执行规范",
     "插入并复制是主动作",
@@ -17,16 +17,15 @@
   ],
   "open_defects": [
     "A03 长文阅读态/像素仍需原生截图",
-    "A07/A12/F12 手机刷新后草稿与场景恢复未闭合",
+    "A07/A12/F12 刷新恢复已有 sessionStorage；逐图队列与白板场景重开仍需补",
     "A09 记住设备未闭合",
-    "A13/A14 hover/页签/全部 UI 线程调度仍需原生回归",
+    "A13/A14 hover/页签仍需原生回归",
     "A15 云端 libEGL 已补依赖，需看下一轮 CI",
-    "A16 包哈希需源码变化后重建，本轮未重打 EXE",
     "A18 真机 Android+豆包 与真实 Cursor 仍缺设备"
   ],
   "reopened_this_round": ["A01", "A02", "A04", "A05", "A06", "A07", "A08", "A10", "A11", "A12", "A15", "A17"],
   "closed_this_round": [],
-  "remediated_findings": ["F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08", "F09", "F10-partial", "F11-partial"],
+  "remediated_findings": ["F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08", "F09", "F10-partial", "F11-partial", "F12-partial"],
   "environment_blockers": [
     {
       "missing": "真实 Android + 豆包输入法 + 同网手机浏览器",
@@ -41,8 +40,15 @@
   ],
   "last_commands": [
     {"cmd": "python -m pytest -q", "exit_code": 0, "output": "168 passed"},
-    {"cmd": "node tests/test_v3_finish_editor.mjs", "exit_code": 0, "output": "finishEditor policy ok"}
+    {"cmd": "npm run typecheck && npm run build", "exit_code": 0, "output": "web built"},
+    {"cmd": "rebuild console+windowed onedir after 74600da", "exit_code": 0, "output": "console 035fca0b… windowed fe74c425…"}
   ],
+  "candidate_artifact": {
+    "source_sha": "74600da87627b7b739df8326dba4b88774256f27",
+    "console_exe_sha256": "035fca0bc7945e45e2338c4ed481887e548b7aec09fbe4b3a8bd14542b1c0677",
+    "windowed_exe_sha256": "fe74c4257d39e90a4f2d4e04ee646d86ebc01366fd9d07b110f6235e6e233c91",
+    "note": "隔离候选，未签名，不是 RELEASE_READY，不是 GitHub Release。"
+  },
   "independent_review": {
     "status": "REQUEST_CHANGES",
     "packet": "DoubaoTypeless_V3_Review_8326bb4",

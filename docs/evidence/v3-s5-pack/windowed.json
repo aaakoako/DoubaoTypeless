@@ -1,18 +1,12 @@
 {
   "name": "DoubaoTypelessV3PreviewUI",
   "console": false,
-  "source_head": "de7c1d2d86ee0f961cadee7053c6b986df0ac389",
-  "exe": "G:\\DoubaoTypeless\\DoubaoTypeless\\docs\\evidence\\v3-s5-pack\\dist\\DoubaoTypelessV3PreviewUI\\DoubaoTypelessV3PreviewUI.exe",
-  "exe_sha256": "46d67d702f08dba074a5237a45ba9867fa57ac409bd634e5c851efd65ef544fa",
-  "exe_bytes": 12686442,
-  "onedir_files": 891,
-  "onedir_bytes": 190479414,
-  "zip_sha256": "fd40c37ca59b58a32836914c17b4efae364cf1bc0efe86ae73c9d8ee32e91b18",
-  "zip_bytes": 82091316,
+  "source_head": "74600da87627b7b739df8326dba4b88774256f27",
+  "exe_sha256": "fe74c4257d39e90a4f2d4e04ee646d86ebc01366fd9d07b110f6235e6e233c91",
+  "exe_bytes": 12691210,
+  "zip_sha256": "85ebf8c39e0877d9c633c7352a94c2363dbe8b0a884f16b1826aa8cb6df28f6c",
   "webengine": false,
-  "console_pack_still_present": true,
   "release": false,
   "signed": false,
-  "built_at": "2026-09-19T10:21:06.682699+00:00",
-  "rebuilt_for": "independent_review_remediations"
+  "rebuilt_for": "review_8326bb4_fixes"
 }
