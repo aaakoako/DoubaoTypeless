@@ -2,23 +2,20 @@
   "schema_version": 1,
   "product_goal": "完整 V3 可发布候选。规范入口 docs/v3-product/MASTER_PLAN.md。",
   "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
-  "current_head": "449aab63c553e53868e1072c278a7d883a2505f9",
-  "working_tree": "clean after S4 conflict commit",
-  "last_completed_slice": "S4_conflict_session_quit",
-  "active_slice": "S5_pack_and_visual",
-  "next_action": "继续 S5：在预览实例未占用 dist 时重打隔离 onedir 并记录完整包哈希（A16）；补 A18 日用路径隔离；统一设置/HUD 视觉与图标。不要等待用户说继续。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
+  "current_head": "031e6082b47db3d9a1b774ede384a1709219bd29",
+  "working_tree": "clean after S5 pack commit",
+  "last_completed_slice": "S5_pack_and_visual",
+  "active_slice": "S5_windowed_pack_and_review_pack",
+  "next_action": "继续 S5：另打一份无控制台、独立命名的窗口包（不要只改现有 console 包）；整理独立复核材料与支持矩阵。真机 Android+豆包输入法和真实 Cursor Composer 仍 BLOCKED_NATIVE。不要等待用户说继续。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
   "accepted_requirements": [
     "MASTER_PLAN 为唯一产品/执行规范",
     "插入并复制是主动作",
-    "电脑改字时手机 WS 不得覆盖当前稿",
-    "撤销会话必须断开对应 WS",
+    "隔离 onedir 不得覆盖正在运行的 dist 预览",
+    "测试管道与日用实例隔离",
     "不自动 merge/tag/Release"
   ],
-  "open_defects": [
-    {"id": "A16", "severity": "P1", "note": "隔离 onedir 被运行中的预览锁住，未重打，旧包哈希作废"},
-    {"id": "A18", "severity": "P1", "note": "测试与日用实例管道隔离仍需加固"}
-  ],
-  "closed_this_round": ["A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08", "A09", "A10", "A11", "A12", "A13", "A14", "A15", "A17"],
+  "open_defects": [],
+  "closed_this_round": ["A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08", "A09", "A10", "A11", "A12", "A13", "A14", "A15", "A16", "A17", "A18"],
   "environment_blockers": [
     {
       "missing": "真实 Android + 豆包输入法 + 同网手机浏览器",
@@ -26,10 +23,9 @@
       "who": "设备持有者"
     },
     {
-      "missing": "未占用的 dist/DoubaoTypelessV3Preview",
-      "blocks": ["A16 重打包哈希"],
-      "who": "本机：结束预览后再打，或改输出目录",
-      "unblocked_work": "S5 视觉/图标/A18"
+      "missing": "真实 Cursor Composer 目标",
+      "blocks": ["J7 真目标图文"],
+      "who": "设备持有者；PasteTarget 不能代替"
     },
     {
       "missing": "独立复核签署",
@@ -38,11 +34,14 @@
     }
   ],
   "last_commands": [
-    {"cmd": "python -m pytest -q", "exit_code": 0, "output": "130 passed, 1 skipped"},
-    {"cmd": "python -m PyInstaller --noconfirm packaging/v3_preview.spec", "exit_code": 1, "output": "PermissionError dist locked by running preview"}
+    {"cmd": "python -m pytest -q", "exit_code": 0, "output": "140 passed"},
+    {"cmd": "python -m PyInstaller --noconfirm --distpath docs/evidence/v3-s5-pack/dist --workpath build/v3-s5 packaging/v3_preview.spec", "exit_code": 0, "output": "onedir 891 files; exe 1bf29ff4…; zip 2a08aba7…; smoke 8767 quit 0"}
   ],
   "candidate_artifact": {
-    "note": "旧 onedir 哈希失效。本次未能重打。不是 RELEASE_READY。"
+    "exe_sha256": "1bf29ff452495c3a1f3b0483834a3706b078e0019472ad83b522c586885a5f39",
+    "zip_sha256": "2a08aba77fa460966654eea52eeca9785567f060fa564adc5eccd145e45cfa6d",
+    "path": "docs/evidence/v3-s5-pack/dist/DoubaoTypelessV3Preview",
+    "note": "隔离 console onedir，不是 RELEASE_READY，未签名，不是 GitHub Release。"
   },
   "published": false,
   "task_complete": false
