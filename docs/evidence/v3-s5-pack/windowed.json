@@ -1,7 +1,7 @@
 {
   "name": "DoubaoTypelessV3PreviewUI",
   "console": false,
-  "source_note": "HUD button-row fix after 1418d4692ca146b409d6a40c5ff4594ced0e87b1",
+  "source_sha": "464af849526a9fefb746846276dbc726305cf904",
   "exe_sha256": "4bae6609e4b5af5e6c8508b774bb7b023b4c0462dd43625e95f96ee9617ae00f",
   "exe_bytes": 12692714,
   "zip_sha256": "f23be749dbc35c89e7e8f5a909c1f041ac33e0ffbd48ed691262336d853181df",

@@ -3,8 +3,8 @@
   "product_goal": "完整 V3 可发布候选。规范入口 docs/v3-product/MASTER_PLAN.md。",
   "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
   "review_sha": "8326bb475707cc4d3f2948379b67a5397226709e",
-  "current_head": "1418d4692ca146b409d6a40c5ff4594ced0e87b1",
-  "working_tree": "A03 native pack pixels + HUD button-row, pending commit/push",
+  "current_head": "464af849526a9fefb746846276dbc726305cf904",
+  "working_tree": "clean after A03 native pack pixels",
   "last_completed_slice": "A03_NATIVE_PACK_PIXELS",
   "active_slice": "REMAINING_OPEN_THEN_REVIEW",
   "next_action": "A07/A12 逐图队列与白板场景、A09 记住设备、A13/A14 hover/页签原生回归、A15 看下一轮 CI。真机 Android+豆包与真实 Cursor 仍只 BLOCKED_NATIVE。不要自签 RELEASE_READY。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
@@ -42,7 +42,7 @@
     {"cmd": "python tools/v3_native_pack_pixels.py", "exit_code": 0, "output": "ok true; HUD 400x300; insert button visible"}
   ],
   "candidate_artifact": {
-    "source_parent": "1418d4692ca146b409d6a40c5ff4594ced0e87b1",
+    "source_sha": "464af849526a9fefb746846276dbc726305cf904",
     "console_exe_sha256": "035fca0bc7945e45e2338c4ed481887e548b7aec09fbe4b3a8bd14542b1c0677",
     "windowed_exe_sha256": "4bae6609e4b5af5e6c8508b774bb7b023b4c0462dd43625e95f96ee9617ae00f",
     "windowed_zip_sha256": "f23be749dbc35c89e7e8f5a909c1f041ac33e0ffbd48ed691262336d853181df",
