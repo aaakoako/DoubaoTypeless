@@ -4,8 +4,8 @@
   "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
   "review_sha": "c3333a55a516022397772eea932c8a21c7a26cd0",
   "product_source_at_review": "69eb4f875be0fea1ab12cce7b1e0d36f40d81b34",
-  "current_head": "uncommitted-c3333a5-remediation",
-  "working_tree": "c3333a5 R01-R08 remediations + rebuilt windowed pack",
+  "current_head": "3c5dd8ec1aa19b0e3429b33f559aac9fbc6e745c",
+  "working_tree": "clean after CHECKPOINT bind",
   "last_completed_slice": "REVIEW_C3333A5_R01_R08",
   "active_slice": "A18_DEVICE_AND_INDEPENDENT_SIGN",
   "next_action": "真机 Android+豆包 与真实 Cursor 仍只 BLOCKED_NATIVE。独立复核再看本轮源码与新窗口包哈希。不要自签 RELEASE_READY。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
@@ -44,7 +44,7 @@
     {"cmd": "PyInstaller packaging/v3_preview_windowed.spec", "exit_code": 0, "output": "windowed onedir isolated"}
   ],
   "candidate_artifact": {
-    "source_sha": "pending-commit",
+    "source_sha": "3c5dd8ec1aa19b0e3429b33f559aac9fbc6e745c",
     "console_exe_sha256": "035fca0bc7945e45e2338c4ed481887e548b7aec09fbe4b3a8bd14542b1c0677",
     "windowed_exe_sha256": "5891472bb331b2e2bf15fc1057d3d62b6fe94f6ddf0c82d0754404c8288d4538",
     "windowed_zip_sha256": "6fdc6137d0ef0e5c84ce09db0b02f7d46dd26b9c43bca5f3a047a8facce5e9cd",

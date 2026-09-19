@@ -1,7 +1,7 @@
 {
   "name": "DoubaoTypelessV3PreviewUI",
   "console": false,
-  "source_note": "Built from working tree remediating review c3333a5; source_sha filled after commit.",
+  "source_sha": "3c5dd8ec1aa19b0e3429b33f559aac9fbc6e745c",
   "previous_exe_sha256": "4bae6609e4b5af5e6c8508b774bb7b023b4c0462dd43625e95f96ee9617ae00f",
   "previous_zip_sha256": "f23be749dbc35c89e7e8f5a909c1f041ac33e0ffbd48ed691262336d853181df",
   "exe_sha256": "5891472bb331b2e2bf15fc1057d3d62b6fe94f6ddf0c82d0754404c8288d4538",
