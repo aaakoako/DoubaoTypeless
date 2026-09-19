@@ -86,6 +86,7 @@ def test_settings_store_never_writes_daily_use(tmp_path):
     stored = load_settings(data_dir)
     assert stored["byok_api_key"] == "sk-isolated"
     assert (data_dir / "settings.json").is_file()
+    assert "sk-isolated" not in (data_dir / "settings.json").read_text(encoding="utf-8")
     assert daily.read_text(encoding="utf-8") == '{"llm_api_key":"keep"}'
     assert not (tmp_path / "config.json").exists()
 
@@ -259,7 +260,9 @@ def test_production_settings_and_pc_copy(tmp_path):
                 await page.goto(f"http://127.0.0.1:{port}/")
                 await page.wait_for_selector("#pairCode")
                 pair_copy = await page.locator("#sheetCard").inner_text()
-                assert "三步上手" in pair_copy
+                assert "二维码" in pair_copy
+                assert "短码" in pair_copy
+                assert "跳过纠错" in pair_copy
                 assert "跳过纠错" in pair_copy
                 await page.fill("#pairCode", auth.new_pairing_challenge())
                 async with page.expect_response(lambda r: r.url.endswith("/v3/pair") and r.request.method == "POST") as info:

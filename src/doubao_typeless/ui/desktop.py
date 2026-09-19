@@ -8,7 +8,15 @@ from pathlib import Path
 from typing import Callable
 
 from doubao_typeless.runtime import lan_ip
+from doubao_typeless.storage.credentials import pairing_page_url
 from doubao_typeless.storage.settings_store import load_settings, save_settings
+from doubao_typeless.storage.vocab_store import load_vocab, save_vocab
+
+PROVIDER_PRESETS = [
+    ("自定义", "", ""),
+    ("DeepSeek", "https://api.deepseek.com/v1", "deepseek-chat"),
+    ("智谱 GLM", "https://open.bigmodel.cn/api/paas/v4", "glm-4-flash"),
+]
 from doubao_typeless.ui.filelog import FileLogger
 from doubao_typeless.ui.single_instance import listen_for_commands, request_quit, request_show
 from doubao_typeless.ui.v3_startup import apply_v3_autostart
@@ -222,6 +230,7 @@ class ClientWindow:
         from PySide6.QtGui import QGuiApplication
         from PySide6.QtWidgets import (
             QCheckBox,
+            QComboBox,
             QFormLayout,
             QFrame,
             QHBoxLayout,
@@ -332,6 +341,11 @@ class ClientWindow:
         sl.addRow(self.autostart)
         sl.addRow(self.start_min)
         sl.addRow(QLabel("可选模型。不配密钥也能用文字、图片和白板。"))
+        self.byok_provider = QComboBox()
+        for name, _url, _model in PROVIDER_PRESETS:
+            self.byok_provider.addItem(name)
+        self.byok_provider.currentIndexChanged.connect(self._apply_provider)
+        sl.addRow("服务商", self.byok_provider)
         self.byok_endpoint = QLineEdit(str(stored.get("byok_endpoint") or ""))
         self.byok_key = QLineEdit(str(stored.get("byok_api_key") or ""))
         self.byok_key.setEchoMode(QLineEdit.Password)
@@ -342,14 +356,23 @@ class ClientWindow:
         self.byok_status = QLabel("")
         self.byok_status.setObjectName("muted")
         sl.addRow(self.byok_status)
+        sl.addRow(QLabel("词库（仅本预览目录，一行 错词 -> 正确）"))
+        self.vocab = QPlainTextEdit()
+        self.vocab.setPlainText(load_vocab(app.data_dir))
+        self.vocab.setFixedHeight(120)
+        sl.addRow(self.vocab)
         srow = QHBoxLayout()
         probe = QPushButton("测试连接")
         probe.setObjectName("ghost")
         probe.clicked.connect(self.probe_byok)
+        export = QPushButton("导出诊断")
+        export.setObjectName("ghost")
+        export.clicked.connect(self.export_diagnostics)
         save = QPushButton("保存设置")
         save.setObjectName("primary")
         save.clicked.connect(self.save_settings)
         srow.addWidget(probe)
+        srow.addWidget(export)
         srow.addWidget(save)
         sl.addRow(srow)
         settings_scroll = QScrollArea()
@@ -381,16 +404,30 @@ class ClientWindow:
         self.tabs = tabs
         self.widget = w
         self._clipboard = QGuiApplication.clipboard()
+        self._hist_sig = None
         self.timer = QTimer(w)
         self.timer.timeout.connect(self.refresh)
         self.timer.start(1000)
         self.refresh()
 
+    def _apply_provider(self, index: int) -> None:
+        if index <= 0 or index >= len(PROVIDER_PRESETS):
+            return
+        _name, url, model = PROVIDER_PRESETS[index]
+        if url:
+            self.byok_endpoint.setText(url)
+        if model:
+            self.byok_model.setText(model)
+
     def phone_url(self) -> str:
         return f"http://{lan_ip()}:{self.app.port}/"
 
+    def pairing_url(self) -> str:
+        code = self.app.auth.current_pairing_challenge() or self.app.auth.new_pairing_challenge()
+        return pairing_page_url(self.phone_url(), code)
+
     def copy_url(self) -> None:
-        self._clipboard.setText(self.phone_url())
+        self._clipboard.setText(self.pairing_url())
 
     def rotate_code(self) -> None:
         self.app.auth.rotate_pairing_challenge()
@@ -415,6 +452,8 @@ class ClientWindow:
             self._on_hide()
             save_settings(self.app.data_dir, {"tray_explained": True})
         self.widget.hide()
+        if getattr(self, "timer", None):
+            self.timer.stop()
         if self._on_hide:
             self._on_hide()
 
@@ -438,11 +477,12 @@ class ClientWindow:
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QListWidgetItem, QPushButton
 
-        url = self.phone_url()
+        url = self.pairing_url()
         self.url_label.setText(url)
-        code = self.app.auth.current_pairing_challenge() or self.app.auth.new_pairing_challenge()
+        code = self.app.auth.current_pairing_challenge() or ""
+        short = self.app.auth.current_short_code() or ""
         remain = int(self.app.auth.pairing_remaining_s())
-        self.code_label.setText(f"配对码 {code}  （{remain}s，一次性）")
+        self.code_label.setText(f"扫码即连。备用短码 {short}  （{remain}s）")
         pix = qr_pixmap(url)
         if not pix.isNull():
             self.qr.setPixmap(pix)
@@ -476,13 +516,19 @@ class ClientWindow:
                     self.grant_row.addWidget(allow_c)
                     self.grant_row.addWidget(revoke)
                 self.device_box.setText("\n".join(lines))
-        self.recent_list.clear()
-        for item in reversed(self.app.history.items[-20:]):
-            bundle = item["bundle"]
-            preview = (bundle.get("text") or "").replace("\n", " ")[:48] or "（无文字）"
-            row = QListWidgetItem(f"{item.get('attempt_result')}  {len(bundle.get('assets') or [])}图  {preview}")
-            row.setData(Qt.UserRole, bundle)
-            self.recent_list.addItem(row)
+        hist_sig = tuple(
+            (item["bundle"].get("bundle_id"), item.get("attempt_result"))
+            for item in self.app.history.items[-20:]
+        )
+        if hist_sig != self._hist_sig:
+            self._hist_sig = hist_sig
+            self.recent_list.clear()
+            for item in reversed(self.app.history.items[-20:]):
+                bundle = item["bundle"]
+                preview = (bundle.get("text") or "").replace("\n", " ")[:48] or "（无文字）"
+                row = QListWidgetItem(f"{item.get('attempt_result')}  {len(bundle.get('assets') or [])}图  {preview}")
+                row.setData(Qt.UserRole, bundle)
+                self.recent_list.addItem(row)
 
     def set_insert(self, session_id: str, value: bool) -> None:
         self.app.auth.set_grants(session_id, allow_insert=value)
@@ -507,9 +553,11 @@ class ClientWindow:
             "byok_model": self.byok_model.text().strip(),
         }
         save_settings(self.app.data_dir, payload)
+        save_vocab(self.app.data_dir, self.vocab.toPlainText())
         stored = load_settings(self.app.data_dir)
         self.app.byok.endpoint = stored["byok_endpoint"]
         self.app.byok.api_key = stored["byok_api_key"]
+        self.app.byok.model = stored["byok_model"]
         ok, err = apply_v3_autostart(bool(stored["autostart"]))
         if stored["autostart"] and not ok:
             self.byok_status.setText(f"设置已保存。开机自启未写入：{err}")
@@ -523,25 +571,16 @@ class ClientWindow:
 
         endpoint = self.byok_endpoint.text().strip()
         key = self.byok_key.text().strip()
+        model = self.byok_model.text().strip()
         if not endpoint or not key:
             self.byok_status.setText(ERROR_LABELS["no_key"])
             return
+        from doubao_typeless.app import _httpx_json_post
 
-        def post(url, body, headers):
-            import httpx
-
-            response = httpx.post(url, json=body, headers=headers, timeout=8.0)
-            response.raise_for_status()
-            data = response.json()
-            text = data.get("text")
-            if not text:
-                choices = data.get("choices") or [{}]
-                text = ((choices[0] or {}).get("message") or {}).get("content") or ""
-            return {"text": text}
-
-        svc = ByokService(endpoint=endpoint, api_key=key, post=post)
+        svc = ByokService(endpoint=endpoint, api_key=key, model=model, post=_httpx_json_post)
         out = svc.polish("ping", draft_id="probe", revision=1, current_draft_id="probe", current_revision=1)
-        self.byok_status.setText(out.get("message") or out.get("status") or "")
+        used = out.get("model") or model
+        self.byok_status.setText(f"{out.get('message') or out.get('status') or ''}  model={used}")
 
     def _selected_bundle(self):
         from PySide6.QtCore import Qt
@@ -576,10 +615,18 @@ class ClientWindow:
         self.app._last_attempt = None
         self.app.insert_last()
 
+    def export_diagnostics(self) -> None:
+        from doubao_typeless.services.v3_diagnostics import write_snapshot
+
+        path = write_snapshot(self.app)
+        self.byok_status.setText(f"诊断已写出 {path.name}，不含密钥和正文")
+
     def show_window(self) -> None:
         self.widget.show()
         self.widget.raise_()
         self.widget.activateWindow()
+        if getattr(self, "timer", None):
+            self.timer.start(1000)
         self.refresh()
 
 

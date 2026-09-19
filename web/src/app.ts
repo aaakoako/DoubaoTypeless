@@ -408,25 +408,39 @@ export function boot(root: HTMLElement): void {
     );
   };
 
+  function pairCodeFromUrl(): string {
+    try {
+      return new URL(location.href).searchParams.get("pair") || "";
+    } catch {
+      return "";
+    }
+  }
+
+  async function submitPair(code: string): Promise<boolean> {
+    const res = await fetch("/v3/pair", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+    if (!res.ok) return false;
+    state.session = await res.json();
+    sessionStorage.setItem("dt.v3.session", JSON.stringify(state.session));
+    $("sheet").classList.remove("show");
+    connect();
+    update();
+    return true;
+  }
+
   function showPair() {
     const sheet = $("sheet");
-    $("sheetCard").innerHTML = `<h2>连接这台电脑</h2><p>三步上手：打开地址 → 输入配对码 → 电脑确认插入/截图权限。手机不能自授按键或截屏。练习插入用电脑 Alt+I。召回是 Alt+Shift+I，不是跳过纠错。</p><input id="pairCode" /><button class="primary" id="pairGo">配对</button>`;
+    const preset = pairCodeFromUrl();
+    $("sheetCard").innerHTML = `<h2>连接这台电脑</h2><p>扫电脑上的二维码即可配对。备用才手输 4 位短码。手机不能自授按键或截屏。练习插入用电脑 Alt+I。召回是 Alt+Shift+I，不是跳过纠错。</p><input id="pairCode" /><button class="primary" id="pairGo">配对</button>`;
+    (document.getElementById("pairCode") as HTMLInputElement).value = preset;
     sheet.classList.add("show");
     $("pairGo").onclick = async () => {
-      const res = await fetch("/v3/pair", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          code: (document.getElementById("pairCode") as HTMLInputElement).value,
-        }),
-      });
-      if (!res.ok) return;
-      state.session = await res.json();
-      sessionStorage.setItem("dt.v3.session", JSON.stringify(state.session));
-      sheet.classList.remove("show");
-      connect();
-      update();
+      await submitPair((document.getElementById("pairCode") as HTMLInputElement).value);
     };
+    if (preset) void submitPair(preset);
   }
 
   $("historyBtn").onclick = async () => {

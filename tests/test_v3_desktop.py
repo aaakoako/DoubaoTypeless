@@ -40,7 +40,8 @@ def test_client_window_shows_live_url_and_grants(tmp_path):
         win = ClientWindow(app)
         assert str(app.port) in win.url_label.text()
         assert "http://" in win.url_label.text()
-        assert "配对码" in win.code_label.text()
+        assert "扫码即连" in win.code_label.text()
+        assert "?pair=" in win.url_label.text()
         assert win.qr.pixmap() is not None and not win.qr.pixmap().isNull()
         code = app.auth.current_pairing_challenge()
         session = app.auth.complete_pairing(code, allow_insert=False, allow_capture=False)
@@ -76,6 +77,7 @@ def test_settings_and_review_use_same_store(tmp_path, monkeypatch):
     stored = load_settings(data)
     assert stored["byok_api_key"] == "sk-desktop-test"
     assert stored["hotkey_insert"] == "<ctrl>+<alt>+i"
+    assert "sk-desktop-test" not in (data / "settings.json").read_text(encoding="utf-8")
     assert daily.read_text(encoding="utf-8") == '{"llm_api_key":"keep-daily"}'
     app.draft.text = "电脑稿"
     panel = ReviewPanel(app)

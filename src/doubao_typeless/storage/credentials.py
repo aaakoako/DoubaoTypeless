@@ -6,6 +6,7 @@ import hmac
 import secrets
 import time
 from dataclasses import dataclass, field
+from urllib.parse import quote
 
 
 @dataclass
@@ -21,38 +22,57 @@ class Session:
     token: str = ""
 
 
+@dataclass
+class PairingChallenge:
+    long_code: str
+    short_code: str
+    expires_at: float
+
+
+def pairing_page_url(base_url: str, code: str) -> str:
+    base = (base_url or "").rstrip("/") + "/"
+    return f"{base}?pair={quote(code or '', safe='')}"
+
+
 class AuthService:
     def __init__(self, *, pairing_ttl_s: float = 120, session_ttl_s: float = 8 * 3600):
         self.pairing_ttl_s = pairing_ttl_s
         self.session_ttl_s = session_ttl_s
-        self._challenge: tuple[str, float] | None = None
+        self._challenge: PairingChallenge | None = None
         self.sessions: dict[str, Session] = {}
 
     def current_pairing_challenge(self) -> str | None:
+        challenge = self._live_challenge()
+        return None if challenge is None else challenge.long_code
+
+    def current_short_code(self) -> str | None:
+        challenge = self._live_challenge()
+        return None if challenge is None else challenge.short_code
+
+    def _live_challenge(self) -> PairingChallenge | None:
         if not self._challenge:
             return None
-        code, expiry = self._challenge
-        if time.monotonic() > expiry:
+        if time.monotonic() > self._challenge.expires_at:
             self._challenge = None
             return None
-        return code
+        return self._challenge
 
     def pairing_remaining_s(self) -> float:
-        if not self._challenge:
+        challenge = self._live_challenge()
+        if challenge is None:
             return 0.0
-        remaining = self._challenge[1] - time.monotonic()
-        if remaining <= 0:
-            self._challenge = None
-            return 0.0
-        return remaining
+        return max(0.0, challenge.expires_at - time.monotonic())
 
     def new_pairing_challenge(self) -> str:
         existing = self.current_pairing_challenge()
         if existing:
             return existing
-        code = secrets.token_urlsafe(8)
-        self._challenge = (code, time.monotonic() + self.pairing_ttl_s)
-        return code
+        self._challenge = PairingChallenge(
+            long_code=secrets.token_urlsafe(8),
+            short_code=f"{secrets.randbelow(10000):04d}",
+            expires_at=time.monotonic() + self.pairing_ttl_s,
+        )
+        return self._challenge.long_code
 
     def rotate_pairing_challenge(self) -> str:
         self._challenge = None
@@ -61,11 +81,14 @@ class AuthService:
     def complete_pairing(self, code: str, *, allow_insert: bool = False, allow_capture: bool = False) -> Session:
         if not self._challenge:
             raise ValueError("no pairing challenge")
-        expected, expiry = self._challenge
+        expected = self._challenge
         self._challenge = None
-        if time.monotonic() > expiry:
+        if time.monotonic() > expected.expires_at:
             raise ValueError("pairing expired")
-        if not hmac.compare_digest(expected, code):
+        offered = (code or "").strip()
+        long_ok = len(offered) == len(expected.long_code) and hmac.compare_digest(expected.long_code, offered)
+        short_ok = len(offered) == 4 and hmac.compare_digest(expected.short_code, offered)
+        if not (long_ok or short_ok):
             raise ValueError("pairing mismatch")
         token = secrets.token_urlsafe(24)
         session = Session(

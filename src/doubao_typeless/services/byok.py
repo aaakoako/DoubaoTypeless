@@ -5,16 +5,42 @@ from typing import Any, Callable
 from urllib.parse import urlparse
 
 
+def chat_url(endpoint: str) -> str:
+    url = (endpoint or "").rstrip("/")
+    if not url:
+        return ""
+    if url.endswith("/chat/completions"):
+        return url
+    return url + "/chat/completions"
+
+
+def extract_model_text(body: dict[str, Any], original: str) -> str:
+    if not isinstance(body, dict):
+        return ""
+    direct = str(body.get("text") or "").strip()
+    if direct:
+        return direct
+    choices = body.get("choices") or []
+    if choices:
+        message = (choices[0] or {}).get("message") or {}
+        content = message.get("content")
+        if isinstance(content, str) and content.strip():
+            return content.strip()
+    return ""
+
+
 class ByokService:
     def __init__(
         self,
         *,
         endpoint: str = "",
         api_key: str = "",
+        model: str = "",
         post: Callable[[str, dict[str, Any], dict[str, str]], dict[str, Any]] | None = None,
     ):
         self.endpoint = (endpoint or "").strip()
         self.api_key = (api_key or "").strip()
+        self.model = (model or "").strip()
         self._post = post
 
     def available(self) -> bool:
@@ -37,11 +63,15 @@ class ByokService:
         if draft_id != current_draft_id or revision != current_revision:
             return {"status": "stale", "reason": "draft moved", "text": None}
         if self._post is None:
-            return {"status": "skipped", "reason": "no_transport", "text": text}
+            return {"status": "skipped", "reason": "no_transport", "message": ERROR_LABELS["no_transport"], "text": text}
         try:
             body = self._post(
-                self.endpoint,
-                {"model": "user", "input": text},
+                chat_url(self.endpoint),
+                {
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": text}],
+                    "input": text,
+                },
                 {"Authorization": f"Bearer {self.api_key}"},
             )
         except Exception as exc:
@@ -54,8 +84,15 @@ class ByokService:
             }
         if draft_id != current_draft_id or revision != current_revision:
             return {"status": "stale", "reason": "draft moved after response", "text": None}
-        out = str(body.get("text") or text)
-        return {"status": "ok", "text": out, "reason": ""}
+        out = extract_model_text(body or {}, text)
+        if not out:
+            return {
+                "status": "error",
+                "reason": "format",
+                "message": ERROR_LABELS["format"],
+                "text": text,
+            }
+        return {"status": "ok", "text": out, "reason": "", "model": self.model}
 
 
 ERROR_LABELS = {
@@ -66,6 +103,7 @@ ERROR_LABELS = {
     "tls": "证书或 TLS 失败，原文仍可插入",
     "format": "返回格式无法使用，原文仍可插入",
     "no_key": "未配置密钥，跳过模型，原文可用",
+    "no_transport": "模型通道未接通，原文可用",
 }
 
 

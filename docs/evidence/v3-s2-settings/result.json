@@ -1,0 +1,17 @@
+{
+  "slice": "S2_byok_qr_vocab",
+  "source_head_before": "6fdcc2acfc723609a01be3910df3aec7011706b7",
+  "status": "IMPLEMENTED",
+  "pytest": "126 passed, 1 skipped",
+  "not_cursor": true,
+  "not_release": true,
+  "fixed": [
+    "A09 QR encodes ?pair= long code; 4-digit short code is backup; phone auto-submits pair query",
+    "A10 BYOK POST uses selected model and chat/completions; empty/reasoning-only keeps original text",
+    "A11 API key leaves settings.json; Windows Credential Manager or isolated secrets file",
+    "A13 recent list rebuilds only when history identity changes; refresh timer stops when hidden",
+    "Settings: provider presets, isolated vocabulary.txt, redacted diagnostics export"
+  ],
+  "production_frontend_rebuilt": true,
+  "html_board_is_not_product": true
+}

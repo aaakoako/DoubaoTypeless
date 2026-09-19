@@ -24,6 +24,17 @@ from doubao_typeless.adapters.observable_target import from_env as observer_from
 from doubao_typeless.ui.hud import HudController
 
 
+def _httpx_json_post(url: str, body: dict, headers: dict) -> dict:
+    import httpx
+
+    response = httpx.post(url, json=body, headers=headers, timeout=8.0)
+    response.raise_for_status()
+    data = response.json()
+    if not isinstance(data, dict):
+        raise ValueError("model response is not an object")
+    return data
+
+
 _log_impl = print
 
 
@@ -62,7 +73,12 @@ class V3App:
         from doubao_typeless.storage.settings_store import load_settings
 
         stored = load_settings(self.data_dir)
-        self.byok = ByokService(endpoint=stored.get("byok_endpoint") or "", api_key=stored.get("byok_api_key") or "")
+        self.byok = ByokService(
+            endpoint=stored.get("byok_endpoint") or "",
+            api_key=stored.get("byok_api_key") or "",
+            model=stored.get("byok_model") or "",
+            post=_httpx_json_post,
+        )
         self.hud = HudController(on_insert=self.insert_current, on_expand=lambda: self._notify_ui("expand"))
         self._observer = observer_from_env()
         self._last_attempt: Attempt | None = None

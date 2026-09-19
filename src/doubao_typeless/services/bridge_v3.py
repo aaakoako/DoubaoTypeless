@@ -280,12 +280,18 @@ class V3Bridge:
         self.byok.endpoint = new_endpoint
         if "api_key" in body:
             self.byok.api_key = str(body.get("api_key") or "").strip()
+        if "model" in body:
+            self.byok.model = str(body.get("model") or "").strip()
         if self.data_dir is not None:
             from doubao_typeless.storage.settings_store import save_settings
 
             save_settings(
                 self.data_dir,
-                {"byok_endpoint": self.byok.endpoint, "byok_api_key": self.byok.api_key},
+                {
+                    "byok_endpoint": self.byok.endpoint,
+                    "byok_api_key": self.byok.api_key,
+                    "byok_model": getattr(self.byok, "model", ""),
+                },
             )
         return web.json_response({"ok": True, "redacted": redact_for_log(self.byok.api_key)})
 
