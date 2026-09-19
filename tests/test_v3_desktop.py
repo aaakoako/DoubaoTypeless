@@ -88,6 +88,12 @@ def test_settings_and_review_use_same_store(tmp_path, monkeypatch):
     assert app.phone_pending["text"] == "手机新稿"
     panel.note_phone_pending()
     assert "手机有更新" in panel.banner.text()
+    panel.keep_pc()
+    assert app.review_editing is True
+    assert panel.editor.toPlainText() == "电脑稿已改"
+    panel.take_phone()
+    assert app.draft.text == "手机新稿"
+    assert panel.editor.toPlainText() == "手机新稿"
     win.widget.show()
     win.hide_to_tray()
     assert win.widget.isVisible() is False

@@ -2,32 +2,34 @@
   "schema_version": 1,
   "product_goal": "完整 V3 可发布候选。规范入口 docs/v3-product/MASTER_PLAN.md。",
   "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
-  "current_head": "34d9308c7cc36bf99f220a29b8be28259e7494ad",
-  "working_tree": "clean after S3 upload commit",
-  "last_completed_slice": "S3_upload_auth_chunk",
-  "active_slice": "S4_conflict_pack_identity",
-  "next_action": "继续 S4：电脑/手机改字冲突产品化（A12）、素材所有权与撤销复核（A17）、Qt 退出加固（A14）、源码变化后重打隔离包（A16）。不要等待用户说继续。不要 merge/tag/Release。",
+  "current_head": "3094f2ac156162a8f406980925ddffb48975dac8",
+  "working_tree": "S4 conflict/session/quit implemented, commit pending",
+  "last_completed_slice": "S4_conflict_session_quit",
+  "active_slice": "S5_pack_and_visual",
+  "next_action": "继续 S5：在预览实例未占用 dist 时重打隔离 onedir 并记录完整包哈希（A16）；补 A18 日用路径隔离；统一设置/HUD 视觉与图标。不要等待用户说继续。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
   "accepted_requirements": [
     "MASTER_PLAN 为唯一产品/执行规范",
     "插入并复制是主动作",
-    "BYOK 发送所选模型且不阻塞原文",
-    "密钥不进 settings.json",
-    "未传完的图不得先发残缺文字",
+    "电脑改字时手机 WS 不得覆盖当前稿",
+    "撤销会话必须断开对应 WS",
     "不自动 merge/tag/Release"
   ],
   "open_defects": [
-    {"id": "A12", "severity": "P1", "note": "电脑/手机改字冲突策略未完全产品化"},
-    {"id": "A14", "severity": "P1", "note": "Qt 线程/退出路径仍需加固"},
-    {"id": "A16", "severity": "P1", "note": "包装身份/窗口模式需随源码重打"},
-    {"id": "A17", "severity": "P0", "note": "session/revoke/asset owner 仍需完整复核"},
-    {"id": "A18", "severity": "P1", "note": "测试与日用实例管道隔离"}
+    {"id": "A16", "severity": "P1", "note": "隔离 onedir 被运行中的预览锁住，未重打，旧包哈希作废"},
+    {"id": "A18", "severity": "P1", "note": "测试与日用实例管道隔离仍需加固"}
   ],
-  "closed_this_round": ["A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08", "A09", "A10", "A11", "A13", "A15"],
+  "closed_this_round": ["A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08", "A09", "A10", "A11", "A12", "A13", "A14", "A15", "A17"],
   "environment_blockers": [
     {
       "missing": "真实 Android + 豆包输入法 + 同网手机浏览器",
       "blocks": ["真机扫码/相册/白板手感"],
       "who": "设备持有者"
+    },
+    {
+      "missing": "未占用的 dist/DoubaoTypelessV3Preview",
+      "blocks": ["A16 重打包哈希"],
+      "who": "本机：结束预览后再打，或改输出目录",
+      "unblocked_work": "S5 视觉/图标/A18"
     },
     {
       "missing": "独立复核签署",
@@ -36,11 +38,11 @@
     }
   ],
   "last_commands": [
-    {"cmd": "npm run typecheck && npm run build", "exit_code": 0, "output": "web/dist index-BPhrVzIw.js"},
-    {"cmd": "python -m pytest -q", "exit_code": 0, "output": "127 passed, 1 skipped"}
+    {"cmd": "python -m pytest -q", "exit_code": 0, "output": "130 passed, 1 skipped"},
+    {"cmd": "python -m PyInstaller --noconfirm packaging/v3_preview.spec", "exit_code": 1, "output": "PermissionError dist locked by running preview"}
   ],
   "candidate_artifact": {
-    "note": "S0–S3 源码已变，旧 onedir 哈希失效。不是 RELEASE_READY。"
+    "note": "旧 onedir 哈希失效。本次未能重打。不是 RELEASE_READY。"
   },
   "published": false,
   "task_complete": false

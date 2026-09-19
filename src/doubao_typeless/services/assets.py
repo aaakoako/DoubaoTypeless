@@ -163,7 +163,13 @@ class UploadService:
             self._purge(session)
             return session["completed"]
         meta = self.store.put_png(payload, width=image.width, height=image.height, role="photo")
-        self.db.upsert_asset(meta["asset_id"], meta["sha256"], meta["bytes"], referenced=False)
+        self.db.upsert_asset(
+            meta["asset_id"],
+            meta["sha256"],
+            meta["bytes"],
+            referenced=False,
+            owner_session_id=str(session.get("owner") or owner_session_id or ""),
+        )
         session["completed"] = meta
         self._purge(session)
         return meta

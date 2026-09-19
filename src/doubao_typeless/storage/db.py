@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS assets (
     sha256 TEXT NOT NULL,
     bytes INTEGER NOT NULL,
     referenced INTEGER NOT NULL DEFAULT 0,
-    created_at REAL NOT NULL
+    created_at REAL NOT NULL,
+    owner_session_id TEXT
 );
 CREATE TABLE IF NOT EXISTS bundles (
     bundle_id TEXT PRIMARY KEY,
@@ -66,6 +67,9 @@ class V3DB:
         with self._lock:
             self.conn.executescript(SCHEMA)
             self.conn.execute("INSERT OR IGNORE INTO migrations(id, name) VALUES (1, 'v3-init')")
+            cols = {row[1] for row in self.conn.execute("PRAGMA table_info(assets)")}
+            if "owner_session_id" not in cols:
+                self.conn.execute("ALTER TABLE assets ADD COLUMN owner_session_id TEXT")
             self.conn.commit()
 
     def upsert_asset(
@@ -76,11 +80,12 @@ class V3DB:
         *,
         referenced: bool = False,
         created_at: float | None = None,
+        owner_session_id: str = "",
     ) -> None:
         with self._lock:
             self.conn.execute(
-            "INSERT OR REPLACE INTO assets(asset_id, sha256, bytes, referenced, created_at) VALUES (?,?,?,?,?)",
-            (asset_id, sha256, nbytes, int(referenced), time.time() if created_at is None else created_at),
+            "INSERT OR REPLACE INTO assets(asset_id, sha256, bytes, referenced, created_at, owner_session_id) VALUES (?,?,?,?,?,?)",
+            (asset_id, sha256, nbytes, int(referenced), time.time() if created_at is None else created_at, owner_session_id or None),
         )
         self.conn.commit()
 

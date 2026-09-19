@@ -197,11 +197,12 @@ class ReviewPanel:
         self.banner.show()
 
     def take_phone(self) -> None:
+        self.app.accept_phone_pending()
         self.reload()
 
     def keep_pc(self) -> None:
+        self.app.keep_pc_edit()
         self.banner.hide()
-        self.app.review_editing = True
 
     def copy_only(self) -> None:
         self.app.draft.text = self.editor.toPlainText()
@@ -218,7 +219,8 @@ class ReviewPanel:
         self.widget.hide()
 
     def show(self) -> None:
-        self.reload()
+        if not self._editing:
+            self.reload()
         self.widget.show()
         self.widget.raise_()
         self.widget.activateWindow()
@@ -493,9 +495,11 @@ class ClientWindow:
             self._clear_grant_row()
             if not sessions:
                 self.qr.show()
+                self.practice.show()
                 self.device_box.setText("还没有手机连上。扫码后在这里批准插入和截图。")
             else:
                 self.qr.hide()
+                self.practice.hide()
                 lines = []
                 for item in sessions:
                     lines.append(
@@ -539,7 +543,13 @@ class ClientWindow:
         self.refresh()
 
     def revoke(self, session_id: str) -> None:
-        self.app.auth.revoke(session_id)
+        loop = getattr(self.app, "_loop", None)
+        if loop is not None:
+            import asyncio
+
+            asyncio.run_coroutine_threadsafe(self.app.bridge.revoke_session(session_id), loop).result(3)
+        else:
+            self.app.auth.revoke(session_id)
         self.refresh()
 
     def save_settings(self) -> None:
@@ -669,10 +679,11 @@ class DesktopShell:
     def _on_ipc(self, command: str) -> None:
         from PySide6.QtCore import QTimer
 
+        host = self.client.widget
         if command == "show":
-            QTimer.singleShot(0, self.client.show_window)
+            QTimer.singleShot(0, host, self.client.show_window)
         elif command == "quit":
-            QTimer.singleShot(0, self.quit)
+            QTimer.singleShot(0, host, self.quit)
 
     def _tray_activated(self, reason) -> None:
         from PySide6.QtWidgets import QSystemTrayIcon
@@ -687,16 +698,17 @@ class DesktopShell:
     def _from_service(self, event: str, **_kw) -> None:
         from PySide6.QtCore import QTimer
 
+        host = self.client.widget
         if event == "recovery_ask":
-            QTimer.singleShot(0, self._ask_recovery)
+            QTimer.singleShot(0, host, self._ask_recovery)
         elif event == "phone_pending":
-            QTimer.singleShot(0, self.review.note_phone_pending)
+            QTimer.singleShot(0, host, self.review.note_phone_pending)
         elif event == "activity":
-            QTimer.singleShot(0, self.client.refresh)
+            QTimer.singleShot(0, host, self.client.refresh)
         elif event == "expand":
-            QTimer.singleShot(0, self.review.show)
+            QTimer.singleShot(0, host, self.review.show)
         elif event in {"hide_after_insert", "new_draft"}:
-            QTimer.singleShot(0, self.review.widget.hide)
+            QTimer.singleShot(0, self.review.widget, self.review.widget.hide)
 
     def _ask_recovery(self) -> None:
         mode = RecoveryDialog(self.client.widget).exec()
@@ -783,6 +795,7 @@ def run_desktop(argv: list[str] | None = None) -> int:
                 insert_combo=str(stored.get("hotkey_insert") or "<alt>+i"),
                 recall_combo=str(stored.get("hotkey_recall") or "<alt>+<shift>+i"),
             )
+            app._hotkeys = start
             if start.get("failures"):
                 logger(f"[v3] 热键注册失败: {start['failures']}")
         except Exception as exc:

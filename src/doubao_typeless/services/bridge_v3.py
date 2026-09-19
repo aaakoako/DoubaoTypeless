@@ -89,8 +89,10 @@ class V3Bridge:
         draft: Draft,
         on_activity: Callable[[str, int], None] | None = None,
         on_intent: Callable[[dict, dict], None] | None = None,
-        on_capture: Callable[[str, str], dict] | None = None,
+        on_capture: Callable[..., dict] | None = None,
         on_recall: Callable[[], None] | None = None,
+        on_phone_draft: Callable[[dict], dict] | None = None,
+        is_pc_editing: Callable[[], bool] | None = None,
         history_list: Callable[[], list] | None = None,
         uploads: UploadService | None = None,
         logger: Callable[[str], None] | None = None,
@@ -106,6 +108,8 @@ class V3Bridge:
         self._on_intent = on_intent
         self._on_capture = on_capture
         self._on_recall = on_recall
+        self._on_phone_draft = on_phone_draft
+        self._is_pc_editing = is_pc_editing or (lambda: False)
         self._history_list = history_list
         self.uploads = uploads
         self.byok = byok
@@ -232,12 +236,26 @@ class V3Bridge:
             }
         )
 
+    async def revoke_session(self, session_id: str) -> bool:
+        removed = self.auth.revoke(session_id)
+        for ws in list(self._clients):
+            bound = self._ws_auth.get(id(ws))
+            if bound is None or bound.session_id != session_id:
+                continue
+            try:
+                await ws.send_json({"type": "error", "error": "session revoked"})
+                await ws.close()
+            except Exception:
+                pass
+            self._ws_auth.pop(id(ws), None)
+        return removed
+
     async def _revoke(self, request: web.Request) -> web.Response:
         denied = self._require_loopback(request)
         if denied:
             return denied
         body = await request.json()
-        removed = self.auth.revoke(str(body.get("session_id") or ""))
+        removed = await self.revoke_session(str(body.get("session_id") or ""))
         return web.json_response({"ok": removed})
 
     async def _byok_get(self, request: web.Request) -> web.Response:
@@ -472,8 +490,14 @@ class V3Bridge:
         return web.json_response({"missing": missing})
 
     async def _asset_get(self, request: web.Request) -> web.StreamResponse:
-        self._session_from(request)
+        session = self._session_from(request)
         asset_id = request.match_info["asset_id"]
+        db = getattr(self.uploads, "db", None)
+        if db is not None:
+            row = db.asset_by_id(asset_id)
+            owner = str((row or {}).get("owner_session_id") or "")
+            if owner and owner != session.session_id:
+                raise web.HTTPForbidden(text="asset owner")
         blob = self.store.get(asset_id)
         return web.Response(
             body=blob,
@@ -579,6 +603,15 @@ class V3Bridge:
         if not authorized:
             await ws.send_json({"type": "error", "error": "unauthorized"})
             return False
+        live = self._ws_auth.get(id(ws))
+        if live is None or live.session_id not in self.auth.sessions:
+            await ws.send_json({"type": "error", "error": "session revoked"})
+            return False
+        try:
+            self.auth.authorize(live.session_id, live.token, "sync")
+        except ValueError:
+            await ws.send_json({"type": "error", "error": "session revoked"})
+            return False
         if self.paused and kind in {
             "draft.update",
             "editor.activity",
@@ -590,6 +623,10 @@ class V3Bridge:
             return True
         try:
             if kind == "draft.update":
+                if self._on_phone_draft:
+                    ack = self._on_phone_draft(data)
+                    await ws.send_json({"type": "draft.ack", **ack})
+                    return True
                 self._apply_draft_fields(data)
                 if self._on_activity and should_wake("draft.update"):
                     self._on_activity(self.draft.text, len(self.draft.assets))
@@ -607,6 +644,9 @@ class V3Bridge:
                     self._on_activity(self.draft.text, len(self.draft.assets))
                 return True
             if kind == "bundle.commit":
+                if self._is_pc_editing():
+                    await ws.send_json({"type": "error", "error": "pc_editing", "message": "电脑正在改字"})
+                    return True
                 if "text" in data or "revision" in data:
                     self._apply_draft_fields(data)
                 bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
@@ -615,6 +655,9 @@ class V3Bridge:
                 await ws.send_json({"type": "bundle.ready", "bundle": public})
                 return True
             if kind == "insert.intent":
+                if self._is_pc_editing():
+                    await ws.send_json({"type": "error", "error": "pc_editing", "message": "电脑正在改字"})
+                    return True
                 session = self.auth.authorize(data["session_id"], data.get("token") or "", "insert")
                 self.auth.consume_nonce(session, str(data.get("nonce") or ""))
                 if "text" in data or "revision" in data:
@@ -629,7 +672,7 @@ class V3Bridge:
                 return True
             if kind == "capture.request":
                 try:
-                    self.auth.authorize(data["session_id"], data.get("token") or "", "capture")
+                    session = self.auth.authorize(data["session_id"], data.get("token") or "", "capture")
                 except ValueError:
                     await ws.send_json(
                         {
@@ -646,6 +689,7 @@ class V3Bridge:
                     meta = self._on_capture(
                         str(data.get("scope") or "primary"),
                         str(data.get("request_id") or uuid.uuid4()),
+                        session,
                     )
                 except ValueError as exc:
                     await ws.send_json({"type": "capture.result", "error": str(exc)})

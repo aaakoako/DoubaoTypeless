@@ -105,6 +105,8 @@ class V3App:
             on_intent=self._on_intent,
             on_capture=self._on_capture,
             on_recall=self.recall_last,
+            on_phone_draft=self.apply_phone_update,
+            is_pc_editing=lambda: self.review_editing,
             history_list=self._history_public,
             uploads=self.uploads,
             logger=_log,
@@ -156,6 +158,51 @@ class V3App:
                 current = self._saved_target
         return current
 
+    def apply_phone_update(self, data: dict) -> dict:
+        if self.review_editing:
+            self.phone_pending = dict(data)
+            self._notify_ui("phone_pending")
+            return {
+                "revision": self.draft.revision,
+                "parked": True,
+                "durable": False,
+                "hash": self.draft.acked_hash,
+            }
+        from doubao_typeless.core.bundle import apply_draft_update
+        from doubao_typeless.services.assets import resolve_asset_refs
+
+        refs = data.get("asset_refs")
+        assets = data.get("assets")
+        if refs is not None and assets is None:
+            assets = resolve_asset_refs(self.store, refs)
+        update = {
+            "text": data.get("text", self.draft.text),
+            "revision": max(int(data.get("revision") or 0), self.draft.revision + 1),
+            "asset_refs": refs if refs is not None else [a.get("asset_id") for a in self.draft.assets],
+        }
+        if assets is not None:
+            update["assets"] = assets
+        apply_draft_update(self.draft, update)
+        self._save_draft()
+        self._on_activity(self.draft.text, len(self.draft.assets))
+        return {
+            "revision": self.draft.revision,
+            "parked": False,
+            "durable": True,
+            "hash": self.draft.acked_hash,
+        }
+
+    def accept_phone_pending(self) -> None:
+        pending = self.phone_pending
+        self.review_editing = False
+        self.phone_pending = None
+        if pending:
+            self.apply_phone_update(pending)
+
+    def keep_pc_edit(self) -> None:
+        self.review_editing = True
+        self._notify_ui("pc_kept")
+
     def _on_activity(self, text: str, image_count: int) -> None:
         self._remember_external_target()
         if self.review_editing:
@@ -184,17 +231,32 @@ class V3App:
 
         return grab_primary(scope, hide=self.hud.hide)
 
-    def _on_capture(self, scope: str, request_id: str = "") -> dict:
-        sessions = list(self.auth.sessions.values())
-        if not sessions:
+    def _on_capture(self, scope: str, request_id: str = "", session=None) -> dict:
+        if session is None:
             raise ValueError("no session")
         self.hud.hide()
-        blob = self.capture.capture(sessions[-1], scope, request_id=request_id or str(uuid.uuid4()))
+        blob = self.capture.capture(session, scope, request_id=request_id or str(uuid.uuid4()))
         from PIL import Image
         import io
 
         image = Image.open(io.BytesIO(blob))
         meta = self.store.put_png(blob, width=image.width, height=image.height, role="screenshot")
+        self.db.upsert_asset(
+            meta["asset_id"],
+            meta["sha256"],
+            meta["bytes"],
+            referenced=True,
+            owner_session_id=session.session_id,
+        )
+        if self.review_editing:
+            pending = dict(self.phone_pending or {})
+            pending_assets = list(pending.get("assets") or [])
+            pending_assets.append(meta)
+            pending["assets"] = pending_assets
+            pending["text"] = pending.get("text", self.draft.text)
+            self.phone_pending = pending
+            self._notify_ui("phone_pending")
+            return meta
         self.draft.assets.append(meta)
         self.draft.revision += 1
         self._on_activity(self.draft.text, len(self.draft.assets))
@@ -523,8 +585,25 @@ class V3App:
         self._loop = loop
         return loop
 
+    def _stop_hotkeys(self) -> None:
+        hotkeys = getattr(self, "_hotkeys", None) or {}
+        for key in ("listener", "release"):
+            obj = hotkeys.get(key)
+            if obj is None:
+                continue
+            try:
+                obj.stop()
+            except Exception:
+                pass
+        self._hotkeys = None
+
     async def stop(self) -> None:
+        self._stop_hotkeys()
         await self.bridge.stop()
+        try:
+            self.db.conn.close()
+        except Exception:
+            pass
         lock = getattr(self, "_lock", None)
         if lock:
             lock.release()
