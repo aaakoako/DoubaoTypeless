@@ -104,3 +104,25 @@ def test_gc_skips_attempt_referenced_assets(tmp_path):
     assert "drop" in removed
     assert "keep" not in removed
     assert db.asset_by_id("keep") is not None
+
+
+def test_default_chunk_is_512kib_and_owner_is_enforced(tmp_path):
+    assert CHUNK == 512 * 1024
+    store = AssetStore(tmp_path / "assets")
+    db = V3DB(tmp_path / "v3.sqlite")
+    svc = UploadService(store, db)
+    payload = _png()
+    digest = hashlib.sha256(payload).hexdigest()
+    session = svc.init(
+        mime="image/png",
+        total_bytes=len(payload),
+        sha256=digest,
+        width=64,
+        height=64,
+        owner_session_id="owner-a",
+    )
+    svc.put_chunk(session["upload_id"], 0, payload, owner_session_id="owner-a")
+    with pytest.raises(ValueError, match="owner"):
+        svc.complete(session["upload_id"], owner_session_id="owner-b")
+    meta = svc.complete(session["upload_id"], owner_session_id="owner-a")
+    assert meta["sha256"] == digest

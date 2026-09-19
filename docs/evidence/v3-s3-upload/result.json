@@ -1,0 +1,12 @@
+{
+  "slice": "S3_upload_auth_chunk",
+  "source_head_before": "93c3d132da8d0881030f7d7ee9b825b110591e76",
+  "status": "IMPLEMENTED",
+  "pytest": "127 passed, 1 skipped",
+  "fixed": [
+    "A07 asset_refs no longer silently drop unfinished images; insert/draft refuse incomplete sets; /v3/assets images load with session headers",
+    "A08 default chunk 512KiB; aiohttp client_max_size 2MiB explicit; upload bound to session owner; randomUUID has getRandomValues fallback"
+  ],
+  "not_release": true,
+  "html_board_is_not_product": true
+}

@@ -133,7 +133,7 @@ class V3Bridge:
         return await handler(request)
 
     def make_app(self) -> web.Application:
-        app = web.Application(middlewares=[self._origin_host_gate])
+        app = web.Application(middlewares=[self._origin_host_gate], client_max_size=2 * 1024 * 1024)
         app.router.add_get("/", self._index)
         app.router.add_get("/ws", self._ws)
         app.router.add_get("/v3/pair", self._pair_get)
@@ -415,7 +415,7 @@ class V3Bridge:
         return web.json_response(meta)
 
     async def _asset_init(self, request: web.Request) -> web.Response:
-        self._session_from(request)
+        owner = self._session_from(request)
         if self.uploads is None:
             raise web.HTTPNotImplemented()
         body = await request.json()
@@ -427,28 +427,34 @@ class V3Bridge:
                 width=int(body.get("width") or 1),
                 height=int(body.get("height") or 1),
                 chunk_size=int(body["chunk_size"]) if body.get("chunk_size") else None,
+                owner_session_id=owner.session_id,
             )
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
         return web.json_response(session)
 
     async def _asset_chunk(self, request: web.Request) -> web.Response:
-        self._session_from(request)
+        owner = self._session_from(request)
         if self.uploads is None:
             raise web.HTTPNotImplemented()
         data = await request.read()
         try:
-            self.uploads.put_chunk(request.match_info["upload_id"], int(request.match_info["index"]), data)
+            self.uploads.put_chunk(
+                request.match_info["upload_id"],
+                int(request.match_info["index"]),
+                data,
+                owner_session_id=owner.session_id,
+            )
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
         return web.json_response({"ok": True})
 
     async def _asset_complete(self, request: web.Request) -> web.Response:
-        self._session_from(request)
+        owner = self._session_from(request)
         if self.uploads is None:
             raise web.HTTPNotImplemented()
         try:
-            meta = self.uploads.complete(request.match_info["upload_id"])
+            meta = self.uploads.complete(request.match_info["upload_id"], owner_session_id=owner.session_id)
         except ValueError as exc:
             return web.json_response({"error": str(exc), "durable": False}, status=400)
         except OSError as exc:
@@ -456,11 +462,11 @@ class V3Bridge:
         return web.json_response(meta)
 
     async def _asset_missing(self, request: web.Request) -> web.Response:
-        self._session_from(request)
+        owner = self._session_from(request)
         if self.uploads is None:
             raise web.HTTPNotImplemented()
         try:
-            missing = self.uploads.missing_chunks(request.match_info["upload_id"])
+            missing = self.uploads.missing_chunks(request.match_info["upload_id"], owner_session_id=owner.session_id)
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
         return web.json_response({"missing": missing})

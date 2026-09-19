@@ -13,7 +13,7 @@ from PIL import Image
 from doubao_typeless.storage.asset_store import JPEG_MAGIC, MAX_BYTES, PNG_MAGIC, AssetStore
 from doubao_typeless.storage.db import V3DB
 
-CHUNK = 1024 * 1024
+CHUNK = 512 * 1024
 MAX_PIXELS = 48_000_000
 SAFE_ID = re.compile(r"^[A-Za-z0-9_-]+$")
 
@@ -68,6 +68,7 @@ class UploadService:
         width: int,
         height: int,
         chunk_size: int | None = None,
+        owner_session_id: str = "",
     ) -> dict:
         if total_bytes <= 0 or total_bytes > MAX_BYTES:
             raise ValueError("asset too large")
@@ -91,16 +92,21 @@ class UploadService:
             "chunks": {},
             "tmp_dir": tmp_dir,
             "completed": None,
+            "owner": owner_session_id,
         }
         return {"upload_id": upload_id, "chunk_size": size, "expected_chunks": expected}
 
-    def _session(self, upload_id: str) -> dict:
+    def _session(self, upload_id: str, owner_session_id: str = "") -> dict:
         if not SAFE_ID.match(upload_id or "") or upload_id not in self._uploads:
             raise ValueError("upload id invalid")
-        return self._uploads[upload_id]
+        session = self._uploads[upload_id]
+        owner = session.get("owner") or ""
+        if owner and owner_session_id and owner != owner_session_id:
+            raise ValueError("upload owner")
+        return session
 
-    def put_chunk(self, upload_id: str, index: int, data: bytes) -> None:
-        session = self._session(upload_id)
+    def put_chunk(self, upload_id: str, index: int, data: bytes, owner_session_id: str = "") -> None:
+        session = self._session(upload_id, owner_session_id)
         if index < 0 or index >= session["expected"]:
             raise ValueError("chunk index")
         if len(session["chunks"]) >= 2 and index not in session["chunks"]:
@@ -114,12 +120,12 @@ class UploadService:
         tmp.replace(part)
         session["chunks"][index] = len(data)
 
-    def missing_chunks(self, upload_id: str) -> list[int]:
-        session = self._session(upload_id)
+    def missing_chunks(self, upload_id: str, owner_session_id: str = "") -> list[int]:
+        session = self._session(upload_id, owner_session_id)
         return [i for i in range(session["expected"]) if i not in session["chunks"]]
 
-    def complete(self, upload_id: str) -> dict:
-        session = self._session(upload_id)
+    def complete(self, upload_id: str, owner_session_id: str = "") -> dict:
+        session = self._session(upload_id, owner_session_id)
         if session["completed"]:
             return session["completed"]
         missing = self.missing_chunks(upload_id)

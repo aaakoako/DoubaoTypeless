@@ -2,35 +2,32 @@
   "schema_version": 1,
   "product_goal": "完整 V3 可发布候选。规范入口 docs/v3-product/MASTER_PLAN.md。",
   "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
-  "current_head": "6fdcc2acfc723609a01be3910df3aec7011706b7",
-  "working_tree": "S2 BYOK/QR/vocab implemented, commit pending",
-  "last_completed_slice": "S2_byok_qr_vocab",
-  "active_slice": "S3_phone_image_http",
-  "next_action": "继续 S3：收紧手机图文上传/鉴权/分块（A07/A08），补全编辑冲突与素材所有权（A12/A17）。不要等待用户说继续。不要 merge/tag/Release。",
+  "current_head": "93c3d132da8d0881030f7d7ee9b825b110591e76",
+  "working_tree": "S3 upload/auth/chunk implemented, commit pending",
+  "last_completed_slice": "S3_upload_auth_chunk",
+  "active_slice": "S4_conflict_pack_identity",
+  "next_action": "继续 S4：电脑/手机改字冲突产品化（A12）、素材所有权与撤销复核（A17）、Qt 退出加固（A14）、源码变化后重打隔离包（A16）。不要等待用户说继续。不要 merge/tag/Release。",
   "accepted_requirements": [
     "MASTER_PLAN 为唯一产品/执行规范",
     "插入并复制是主动作",
-    "BYOK 必须发送所选模型且不阻塞原文插入",
+    "BYOK 发送所选模型且不阻塞原文",
     "密钥不进 settings.json",
-    "不自动 merge/tag/Release",
-    "缺真机只阻塞相应验证"
+    "未传完的图不得先发残缺文字",
+    "不自动 merge/tag/Release"
   ],
   "open_defects": [
-    {"id": "A07", "severity": "P1", "note": "手机图文流程/上传失败残缺文字仍需按总计划收紧"},
-    {"id": "A08", "severity": "P1", "note": "HTTP 上传/1MiB/randomUUID/Origin 需再收紧"},
     {"id": "A12", "severity": "P1", "note": "电脑/手机改字冲突策略未完全产品化"},
     {"id": "A14", "severity": "P1", "note": "Qt 线程/退出路径仍需加固"},
     {"id": "A16", "severity": "P1", "note": "包装身份/窗口模式需随源码重打"},
-    {"id": "A17", "severity": "P0", "note": "session/revoke/asset owner 仍需复核"},
+    {"id": "A17", "severity": "P0", "note": "session/revoke/asset owner 仍需完整复核"},
     {"id": "A18", "severity": "P1", "note": "测试与日用实例管道隔离"}
   ],
-  "closed_this_round": ["A01", "A02", "A03", "A04", "A05", "A06", "A09", "A10", "A11", "A13", "A15"],
+  "closed_this_round": ["A01", "A02", "A03", "A04", "A05", "A06", "A07", "A08", "A09", "A10", "A11", "A13", "A15"],
   "environment_blockers": [
     {
       "missing": "真实 Android + 豆包输入法 + 同网手机浏览器",
-      "blocks": ["真机扫码配对/相册/白板手感"],
-      "who": "设备持有者",
-      "unblocked_work": "S3 上传协议、素材所有权、编辑冲突"
+      "blocks": ["真机扫码/相册/白板手感"],
+      "who": "设备持有者"
     },
     {
       "missing": "独立复核签署",
@@ -39,11 +36,11 @@
     }
   ],
   "last_commands": [
-    {"cmd": "npm run typecheck && npm run build", "exit_code": 0, "output": "web/dist rebuilt"},
-    {"cmd": "python -m pytest -q", "exit_code": 0, "output": "126 passed, 1 skipped"}
+    {"cmd": "npm run typecheck && npm run build", "exit_code": 0, "output": "web/dist index-BPhrVzIw.js"},
+    {"cmd": "python -m pytest -q", "exit_code": 0, "output": "127 passed, 1 skipped"}
   ],
   "candidate_artifact": {
-    "note": "S0–S2 源码已变，旧 onedir 哈希失效，发布前必须重打。不是 RELEASE_READY。"
+    "note": "S0–S3 源码已变，旧 onedir 哈希失效。不是 RELEASE_READY。"
   },
   "published": false,
   "task_complete": false

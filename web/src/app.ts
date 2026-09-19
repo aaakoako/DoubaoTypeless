@@ -1,5 +1,5 @@
 import { SharedEditor, type Tool } from "./editor/canvas";
-import { looksLikeKeyScript } from "./transport/protocol";
+import { looksLikeKeyScript, newId } from "./transport/protocol";
 import { uploadPng } from "./transport/upload";
 
 type Session = { session_id: string; token: string; device_id?: string };
@@ -131,7 +131,9 @@ export function boot(root: HTMLElement): void {
       wrap.innerHTML = `<img alt="${i + 1} · ${a.kind}" /><label>${i + 1} · ${a.kind}</label><button class="left">←</button><button class="right">→</button><button class="remove">删</button>`;
       const img = wrap.querySelector("img") as HTMLImageElement;
       img.src = a.preview;
-      img.addEventListener("click", () => openEditor(a.kind === "白板" ? "快速白板" : "图片标注", a));
+      img.addEventListener("click", () => {
+        void openEditor(a.kind === "白板" ? "快速白板" : "图片标注", a);
+      });
       wrap.querySelector(".left")!.addEventListener("click", (ev) => {
         ev.stopPropagation();
         move(i, -1);
@@ -196,25 +198,36 @@ export function boot(root: HTMLElement): void {
           h: msg.asset.height,
         };
         state.assets.push(a);
-        openEditor("图片标注", a);
+        void openEditor("图片标注", a);
         update();
       }
     };
   }
 
   function assetRefs(): string[] {
-    return state.assets.map((a) => a.asset_id).filter((id): id is string => Boolean(id));
+    const missing = state.assets.filter((a) => !a.asset_id);
+    if (missing.length) {
+      throw new Error("incomplete assets");
+    }
+    return state.assets.map((a) => a.asset_id as string);
   }
 
   function sendDraft() {
     if (!ws || ws.readyState !== 1) return;
+    let refs: string[];
+    try {
+      refs = assetRefs();
+    } catch {
+      toast("还有图片没传完，不会先发残缺文字");
+      return;
+    }
     ws.send(
       JSON.stringify({
         protocol: 3,
         type: "draft.update",
         text: state.text,
         revision: ++state.revision,
-        asset_refs: assetRefs(),
+        asset_refs: refs,
       })
     );
   }
@@ -239,7 +252,7 @@ export function boot(root: HTMLElement): void {
   $("boardBtn").onclick = () => {
     const a: Asset = { id: "board-" + Date.now(), kind: "白板", preview: "", w: 1600, h: 1000 };
     state.assets.push(a);
-    openEditor("快速白板", a);
+    void openEditor("快速白板", a);
   };
   $("photoBtn").onclick = () => $("file").click();
   $("captureBtn").onclick = () => {
@@ -273,13 +286,13 @@ export function boot(root: HTMLElement): void {
       a.w = image.naturalWidth || 1;
       a.h = image.naturalHeight || 1;
       state.assets.push(a);
-      openEditor("图片标注", a);
+      void openEditor("图片标注", a);
     }
     (e.target as HTMLInputElement).value = "";
     update();
   });
 
-  function openEditor(title: string, asset: Asset) {
+  async function openEditor(title: string, asset: Asset) {
     currentId = asset.id;
     state.editorKind = title;
     $("composer").style.display = "none";
@@ -294,7 +307,18 @@ export function boot(root: HTMLElement): void {
     } else if (title === "快速白板") {
       editor.addBlankBoard(asset.w || 1600, asset.h || 1000);
       host.dataset.ready = "1";
-    } else if (asset.preview) editor.loadImage(asset.preview, asset.w || 1600, asset.h || 1000);
+    } else if (asset.preview) {
+      let src = asset.preview;
+      if (src.startsWith("/v3/assets/") && state.session) {
+        const res = await fetch(src, { headers: headers() });
+        if (!res.ok) {
+          toast("图片需要登录后才能看");
+          return;
+        }
+        src = URL.createObjectURL(await res.blob());
+      }
+      editor.loadImage(src, asset.w || 1600, asset.h || 1000);
+    }
     requestAnimationFrame(() => editor?.resize());
     if (ws?.readyState === 1) ws.send(JSON.stringify({ protocol: 3, type: "editor.activity", kind: "edit" }));
   }
@@ -384,8 +408,15 @@ export function boot(root: HTMLElement): void {
       return;
     }
     if (!state.text.trim() && !state.assets.length) return;
+    let refs: string[];
+    try {
+      refs = assetRefs();
+    } catch {
+      toast("还有图片没传完，不会先发残缺文字");
+      return;
+    }
     sendDraft();
-    ws.send(JSON.stringify({ protocol: 3, type: "bundle.commit", text: state.text, revision: state.revision, asset_refs: assetRefs() }));
+    ws.send(JSON.stringify({ protocol: 3, type: "bundle.commit", text: state.text, revision: state.revision, asset_refs: refs }));
     const nonceRes = await fetch("/v3/nonce", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(state.session) });
     if (!nonceRes.ok) {
       toast("请在电脑确认插入权限。拒绝后仍可同步文字。练习插入用电脑 Alt+I。");
@@ -399,11 +430,11 @@ export function boot(root: HTMLElement): void {
         session_id: state.session.session_id,
         token: state.session.token,
         nonce: nonce.nonce,
-        intent_id: crypto.randomUUID(),
+        intent_id: newId(),
         trigger: "phone",
         text: state.text,
         revision: state.revision,
-        asset_refs: assetRefs(),
+        asset_refs: refs,
       })
     );
   };
