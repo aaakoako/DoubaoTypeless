@@ -6,8 +6,8 @@
 
 | 包 | 控制台 | EXE SHA256 | ZIP SHA256 |
 |---|---|---|---|
-| DoubaoTypelessV3Preview | 有 | `fd06cfd510ea23ebb1a4c4f9051b87da8422252f5b3f86724d93df766c96f084` | `0ca992fe494c61791fa9415d9866ddd8fdb1b24076c0b2ae3cec9a9bb568a7b6` |
-| DoubaoTypelessV3PreviewUI | 无 | `42dc749286afb551457abebe60aa2aafe20f3f3455a552393318a493d09063ba` | `6e4bd1f5f41c0994d1d45ad8d768aeb727834fdeb56132234247f5ba55cfcf77` |
+| DoubaoTypelessV3Preview | 有 | `eab2e68ff0793ef157b70300f82e85c1576e63edcd7058a69802e4ae294fa84c` | `eac99f3662577d3624f1b3fe4150396ed68410d898560c46024a2cf221d33f5c` |
+| DoubaoTypelessV3PreviewUI | 无 | `ec137b462b43de7ccca095ee975c9065f936c45936c99fb5ec13471e04e4a7fe` | `c5539fc1d82dd0b1bf1b1bd5306f002e4c6e565823e6791131d33a047479f5a7` |
 
 两份包都未签名，不是 GitHub Release，源码 SHA 不等于包哈希。
 
@@ -21,6 +21,7 @@
 - 预览管道/数据目录/自启动名与日用 `DoubaoTypeless` 隔离
 - 检查更新只打开公开下载页，不自动替换
 - 日用词库只读导入；`DT_V3_TARGET_STATE` 单独存在不能当正式确认
+- 当前图文有图序缩略图；模型建议可采纳/拒绝；手机可起名
 - pytest 以 CHECKPOINT 记录为准
 
 ## 不能自称通过

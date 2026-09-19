@@ -4,8 +4,8 @@
   "source_head_before": "ac92b249618e07134a9b35c15a48604a744c6d09",
   "output": "G:\\DoubaoTypeless\\DoubaoTypeless\\docs\\evidence\\v3-s5-pack\\dist\\DoubaoTypelessV3Preview",
   "exe": "G:\\DoubaoTypeless\\DoubaoTypeless\\docs\\evidence\\v3-s5-pack\\dist\\DoubaoTypelessV3Preview\\DoubaoTypelessV3Preview.exe",
-  "exe_sha256": "fd06cfd510ea23ebb1a4c4f9051b87da8422252f5b3f86724d93df766c96f084",
-  "exe_bytes": 12685018,
+  "exe_sha256": "eab2e68ff0793ef157b70300f82e85c1576e63edcd7058a69802e4ae294fa84c",
+  "exe_bytes": 12691423,
   "onedir_files": 891,
   "onedir_bytes": 190477990,
   "webengine": false,
@@ -24,9 +24,9 @@
   "release": false,
   "signed": false,
   "note": "Isolated onedir written away from locked dist/. Smoke used DT_V3_PIPE and DT_V3_DATA_DIR. Not a GitHub Release. Not RELEASE_READY.",
-  "built_at": "2026-09-19T09:07:33.376406+00:00",
+  "built_at": "2026-09-19T09:25:56.649532+00:00",
   "zip": "G:\\DoubaoTypeless\\DoubaoTypeless\\docs\\evidence\\v3-s5-pack\\DoubaoTypelessV3Preview-onedir.zip",
-  "zip_sha256": "0ca992fe494c61791fa9415d9866ddd8fdb1b24076c0b2ae3cec9a9bb568a7b6",
-  "zip_bytes": 82084055,
-  "rebuilt_for": "S5_independent_review"
+  "zip_sha256": "eac99f3662577d3624f1b3fe4150396ed68410d898560c46024a2cf221d33f5c",
+  "zip_bytes": 82089493,
+  "rebuilt_for": "S5_client_ux"
 }

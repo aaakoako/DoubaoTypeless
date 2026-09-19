@@ -47,6 +47,16 @@ def set_log(fn) -> None:
     _log_impl = fn
 
 
+def _optional_float(value: object) -> float | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
 class V3App:
     def __init__(self, *, data_dir: Path | None = None, port: int = 8766):
         self.data_dir = Path(data_dir or v3_data_dir())
@@ -77,8 +87,11 @@ class V3App:
             endpoint=stored.get("byok_endpoint") or "",
             api_key=stored.get("byok_api_key") or "",
             model=stored.get("byok_model") or "",
+            extra_prompt=str(stored.get("byok_prompt") or ""),
+            temperature=_optional_float(stored.get("byok_temperature")),
             post=_httpx_json_post,
         )
+        self._last_suggestion = None
         self.hud = HudController(
             on_insert=self.insert_current,
             on_copy=self.copy_text,
@@ -445,6 +458,55 @@ class V3App:
         payload = self._on_intent(intent, bundle)
         return self._after_insert(bundle, payload)
 
+    def draft_image_previews(self) -> list[dict]:
+        out: list[dict] = []
+        for index, asset in enumerate(self.draft.assets):
+            asset_id = str(asset.get("asset_id") or "")
+            data = b""
+            present = False
+            if asset_id:
+                try:
+                    data = self.store.get(asset_id)
+                    present = True
+                except FileNotFoundError:
+                    present = False
+            out.append(
+                {
+                    "order": index + 1,
+                    "asset_id": asset_id,
+                    "present": present,
+                    "bytes": len(data),
+                    "data": data,
+                    "width": asset.get("width"),
+                    "height": asset.get("height"),
+                }
+            )
+        return out
+
+    def suggest_text(self, text: str) -> dict:
+        out = self.byok.polish(
+            text,
+            draft_id=self.draft.draft_id,
+            revision=self.draft.revision,
+            current_draft_id=self.draft.draft_id,
+            current_revision=self.draft.revision,
+        )
+        suggested = out.get("text") if out.get("status") == "ok" else None
+        self._last_suggestion = {"original": text, "suggested": suggested, **out}
+        return self._last_suggestion
+
+    def apply_suggestion(self) -> bool:
+        last = self._last_suggestion or {}
+        if not last.get("suggested") or self.draft.text != last.get("original"):
+            return False
+        self.draft.text = str(last["suggested"])
+        self.draft.revision += 1
+        self._save_draft()
+        return True
+
+    def reject_suggestion(self) -> None:
+        self._last_suggestion = None
+
     def copy_text(self) -> str:
         text = self.draft.text or ""
         self._copied_text = text
@@ -589,16 +651,26 @@ class V3App:
         self._loop = loop
         return loop
 
-    def apply_hotkeys(self, insert: str, recall: str) -> list[str]:
+    def apply_hotkeys(
+        self,
+        insert: str,
+        recall: str,
+        *,
+        expand: str = "<alt>+<shift>+e",
+        capture: str = "<alt>+<shift>+s",
+    ) -> list[str]:
         self._stop_hotkeys()
         from doubao_typeless.platform.windows.hotkeys import start_hotkeys
 
         start = start_hotkeys(
             on_insert=self.insert_current,
             on_recall=self.recall_last,
+            on_expand=lambda: self._notify_ui("expand"),
             on_region=self.capture_region,
             insert_combo=insert or "<alt>+i",
             recall_combo=recall or "<alt>+<shift>+i",
+            expand_combo=expand or "<alt>+<shift>+e",
+            capture_combo=capture or "<alt>+<shift>+s",
         )
         self._hotkeys = start
         return list(start.get("failures") or [])

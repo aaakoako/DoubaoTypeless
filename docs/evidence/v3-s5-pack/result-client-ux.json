@@ -1,0 +1,19 @@
+{
+  "slice": "S5_client_ux",
+  "source_head_before": "9a621f144264ae3bf627bb1d5bf7537d0dca7fbf",
+  "status": "IMPLEMENTED",
+  "pytest": "152 passed",
+  "fixed": [
+    "Review panel shows ordered thumbnails and enlarge; missing assets stay visible",
+    "Device nickname instead of raw hex; expand/capture hotkeys are configurable",
+    "BYOK suggestion apply/reject does not auto-replace; advanced prompt/temperature stay folded"
+  ],
+  "pack": {
+    "console_exe_sha256": "eab2e68ff0793ef157b70300f82e85c1576e63edcd7058a69802e4ae294fa84c",
+    "windowed_exe_sha256": "ec137b462b43de7ccca095ee975c9065f936c45936c99fb5ec13471e04e4a7fe",
+    "release": false,
+    "signed": false
+  },
+  "independent_review": "WAITING",
+  "not_release": true
+}

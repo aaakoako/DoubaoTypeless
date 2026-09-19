@@ -42,11 +42,15 @@ class ByokService:
         endpoint: str = "",
         api_key: str = "",
         model: str = "",
+        extra_prompt: str = "",
+        temperature: float | None = None,
         post: Callable[[str, dict[str, Any], dict[str, str]], dict[str, Any]] | None = None,
     ):
         self.endpoint = (endpoint or "").strip()
         self.api_key = (api_key or "").strip()
         self.model = (model or "").strip()
+        self.temperature = temperature
+        self.extra_prompt = (extra_prompt or "").strip()
         self._post = post
 
     def available(self) -> bool:
@@ -71,13 +75,20 @@ class ByokService:
         if self._post is None:
             return {"status": "skipped", "reason": "no_transport", "message": ERROR_LABELS["no_transport"], "text": text}
         try:
+            messages = []
+            if self.extra_prompt:
+                messages.append({"role": "system", "content": self.extra_prompt})
+            messages.append({"role": "user", "content": text})
+            payload: dict[str, Any] = {
+                "model": self.model,
+                "messages": messages,
+                "input": text,
+            }
+            if self.temperature is not None:
+                payload["temperature"] = self.temperature
             body = self._post(
                 chat_url(self.endpoint),
-                {
-                    "model": self.model,
-                    "messages": [{"role": "user", "content": text}],
-                    "input": text,
-                },
+                payload,
                 {"Authorization": f"Bearer {self.api_key}"},
             )
         except Exception as exc:

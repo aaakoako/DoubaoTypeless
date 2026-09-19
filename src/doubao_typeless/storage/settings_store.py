@@ -19,9 +19,15 @@ def load_settings(data_dir: Path) -> dict[str, Any]:
         "byok_model": "",
         "hotkey_insert": "<alt>+i",
         "hotkey_recall": "<alt>+<shift>+i",
+        "hotkey_expand": "<alt>+<shift>+e",
+        "hotkey_capture": "<alt>+<shift>+s",
         "autostart": False,
         "start_minimized": False,
         "tray_explained": False,
+        "device_nicknames": {},
+        "byok_temperature": "",
+        "byok_timeout": "",
+        "byok_prompt": "",
     }
     path = settings_path(data_dir)
     if not path.is_file():
@@ -40,9 +46,20 @@ def load_settings(data_dir: Path) -> dict[str, Any]:
     out["byok_model"] = str(out.get("byok_model") or "")
     out["hotkey_insert"] = str(out.get("hotkey_insert") or "<alt>+i")
     out["hotkey_recall"] = str(out.get("hotkey_recall") or "<alt>+<shift>+i")
+    out["hotkey_expand"] = str(out.get("hotkey_expand") or "<alt>+<shift>+e")
+    out["hotkey_capture"] = str(out.get("hotkey_capture") or "<alt>+<shift>+s")
     out["autostart"] = bool(out.get("autostart"))
     out["start_minimized"] = bool(out.get("start_minimized"))
     out["tray_explained"] = bool(out.get("tray_explained"))
+    names = out.get("device_nicknames")
+    out["device_nicknames"] = {
+        str(key): str(value).strip()
+        for key, value in (names.items() if isinstance(names, dict) else [])
+        if str(value).strip()
+    }
+    out["byok_temperature"] = str(out.get("byok_temperature") or "")
+    out["byok_timeout"] = str(out.get("byok_timeout") or "")
+    out["byok_prompt"] = str(out.get("byok_prompt") or "")
     file_key = str(data.get("byok_api_key") or "")
     stored_key = get_secret(data_dir, "byok_api_key")
     if file_key and not stored_key:
@@ -67,9 +84,15 @@ ALLOWED = {
     "byok_model",
     "hotkey_insert",
     "hotkey_recall",
+    "hotkey_expand",
+    "hotkey_capture",
     "autostart",
     "start_minimized",
     "tray_explained",
+    "device_nicknames",
+    "byok_temperature",
+    "byok_timeout",
+    "byok_prompt",
 }
 
 

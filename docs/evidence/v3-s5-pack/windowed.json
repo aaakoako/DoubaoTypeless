@@ -2,12 +2,12 @@
   "name": "DoubaoTypelessV3PreviewUI",
   "console": false,
   "exe": "G:\\DoubaoTypeless\\DoubaoTypeless\\docs\\evidence\\v3-s5-pack\\dist\\DoubaoTypelessV3PreviewUI\\DoubaoTypelessV3PreviewUI.exe",
-  "exe_sha256": "42dc749286afb551457abebe60aa2aafe20f3f3455a552393318a493d09063ba",
-  "exe_bytes": 12679898,
+  "exe_sha256": "ec137b462b43de7ccca095ee975c9065f936c45936c99fb5ec13471e04e4a7fe",
+  "exe_bytes": 12686303,
   "onedir_files": 891,
   "onedir_bytes": 190472870,
-  "zip_sha256": "6e4bd1f5f41c0994d1d45ad8d768aeb727834fdeb56132234247f5ba55cfcf77",
-  "zip_bytes": 82085320,
+  "zip_sha256": "c5539fc1d82dd0b1bf1b1bd5306f002e4c6e565823e6791131d33a047479f5a7",
+  "zip_bytes": 82092018,
   "webengine": false,
   "console_pack_still_present": true,
   "smoke": {
@@ -20,6 +20,6 @@
   },
   "release": false,
   "signed": false,
-  "built_at": "2026-09-19T09:07:33.378166+00:00",
-  "rebuilt_for": "S5_independent_review"
+  "built_at": "2026-09-19T09:25:56.650908+00:00",
+  "rebuilt_for": "S5_client_ux"
 }

@@ -11,9 +11,12 @@ def start_hotkeys(
     *,
     on_insert: Callable[[], None],
     on_recall: Callable[[], None],
+    on_expand: Callable[[], None] | None = None,
     on_region: Callable[[], None] | None = None,
     insert_combo: str = "<alt>+i",
     recall_combo: str = "<alt>+<shift>+i",
+    expand_combo: str = "<alt>+<shift>+e",
+    capture_combo: str = "<alt>+<shift>+s",
 ):
     from pynput.keyboard import GlobalHotKeys, Key, Listener
 
@@ -33,8 +36,11 @@ def start_hotkeys(
         insert_combo or "<alt>+i": wrap(insert_gate, on_insert),
         recall_combo or "<alt>+<shift>+i": wrap(recall_gate, on_recall),
     }
+    expand_gate = HotkeyGate()
+    if on_expand:
+        mapping[expand_combo or "<alt>+<shift>+e"] = wrap(expand_gate, on_expand)
     if on_region:
-        mapping["<alt>+<shift>+s"] = wrap(region_gate, on_region)
+        mapping[capture_combo or "<alt>+<shift>+s"] = wrap(region_gate, on_region)
     try:
         listener = GlobalHotKeys(mapping)
         listener.start()
@@ -43,10 +49,11 @@ def start_hotkeys(
         listener = None
 
     def on_release(key):
-        if key in {Key.alt, Key.alt_l, Key.alt_r, Key.shift, Key.shift_l, Key.shift_r} or getattr(key, "char", "") in {"i", "I", "s", "S"}:
+        if key in {Key.alt, Key.alt_l, Key.alt_r, Key.shift, Key.shift_l, Key.shift_r} or getattr(key, "char", "") in {"i", "I", "s", "S", "e", "E"}:
             insert_gate.release()
             recall_gate.release()
             region_gate.release()
+            expand_gate.release()
 
     release_listener = Listener(on_release=on_release)
     try:

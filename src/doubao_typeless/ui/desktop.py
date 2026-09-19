@@ -169,6 +169,8 @@ class ReviewPanel:
         self.images = QLabel("没有图片")
         self.images.setObjectName("muted")
         layout.addWidget(self.images)
+        self.image_row = QHBoxLayout()
+        layout.addLayout(self.image_row)
         self.editor = QPlainTextEdit()
         self.editor.textChanged.connect(self._mark_editing)
         layout.addWidget(self.editor, 1)
@@ -182,6 +184,15 @@ class ReviewPanel:
         terms_btn = QPushButton("检查术语")
         terms_btn.setObjectName("ghost")
         terms_btn.clicked.connect(self.check_terms)
+        suggest = QPushButton("建议改写")
+        suggest.setObjectName("ghost")
+        suggest.clicked.connect(self.suggest_rewrite)
+        apply_s = QPushButton("采用建议")
+        apply_s.setObjectName("ghost")
+        apply_s.clicked.connect(self.apply_rewrite)
+        reject_s = QPushButton("不用建议")
+        reject_s.setObjectName("ghost")
+        reject_s.clicked.connect(self.reject_rewrite)
         copy = QPushButton("复制")
         copy.setObjectName("ghost")
         copy.clicked.connect(self.copy_only)
@@ -191,6 +202,9 @@ class ReviewPanel:
         row.addWidget(use_phone)
         row.addWidget(keep)
         row.addWidget(terms_btn)
+        row.addWidget(suggest)
+        row.addWidget(apply_s)
+        row.addWidget(reject_s)
         row.addStretch(1)
         row.addWidget(copy)
         row.addWidget(insert)
@@ -209,8 +223,7 @@ class ReviewPanel:
         self.editor.blockSignals(True)
         self.editor.setPlainText(self.app.draft.text or "")
         self.editor.blockSignals(False)
-        count = len(self.app.draft.assets)
-        self.images.setText(f"{count} 张图，顺序即投递顺序" if count else "没有图片")
+        self._refresh_images()
 
     def note_phone_pending(self) -> None:
         if not self._editing:
@@ -232,6 +245,89 @@ class ReviewPanel:
         self.app.review_editing = False
         self.app._save_draft()
         self.app.copy_text()
+
+    def _clear_image_row(self) -> None:
+        while self.image_row.count():
+            item = self.image_row.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+    def _refresh_images(self) -> None:
+        from PySide6.QtCore import Qt
+        from PySide6.QtGui import QPixmap
+        from PySide6.QtWidgets import QLabel, QPushButton
+
+        previews = self.app.draft_image_previews()
+        if not previews:
+            self.images.setText("没有图片")
+            self._clear_image_row()
+            return
+        missing = sum(1 for item in previews if not item["present"])
+        self.images.setText(
+            f"{len(previews)} 张图，顺序即投递顺序"
+            + ("，有图还没传到电脑" if missing else "")
+        )
+        self._clear_image_row()
+        for item in previews:
+            thumb = QPushButton(f"{item['order']}")
+            thumb.setFixedSize(72, 72)
+            if item["present"] and item["data"]:
+                pix = QPixmap()
+                pix.loadFromData(item["data"])
+                thumb.setIcon(pix)
+                thumb.setIconSize(thumb.size() * 0.9)
+                thumb.clicked.connect(lambda _=False, payload=item["data"]: self._enlarge(payload))
+            else:
+                thumb.setText(f"{item['order']}\n缺图")
+            self.image_row.addWidget(thumb)
+        self.image_row.addStretch(1)
+
+    def _enlarge(self, payload: bytes) -> None:
+        from PySide6.QtGui import QPixmap
+        from PySide6.QtWidgets import QDialog, QLabel, QVBoxLayout
+
+        dlg = QDialog(self.widget)
+        dlg.setWindowTitle("查看图片")
+        box = QVBoxLayout(dlg)
+        label = QLabel()
+        pix = QPixmap()
+        pix.loadFromData(payload)
+        from PySide6.QtCore import Qt
+
+        if not pix.isNull():
+            label.setPixmap(pix.scaled(480, 480, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        else:
+            label.setPixmap(pix)
+        box.addWidget(label)
+        dlg.resize(500, 500)
+        dlg.exec()
+
+    def suggest_rewrite(self) -> None:
+        self.app.draft.text = self.editor.toPlainText()
+        out = self.app.suggest_text(self.editor.toPlainText())
+        if out.get("suggested") and out["suggested"] != out.get("original"):
+            self.banner.setText("有一处建议，可采用或不用。插入不会被模型挡住。")
+        else:
+            self.banner.setText(out.get("message") or "没有可用的改写建议")
+        self.banner.show()
+
+    def apply_rewrite(self) -> None:
+        self.app.draft.text = self.editor.toPlainText()
+        if not self.app.apply_suggestion():
+            self.banner.setText("建议已过期，请再点建议改写")
+            self.banner.show()
+            return
+        self.editor.blockSignals(True)
+        self.editor.setPlainText(self.app.draft.text)
+        self.editor.blockSignals(False)
+        self.banner.setText("已采用建议，可再点不用建议前的稿已替换")
+        self.banner.show()
+
+    def reject_rewrite(self) -> None:
+        self.app.reject_suggestion()
+        self.banner.setText("已不用这次建议，原文未改")
+        self.banner.show()
 
     def check_terms(self) -> None:
         from doubao_typeless.services.terms import hints
@@ -346,6 +442,10 @@ class ClientWindow:
         self.device_box = QLabel("还没有手机连上。扫码后在这里批准插入和截图。")
         self.device_box.setWordWrap(True)
         cl.addWidget(self.device_box)
+        self.device_name = QLineEdit()
+        self.device_name.setPlaceholderText("给已连接的手机起个名字")
+        self.device_name.hide()
+        cl.addWidget(self.device_name)
         self.grant_row = QHBoxLayout()
         cl.addLayout(self.grant_row)
         cl.addWidget(QLabel("本机练习框（引导用，不是 Cursor）"))
@@ -376,6 +476,10 @@ class ClientWindow:
         self.hotkey_recall = QLineEdit(str(stored.get("hotkey_recall") or "<alt>+<shift>+i"))
         sl.addRow("插入并复制", self.hotkey_insert)
         sl.addRow("召回上次", self.hotkey_recall)
+        self.hotkey_expand = QLineEdit(str(stored.get("hotkey_expand") or "<alt>+<shift>+e"))
+        self.hotkey_capture = QLineEdit(str(stored.get("hotkey_capture") or "<alt>+<shift>+s"))
+        sl.addRow("展开当前图文", self.hotkey_expand)
+        sl.addRow("截图给手机", self.hotkey_capture)
         self.autostart = QCheckBox("登录 Windows 时启动（到托盘）")
         self.autostart.setChecked(bool(stored.get("autostart")))
         self.start_min = QCheckBox("启动后先到托盘")
@@ -402,6 +506,22 @@ class ClientWindow:
         self.byok_url_note.setWordWrap(True)
         self.byok_endpoint.textChanged.connect(lambda t: self.byok_url_note.setText(url_join_note(t)))
         sl.addRow(self.byok_url_note)
+        from PySide6.QtWidgets import QGroupBox
+
+        advanced = QGroupBox("高级模型参数（默认不用）")
+        advanced.setCheckable(True)
+        advanced.setChecked(bool(stored.get("byok_prompt") or stored.get("byok_temperature") or stored.get("byok_timeout")))
+        adv = QFormLayout(advanced)
+        self.byok_prompt = QPlainTextEdit()
+        self.byok_prompt.setPlainText(str(stored.get("byok_prompt") or ""))
+        self.byok_prompt.setFixedHeight(64)
+        self.byok_temperature = QLineEdit(str(stored.get("byok_temperature") or ""))
+        self.byok_timeout = QLineEdit(str(stored.get("byok_timeout") or ""))
+        adv.addRow("附加说明", self.byok_prompt)
+        adv.addRow("温度", self.byok_temperature)
+        adv.addRow("超时秒", self.byok_timeout)
+        sl.addRow(advanced)
+        self.byok_advanced = advanced
         self.byok_status = QLabel("")
         self.byok_status.setObjectName("muted")
         sl.addRow(self.byok_status)
@@ -590,13 +710,18 @@ class ClientWindow:
                 self.qr.show()
                 self.practice.show()
                 self.device_box.setText("还没有手机连上。扫码后在这里批准插入和截图。")
+                self.device_name.hide()
             else:
                 self.qr.hide()
                 self.practice.hide()
+                from doubao_typeless.storage.credentials import device_label
+
+                nicks = load_settings(self.app.data_dir).get("device_nicknames") or {}
                 lines = []
-                for item in sessions:
+                for index, item in enumerate(sessions, start=1):
+                    name = device_label(item["device_id"], nicks, index)
                     lines.append(
-                        f"设备 {item['device_id'][:8]}  插入={'开' if item['allow_insert'] else '关'}  "
+                        f"{name}  插入={'开' if item['allow_insert'] else '关'}  "
                         f"截图={'开' if item['allow_capture'] else '关'}"
                     )
                     sid = item["session_id"]
@@ -612,6 +737,9 @@ class ClientWindow:
                     self.grant_row.addWidget(allow_i)
                     self.grant_row.addWidget(allow_c)
                     self.grant_row.addWidget(revoke)
+                self.device_name.show()
+                if not self.device_name.hasFocus():
+                    self.device_name.setText(device_label(sessions[0]["device_id"], nicks, 1))
                 self.device_box.setText("\n".join(lines))
         hist_sig = tuple(
             (item["bundle"].get("bundle_id"), item.get("attempt_result"))
@@ -647,14 +775,24 @@ class ClientWindow:
         self.refresh()
 
     def save_settings(self) -> None:
+        nicks = dict(load_settings(self.app.data_dir).get("device_nicknames") or {})
+        sessions = self.app.auth.public_sessions()
+        if sessions and self.device_name.text().strip():
+            nicks[sessions[0]["device_id"]] = self.device_name.text().strip()
         payload = {
             "hotkey_insert": self.hotkey_insert.text().strip() or "<alt>+i",
             "hotkey_recall": self.hotkey_recall.text().strip() or "<alt>+<shift>+i",
+            "hotkey_expand": self.hotkey_expand.text().strip() or "<alt>+<shift>+e",
+            "hotkey_capture": self.hotkey_capture.text().strip() or "<alt>+<shift>+s",
             "autostart": self.autostart.isChecked(),
             "start_minimized": self.start_min.isChecked(),
             "byok_endpoint": self.byok_endpoint.text().strip(),
             "byok_api_key": self.byok_key.text().strip(),
             "byok_model": self.byok_model.text().strip(),
+            "byok_prompt": self.byok_prompt.toPlainText().strip(),
+            "byok_temperature": self.byok_temperature.text().strip(),
+            "byok_timeout": self.byok_timeout.text().strip(),
+            "device_nicknames": nicks,
         }
         save_settings(self.app.data_dir, payload)
         save_vocab(self.app.data_dir, self.vocab.toPlainText())
@@ -662,7 +800,16 @@ class ClientWindow:
         self.app.byok.endpoint = stored["byok_endpoint"]
         self.app.byok.api_key = stored["byok_api_key"]
         self.app.byok.model = stored["byok_model"]
-        failures = self.app.apply_hotkeys(stored["hotkey_insert"], stored["hotkey_recall"])
+        self.app.byok.extra_prompt = stored["byok_prompt"]
+        from doubao_typeless.app import _optional_float
+
+        self.app.byok.temperature = _optional_float(stored["byok_temperature"])
+        failures = self.app.apply_hotkeys(
+            stored["hotkey_insert"],
+            stored["hotkey_recall"],
+            expand=stored["hotkey_expand"],
+            capture=stored["hotkey_capture"],
+        )
         ok, err = apply_v3_autostart(bool(stored["autostart"]))
         if stored["autostart"] and not ok:
             self.byok_status.setText(f"设置已保存。开机自启未写入：{err}")
@@ -889,9 +1036,12 @@ def run_desktop(argv: list[str] | None = None) -> int:
             start = start_hotkeys(
                 on_insert=app.insert_current,
                 on_recall=app.recall_last,
+                on_expand=lambda: app._notify_ui("expand"),
                 on_region=app.capture_region,
                 insert_combo=str(stored.get("hotkey_insert") or "<alt>+i"),
                 recall_combo=str(stored.get("hotkey_recall") or "<alt>+<shift>+i"),
+                expand_combo=str(stored.get("hotkey_expand") or "<alt>+<shift>+e"),
+                capture_combo=str(stored.get("hotkey_capture") or "<alt>+<shift>+s"),
             )
             app._hotkeys = start
             if start.get("failures"):

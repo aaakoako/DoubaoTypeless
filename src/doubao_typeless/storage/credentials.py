@@ -29,6 +29,11 @@ class PairingChallenge:
     expires_at: float
 
 
+def device_label(device_id: str, nicknames: dict | None, index: int) -> str:
+    nick = str((nicknames or {}).get(device_id) or "").strip()
+    return nick or f"手机 {index}"
+
+
 def pairing_page_url(base_url: str, code: str) -> str:
     base = (base_url or "").rstrip("/") + "/"
     return f"{base}?pair={quote(code or '', safe='')}"
