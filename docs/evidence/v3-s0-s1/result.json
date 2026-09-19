@@ -1,0 +1,20 @@
+{
+  "slice": "S0_S1_command_layer",
+  "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
+  "status": "IMPLEMENTED",
+  "pytest": "122 passed, 1 skipped",
+  "skipped": "test_wake_pipe when live preview owns DoubaoTypelessV3Preview pipe",
+  "not_cursor": true,
+  "not_release": true,
+  "fixed": [
+    "A01 insert_current freezes current draft; insert_last no longer falls back to current",
+    "A02 insert+copy+hide+matching new draft is one command-layer transaction",
+    "A03 HUD 400 DIP, no text[-200:], button 插入并复制",
+    "A04 save/restore external focus; own Qt windows return OWN_WINDOW",
+    "A05 delivery compares focus identity, not only classify_focus kind",
+    "A06 restore_history asks when current draft exists",
+    "A15 capture import no longer touches windll on Linux; snapshot accepts CRLF/LF; recovery test stubs OS; CI installs PySide6"
+  ],
+  "remaining": ["A07", "A08", "A09", "A10", "A11", "A12", "A13", "A14", "A16", "A17", "A18"],
+  "html_board_is_not_product": true
+}

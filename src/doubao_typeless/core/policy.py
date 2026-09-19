@@ -29,6 +29,19 @@ def classify_focus(class_name: str, control_type: str = "", automation_id: str =
     return "unknown"
 
 
+OWN_WINDOW_MARKERS = (
+    "dt-v3-hud",
+    "doubaotypeless",
+    "当前图文",
+    "上次结果未知",
+)
+
+
+def is_own_window(class_name: str, title: str = "", automation_id: str = "") -> bool:
+    blob = f"{class_name} {title} {automation_id}".lower()
+    return any(token in blob for token in OWN_WINDOW_MARKERS)
+
+
 def may_inject(kind: FocusKind, *, wants_images: bool) -> bool:
     if kind in {"composer", "paste"}:
         return True

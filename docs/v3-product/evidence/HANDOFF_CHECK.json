@@ -1,0 +1,70 @@
+{
+  "kind": "handoff file and design-page checks ONLY",
+  "product_tests_run": false,
+  "native_product_run": false,
+  "source_sha": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
+  "integrity_checks": {
+    "96_original_cases_unique": true,
+    "24_user_experience_cases_mapped": true,
+    "41_capability_inventory": true,
+    "no_product_pass_assigned": true
+  },
+  "ui_views": [
+    {
+      "view": "connect",
+      "rendered": true
+    },
+    {
+      "view": "connected",
+      "rendered": true
+    },
+    {
+      "view": "settings",
+      "rendered": true
+    },
+    {
+      "view": "ai",
+      "rendered": true
+    },
+    {
+      "view": "recent",
+      "rendered": true
+    },
+    {
+      "view": "review",
+      "rendered": true
+    },
+    {
+      "view": "short",
+      "rendered": true
+    },
+    {
+      "view": "long",
+      "rendered": true
+    },
+    {
+      "view": "hidden",
+      "rendered": true
+    },
+    {
+      "view": "markup",
+      "rendered": true
+    },
+    {
+      "view": "recovery",
+      "rendered": true
+    }
+  ],
+  "responsive_width_390": {
+    "sw": 390,
+    "w": 390
+  },
+  "page_errors": [],
+  "readable_plan_h2_count": 11,
+  "render_method": "system Chromium, page.set_content of owned local HTML; no product/remote application navigation",
+  "render_notes": [
+    "bundled Playwright browser unavailable; system Chromium used",
+    "file URL navigation blocked by environment; local HTML bytes rendered in page via set_content"
+  ],
+  "visual_inspection": "UI_REFERENCE.png opened and inspected; product UI was not inspected or executed"
+}

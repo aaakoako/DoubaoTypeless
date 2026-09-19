@@ -8,6 +8,12 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+try:
+    import PySide6  # noqa: F401
+    HAS_PYSIDE = True
+except ImportError:
+    HAS_PYSIDE = False
+
 from doubao_typeless.app import V3App
 from doubao_typeless.ui.filelog import FileLogger
 from doubao_typeless.ui.recovery import plan_retry
@@ -85,6 +91,7 @@ def test_settings_and_review_use_same_store(tmp_path, monkeypatch):
     assert win.widget.isVisible() is False
 
 
+@pytest.mark.skipif(not HAS_PYSIDE, reason="PySide6 not installed")
 def test_recovery_dialog_asks_instead_of_auto_replay():
     plan = plan_retry(
         previous_result="UNKNOWN",
@@ -122,8 +129,9 @@ def test_pause_blocks_draft_without_dropping_text(tmp_path):
     assert app.draft.text == "kept"
 
 
+@pytest.mark.skipif(not HAS_PYSIDE, reason="PySide6 not installed")
 def test_wake_pipe_is_preview_specific_and_false_without_server():
-    from PySide6.QtNetwork import QLocalServer
+    from PySide6.QtNetwork import QLocalServer, QLocalSocket
     from doubao_typeless.ui.single_instance import PIPE, request_quit, request_show
     from doubao_typeless.ui.v3_startup import V3_RUN_NAME
 
@@ -131,6 +139,11 @@ def test_wake_pipe_is_preview_specific_and_false_without_server():
     assert V3_RUN_NAME == "DoubaoTypelessV3Preview"
     assert V3_RUN_NAME != "DoubaoTypeless"
     _qt_app()
+    probe = QLocalSocket()
+    probe.connectToServer(PIPE)
+    if probe.waitForConnected(80):
+        probe.disconnectFromServer()
+        pytest.skip("live preview instance owns the pipe; do not poke it")
     QLocalServer.removeServer(PIPE)
     assert request_show() is False
     assert request_quit() is False

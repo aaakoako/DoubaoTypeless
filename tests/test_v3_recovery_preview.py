@@ -32,8 +32,8 @@ def test_ping_and_hello_do_not_wake_hud():
     assert should_wake("pong") is False
     assert should_wake("session.hello") is False
     assert should_wake("draft.update") is True
-    assert TEXT_SIZE == (360, 88)
-    assert IMAGE_SIZE == (360, 132)
+    assert TEXT_SIZE == (400, 88)
+    assert IMAGE_SIZE == (400, 132)
 
 
 def test_intent_duplicate_and_busy_do_not_double_paste():

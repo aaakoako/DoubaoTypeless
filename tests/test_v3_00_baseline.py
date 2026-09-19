@@ -36,6 +36,17 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _sha256_newline_aliases(path: Path) -> set[str]:
+    raw = path.read_bytes()
+    lf = raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    crlf = lf.replace(b"\n", b"\r\n")
+    return {
+        hashlib.sha256(raw).hexdigest(),
+        hashlib.sha256(lf).hexdigest(),
+        hashlib.sha256(crlf).hexdigest(),
+    }
+
+
 def test_legacy_sanitized_config_fixture_exists_and_has_no_secrets():
     assert SANITIZED_CONFIG.is_file(), "缺少 tests/fixtures/legacy/config.sanitized.json"
     raw = SANITIZED_CONFIG.read_text(encoding="utf-8")
@@ -88,7 +99,7 @@ def test_daily_use_snapshot_matches_current_tree():
     for rel, expected in snap["tracked_hashes"].items():
         path = ROOT / rel
         assert path.is_file(), f"快照后丢失 {rel}"
-        assert _sha256(path) == expected, f"{rel} 已被改写"
+        assert expected in _sha256_newline_aliases(path), f"{rel} 已被改写"
     for rel in snap["must_remain_absent"]:
         assert not (ROOT / rel).exists(), f"禁止写入日用文件 {rel}"
 

@@ -1,0 +1,475 @@
+{
+  "reviewed_sha": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
+  "legacy_sha": "e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5",
+  "features": [
+    {
+      "capability": "插入并复制",
+      "legacy": "主按钮＋Alt+I，最终保留文本到剪贴板",
+      "current": "仅“插入”标签；有写剪贴板底层但流程不完整",
+      "required": "恢复主动作及结果语义；不是只改按钮名",
+      "stage": "S1"
+    },
+    {
+      "capability": "只复制文字",
+      "legacy": "有独立复制，不插入",
+      "current": "详情缺独立复制入口",
+      "required": "一次点击复制，不新稿不清图，不冒充已投递",
+      "stage": "S1"
+    },
+    {
+      "capability": "当前稿与上次图文",
+      "legacy": "旧有文字历史可恢复",
+      "current": "last_bundle优先，混稿风险",
+      "required": "当前总是当前；上次独立不可变，安全恢复",
+      "stage": "S1/S3"
+    },
+    {
+      "capability": "插入后收窗",
+      "legacy": "旧按钮先hide",
+      "current": "无统一完成控制",
+      "required": "大浮窗先隐藏，结束短反馈再隐藏",
+      "stage": "S1"
+    },
+    {
+      "capability": "手机开始下一段",
+      "legacy": "旧发无版本cleared",
+      "current": "手机只toast，普通目标unknown卡住",
+      "required": "非破坏性轮换＋精确回执＋可召回",
+      "stage": "S1"
+    },
+    {
+      "capability": "长文可读",
+      "legacy": "可调整审阅窗/全文编辑",
+      "current": "固定88/132高度、尾200字",
+      "required": "有上限自适应＋全文详情，不缩字号",
+      "stage": "S1"
+    },
+    {
+      "capability": "电脑改字与标准编辑",
+      "legacy": "有编辑/选中/撤销等",
+      "current": "有QPlainTextEdit，真实冲突不完整",
+      "required": "完整保留，手机来稿不覆盖编辑分支",
+      "stage": "S1/S3"
+    },
+    {
+      "capability": "热键与冲突",
+      "legacy": "插入/唤起、可自定义",
+      "current": "插入/召回部分可配；展开/截图配置不足",
+      "required": "四动作统一注册反馈，保存失败保留旧绑定",
+      "stage": "S1/S4"
+    },
+    {
+      "capability": "焦点与外部目标",
+      "legacy": "保存前台窗口并尝试恢复",
+      "current": "只看class/title；自家窗口可能成为目标",
+      "required": "明确外部控件、文档/会话身份，每步复核",
+      "stage": "S1/S2"
+    },
+    {
+      "capability": "剪贴板保护",
+      "legacy": "有设置，插入路径keep_in_clipboard=True",
+      "current": "无完整策略UI",
+      "required": "主“插入并复制”保留结果；保护用户中途复制；其他恢复模式另命名",
+      "stage": "S1"
+    },
+    {
+      "capability": "手动清空/新稿",
+      "legacy": "有清空",
+      "current": "没有完整多端语义",
+      "required": "保全上一版，可撤销；不删历史或晚来的新稿",
+      "stage": "S1/S3"
+    },
+    {
+      "capability": "首次连接与二维码",
+      "legacy": "设置可扫码",
+      "current": "原生入口已接，仍扫码后长码",
+      "required": "零手输配对，短码备用，本机批准，可记住设备",
+      "stage": "S0/S4"
+    },
+    {
+      "capability": "完整原生客户端",
+      "legacy": "旧Tk设置/审阅",
+      "current": "Qt主窗、托盘、详情已接",
+      "required": "保留已有实现完善，不退回pc.html/CLI",
+      "stage": "S1/S4"
+    },
+    {
+      "capability": "自启动与托盘",
+      "legacy": "有",
+      "current": "V3隔离注册项与二次唤起已实现",
+      "required": "自启到托盘、手动开窗口、真点击退出、重复开只唤起",
+      "stage": "S4/S5"
+    },
+    {
+      "capability": "手机IME原路径",
+      "legacy": "原textarea与同步",
+      "current": "网页仍有文字入口",
+      "required": "真实composition/回改/末尾字符不丢，不再造ASR",
+      "stage": "S1"
+    },
+    {
+      "capability": "会话重连与持久草稿",
+      "legacy": "有重连和文本历史但弱",
+      "current": "服务端有快照，手机版恢复不足",
+      "required": "正文/图序/scene持久化，重连不重发系统动作",
+      "stage": "S1/S3"
+    },
+    {
+      "capability": "手机相册多图",
+      "legacy": "新增",
+      "current": "入口有，多选/未上传状态不足",
+      "required": "独立每图状态、方向/裁剪/重排/重编辑、不漏图",
+      "stage": "S2/S3"
+    },
+    {
+      "capability": "电脑截图到手机",
+      "legacy": "新增",
+      "current": "原生捕获有，鉴权加载/主动推送不足",
+      "required": "手机和PC热键都到手机正确编辑页，授权范围可控",
+      "stage": "S2"
+    },
+    {
+      "capability": "裁剪与隐私遮挡",
+      "legacy": "新增",
+      "current": "有部分画布实现",
+      "required": "源图可逆编辑；只发完成成品；真实像素遮挡",
+      "stage": "S2/S3"
+    },
+    {
+      "capability": "手机笔刷和图形",
+      "legacy": "新增",
+      "current": "部分Konva工具/undo已补",
+      "required": "3笔刷、箭头、线/矩形/椭圆/文字/编号/移动/橡皮可用",
+      "stage": "S3"
+    },
+    {
+      "capability": "轻量白板",
+      "legacy": "新增，用户本轮要求",
+      "current": "已有单画布和简单线框",
+      "required": "横/竖/方画布、网格可隐藏、组件可编辑、能重开",
+      "stage": "S3"
+    },
+    {
+      "capability": "编号与文字说明",
+      "legacy": "新增",
+      "current": "显示图序但关联能力不足",
+      "required": "编号绑定图片ID；调整图序后说明不串；用户确认才插说明",
+      "stage": "S3"
+    },
+    {
+      "capability": "手机边画边说",
+      "legacy": "新增，原V3有说明抽屉",
+      "current": "已读页面未形成抽屉",
+      "required": "编辑器内文字抽屉，原输入法说说明不来回跳页",
+      "stage": "S3"
+    },
+    {
+      "capability": "桌面图片预览",
+      "legacy": "新增",
+      "current": "仅图数量QLabel",
+      "required": "缩略图、图序、放大查看；不另做电脑绘画软件",
+      "stage": "S2/S4"
+    },
+    {
+      "capability": "图像上传/大小限制",
+      "legacy": "新增",
+      "current": "refs解析已补，默认1MiB边界仍风险",
+      "required": "二进制鉴权上传、完整校验、限流、失效引用明确拒绝",
+      "stage": "S2"
+    },
+    {
+      "capability": "主目标一键图文",
+      "legacy": "新增",
+      "current": "专用target有记录；真实Cursor未完成",
+      "required": "当前聊天网页和Cursor能力分别验证；主目标不能永久半自动冒充一键",
+      "stage": "S2/S5"
+    },
+    {
+      "capability": "部分/未知安全重试",
+      "legacy": "新增",
+      "current": "有真实对话框，目标和接线不足",
+      "required": "完整重贴/只补文/取消实际执行；不清目标原内容",
+      "stage": "S3"
+    },
+    {
+      "capability": "最近内容",
+      "legacy": "旧文字历史",
+      "current": "图文列表有，每秒重建；恢复覆盖",
+      "required": "缩略图首句时间，选择稳定，恢复新稿不丢正在写的稿",
+      "stage": "S3/S4"
+    },
+    {
+      "capability": "服务商与模型预设",
+      "legacy": "旧版有",
+      "current": "三个裸字段",
+      "required": "预设＋自定义，模型值贯穿probe和实际纠错",
+      "stage": "S4"
+    },
+    {
+      "capability": "每服务商Key",
+      "legacy": "旧有Key分桶但明文",
+      "current": "单明文Key",
+      "required": "电脑OS凭据库＋配置引用，跨host重新授权",
+      "stage": "S0/S4"
+    },
+    {
+      "capability": "手动术语辅助",
+      "legacy": "旧有建议采纳拒绝",
+      "current": "服务有空transport/错误字段",
+      "required": "真实手动入口，选中文本或当前稿，局部建议可撤回",
+      "stage": "S4"
+    },
+    {
+      "capability": "词库管理",
+      "legacy": "旧有词典/术语管理",
+      "current": "只有hints基础，不是管理器",
+      "required": "查看/新增/编辑/禁用/导入，歧义词默认仅提示",
+      "stage": "S4"
+    },
+    {
+      "capability": "高级模型参数",
+      "legacy": "旧有prompt/timeout/temperature等",
+      "current": "缺省掉",
+      "required": "折叠保留prompt/timeout/支持参数，默认简单",
+      "stage": "S4"
+    },
+    {
+      "capability": "模型错误与测试",
+      "legacy": "旧有probe",
+      "current": "同步阻塞、未用所选model",
+      "required": "异步可取消，结构化401/404/429/超时/TLS/空返回",
+      "stage": "S4"
+    },
+    {
+      "capability": "后台学习/自动改写",
+      "legacy": "旧有双通道与学习队列",
+      "current": "已弱化",
+      "required": "本轮主流程关闭，不恢复默认后台学习；旧数据可读保留",
+      "stage": "有意精简"
+    },
+    {
+      "capability": "连接诊断与日志",
+      "legacy": "旧有自检/导出",
+      "current": "图形help主要日志路径",
+      "required": "一键诊断/导出，无Key/token/正文/图片，不常驻调试字段",
+      "stage": "S4"
+    },
+    {
+      "capability": "版本与更新",
+      "legacy": "旧有更新机制",
+      "current": "无完整V3UI闭环",
+      "required": "版本/检查更新/公开下载页；不静默覆日用或预览转正式",
+      "stage": "S4/S5"
+    },
+    {
+      "capability": "主题、控件与图标",
+      "legacy": "旧有资源；用户要求重做",
+      "current": "局部样式与旧icon混用",
+      "required": "平面全状态、深浅主题、完整图标/托盘变体、无装饰阴影",
+      "stage": "S4"
+    },
+    {
+      "capability": "构建/依赖/许可证",
+      "legacy": "旧有Windows发行",
+      "current": "CI已增但红；包仍consoleTrue",
+      "required": "锁定依赖、无控制台正式候选、完整ZIP与资源清单",
+      "stage": "S0/S5"
+    },
+    {
+      "capability": "日用隔离/迁移/回退",
+      "legacy": "旧日用数据必须保护",
+      "current": "preview目录隔离与锁已有",
+      "required": "隔离测试；只读导入确认；旧数据/启动项不被覆盖",
+      "stage": "S0/S5"
+    },
+    {
+      "capability": "macOS/Linux/公网隧道",
+      "legacy": "用户后续方向",
+      "current": "未完成",
+      "required": "接口可扩展；本轮不承诺、不用占位入口宣称支持",
+      "stage": "明确后置"
+    }
+  ],
+  "findings": [
+    {
+      "id": "A01",
+      "priority": "P0",
+      "title": "当前稿与上次图文仍混用",
+      "evidence": "app.insert_last先读last_bundle，仅为空才冻结当前稿；ReviewPanel保存电脑改字后仍调用该入口。可能继续拿A而不是当前B。",
+      "location": "app.py::insert_last; desktop.py::ReviewPanel.insert",
+      "required_fix": "当前插入始终冻结当前稿；召回独立加载不可变历史；不得靠清_last_attempt掩盖。",
+      "stage": "S1",
+      "case_ids": "AC3-013,016,064,065,069"
+    },
+    {
+      "id": "A02",
+      "priority": "P1",
+      "title": "插入后的收窗、复制、新稿不是统一事务",
+      "evidence": "_on_intent只在CONFIRMED归档本机draft；手机attempt.status只改提示；通用observe_text始终unknown；没有所有入口共同的完成/轮换回执。",
+      "location": "app.py::_on_intent; web/src/app.ts::ws.onmessage",
+      "required_fix": "按第4节拆开复制结果、注入结果、接收证据、草稿轮换和窗口可见性。",
+      "stage": "S1",
+      "case_ids": "AC3-016,025,026,030,037,039"
+    },
+    {
+      "id": "A03",
+      "priority": "P1",
+      "title": "长文被固定高度与200字符尾部限制",
+      "evidence": "hud仍是360×88/132，QLabel只取text[-200:]。原设计确实这样写，本次属于已批准的体验修订。",
+      "location": "ui/hud.py::_apply_show",
+      "required_fix": "按排版有上限增高；不截断模型中的正文；滚动阅读不被追尾。",
+      "stage": "S1",
+      "case_ids": "AC3-029,030,040,091"
+    },
+    {
+      "id": "A04",
+      "priority": "P0",
+      "title": "打开审阅/恢复窗口后的目标交接缺失",
+      "evidence": "ReviewPanel先调用insert_last再隐藏；恢复选择在活动对话框中调用投递；read_focus只回顶层class/title，没有明确保存、恢复和验证用户选中的外部控件。",
+      "location": "ui/desktop.py::ReviewPanel.insert,DesktopShell._ask_recovery; platform/windows/clipboard.py::read_focus",
+      "required_fix": "本应用窗口绝不作为投递目标；记录上次明确外部目标，主动编辑后恢复并实测验证；不能猜一个旧窗口。",
+      "stage": "S1",
+      "case_ids": "AC3-005,007,034,063,065"
+    },
+    {
+      "id": "A05",
+      "priority": "P0",
+      "title": "目标变化检查仍只比较类别",
+      "evidence": "delivery.py与旧审计版本blob一致；同类Composer切换可能继续发；等待修饰键后没有立即复核，已有图片步骤也可能回报NO_STEPS。",
+      "location": "services/delivery.py::run",
+      "required_fix": "具体目标指纹、逐步日志、等待后再检查；已发任何一步不回退零步骤。",
+      "stage": "S1/S2",
+      "case_ids": "AC3-007,034,035,036,062,063,067"
+    },
+    {
+      "id": "A06",
+      "priority": "P0",
+      "title": "恢复历史会直接覆盖当前草稿",
+      "evidence": "ClientWindow.restore_as_draft直接写共享draft.text/assets；界面文字却说不会覆盖。重投还会清_last_attempt，失去历史不确定结果上下文。",
+      "location": "ui/desktop.py::restore_as_draft,replay_snapshot; services/history.py",
+      "required_fix": "恢复先保全当前非空稿再建新ID/epoch，或明确选择；重投保留原Bundle和Attempt，不能丢掉manifest身份。",
+      "stage": "S3",
+      "case_ids": "AC3-065,066,067,069,070"
+    },
+    {
+      "id": "A07",
+      "priority": "P1",
+      "title": "手机图片流程没有随D1/D2更新",
+      "evidence": "web/src/app.ts blob与55d03cc相同：未上传附件被assetRefs过滤；上传失败后回主页；多选图连续覆盖编辑器；截图URL直接加载无自定义鉴权头。",
+      "location": "web/src/app.ts::assetRefs,finishEditor,openEditor; web/src/editor/canvas.ts::loadImage",
+      "required_fix": "每图显式状态；不能静默漏图；源图→可编辑场景→输出分开；鉴权fetch→blob；多选先入队不反复抢编辑器。",
+      "stage": "S2/S3",
+      "case_ids": "AC3-021,038,041,045,046,047,056,057,060"
+    },
+    {
+      "id": "A08",
+      "priority": "P1",
+      "title": "HTTP安全上下文与1MiB边界仍需修",
+      "evidence": "页面仍用crypto.randomUUID；默认服务app未显式扩大body上限，CHUNK仍1MiB。旧反例适用于相同组合，但本轮未运行当前HTTP反例。",
+      "location": "web/src/app.ts::sendBtn; services/assets.py::CHUNK; services/bridge_v3.py::make_app",
+      "required_fix": "真实非loopback HTTP生产页面测试；合法安全随机ID兼容；显式协调有限请求大小与分块，不靠测试环境覆盖变量。",
+      "stage": "S2",
+      "case_ids": "AC3-021,022,027,039,041,085"
+    },
+    {
+      "id": "A09",
+      "priority": "P1",
+      "title": "二维码只含地址，长码仍需人工输入",
+      "evidence": "qr_pixmap(url)，code单独展示；AuthService URLsafe8；刷新每秒重新生成QR并可能开启新挑战；会话不等于记住设备。",
+      "location": "ui/desktop.py::phone_url,refresh; storage/credentials.py",
+      "required_fix": "普通扫码零手输；临时邀请与长期凭据分开；短码只是受限备用；已连接页收起扫码和练习区。",
+      "stage": "S0/S4",
+      "case_ids": "AC3-017,018,019,020,077,080"
+    },
+    {
+      "id": "A10",
+      "priority": "P1",
+      "title": "BYOK有表单但不是完整可用辅助",
+      "evidence": "byok_model只保存没有注入请求；probe同步httpx.post阻塞Qt；ByokService默认no_transport，写死model=user/input。未见审阅“检查术语”闭环。",
+      "location": "ui/desktop.py::save_settings,probe_byok; services/byok.py; app.py::__init__",
+      "required_fix": "同一异步配置/请求通道给probe和正文；真实所选model；明确用途和手动按钮；局部建议接受/拒绝/撤回。",
+      "stage": "S4",
+      "case_ids": "AC3-072,073,074,075,076,077"
+    },
+    {
+      "id": "A11",
+      "priority": "P0",
+      "title": "密钥明文入settings，配置变更缺统一安全边界",
+      "evidence": "settings_store保存byok_api_key明文。原子写json不等于安全存储；不同UI路径对更换host/旧key处理需统一。",
+      "location": "storage/settings_store.py::save_settings; ui/desktop.py::save_settings",
+      "required_fix": "OS凭据库，配置只存引用；不可用回会话模式；更换主机重新授权，不复制Key到证据。",
+      "stage": "S0/S4",
+      "case_ids": "AC3-072,074,080,086,092"
+    },
+    {
+      "id": "A12",
+      "priority": "P1",
+      "title": "手机/电脑编辑冲突只拦显示，没建立完整写入协议",
+      "evidence": "bridge先_apply_draft_fields再_on_activity；review_editing时回调返回但共享草稿已经变化；测试直接调_on_activity未走真实WS。",
+      "location": "services/bridge_v3.py::_handle; app.py::_on_activity; tests/test_v3_desktop.py",
+      "required_fix": "唯一状态写入者；电脑编辑分支与手机pending独立；显式采纳/保留；真实WS自动化验证，不只检查QPlainTextEdit。",
+      "stage": "S1/S3",
+      "case_ids": "AC3-014,016,025,064,069"
+    },
+    {
+      "id": "A13",
+      "priority": "P1",
+      "title": "原生UI持续轮询、列表选择易丢",
+      "evidence": "ClientWindow每秒refresh；每次生成QR、查IP、clear重建recent_list，隐藏窗口也继续。详情只有图数，无预览/复制；练习框固定在主页。",
+      "location": "ui/desktop.py::refresh,ClientWindow.__init__,ReviewPanel",
+      "required_fix": "事件驱动更新，列表保留选择和滚动；可见时仅更新倒计时；补缩略图/复制，练习后置；完整控件状态样式。",
+      "stage": "S1/S4",
+      "case_ids": "AC3-029,030,040,069,077,081,091"
+    },
+    {
+      "id": "A14",
+      "priority": "P1",
+      "title": "新GUI跨线程通知与退出需要按真实入口重验",
+      "evidence": "HUD.show改为有context的singleShot是进展；DesktopShell._from_service却使用无接收context的singleShot；hide直接调控件。stop只关bridge和锁。",
+      "location": "ui/desktop.py::_from_service,_on_ipc,quit; ui/hud.py; app.py::stop",
+      "required_fix": "统一QObject queued signal或有接收者的调度；timer在所属线程；退出停止热键/线程/DB再退出；不能仅靠Python状态变量。",
+      "stage": "S1/S5",
+      "case_ids": "AC3-005,030,035,070,087,091"
+    },
+    {
+      "id": "A15",
+      "priority": "P1",
+      "title": "最新CI真实失败，不再是旧Pillow问题",
+      "evidence": "当前run35421285278前端构建通过，pytest=5 failed/108 passed/3 skipped，Windows job跳过；Linux导入WinAPI、缺PySide6、恢复测试及LF/CRLF基线差异。",
+      "location": " .github/workflows/preview-v3.yml; tests/test_v3_00_baseline.py; tests/test_v3_desktop.py",
+      "required_fix": "隔离纯逻辑与native测试；Windows执行native而非全skip；安装正确依赖；修EOL基线方式，不随意改成通过。",
+      "stage": "S0/S5",
+      "case_ids": "AC3-004,034,043,065,085,087,088"
+    },
+    {
+      "id": "A16",
+      "priority": "P1",
+      "title": "包身份、发布文档和真正完成状态未统一",
+      "evidence": "CHECKPOINT.open_defects为空；current_head=cc777合理因4eb仅文档；checkpoints和checksums可能不同代包；exe哈希不覆盖onedir中DLL/网页资源。",
+      "location": "docs/v3-delivery/CHECKPOINT.json; docs/release/checksums.txt; packaging/v3_preview.spec",
+      "required_fix": "重开真实缺陷；唯一候选清单绑定源提交、构建输入/完整ZIP与文件manifest；最终无控制台包，不发布旧spec构建。",
+      "stage": "S0/S5",
+      "case_ids": "AC3-084,085,088,093,094,095,096"
+    },
+    {
+      "id": "A17",
+      "priority": "P0",
+      "title": "权限与会话边界仍需全链路复核",
+      "evidence": "已有握手鉴权和本机批准是进展，但后续draft.update只依赖连接authorized标记；授权撤销/过期、会话绑定、素材归属及截图使用sessions[-1]仍缺一致约束。",
+      "location": "services/bridge_v3.py::_handle; storage/credentials.py::revoke; app.py::_on_capture",
+      "required_fix": "撤销关闭相应WS；每次数据变更/动作验证绑定会话；截屏使用已授权的发起会话，资产按所有者解析；不把任意局域网Origin当本站。",
+      "stage": "S0/S2",
+      "case_ids": "AC3-017,018,019,020,024,044,080,092"
+    },
+    {
+      "id": "A18",
+      "priority": "P1",
+      "title": "回归测试覆盖仍绕开日常连续使用",
+      "evidence": "桌面测试直接调用方法；S2专用target只能证明该target；CHECKPOINT拿缺adb/comtypes概括阻塞，仍有未完成开发。",
+      "location": "tests/test_v3_desktop.py; docs/v3-delivery/CHECKPOINT.json; docs/evidence/v3-d2/",
+      "required_fix": "所有入口分别执行连续A/B/C、复制、新稿、撤销、真实WS、真目标；开发依赖可安装不算物理缺设备；原型自测不累计产品通过。",
+      "stage": "S0–S5",
+      "case_ids": "AC3-002,006,037,039,073,083,089,090,091,094,095"
+    }
+  ]
+}

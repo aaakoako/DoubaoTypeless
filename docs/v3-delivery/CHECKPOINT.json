@@ -1,54 +1,63 @@
 {
   "schema_version": 1,
-  "product_goal": "完整 V3 可发布候选（R01-R10）。当前任务未完成：缺真机主流程、缺 Cursor 一键图文、缺独立复核。",
-  "review_base": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
-  "current_head": "cc777d0ad9b28688f9f74e112ac99591b5221b75",
-  "working_tree": "clean after D2 commit",
-  "last_completed_slice": "D2_desktop_flows_reverified",
-  "active_slice": "S5_candidate_after_native_gaps",
-  "next_action": "继续不受阻工作：整理候选说明与迁移回退材料；真机与 Cursor 保持 BLOCKED_NATIVE。不要等待用户说继续。不要 merge/tag/Release。任务未完成。",
+  "product_goal": "完整 V3 可发布候选。规范入口 docs/v3-product/MASTER_PLAN.md。不是工程预览停等。",
+  "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
+  "current_head": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
+  "working_tree": "S0/S1 implemented, commit pending",
+  "last_completed_slice": "S0_S1_command_layer",
+  "active_slice": "S2_byok_qr_vocab",
+  "next_action": "继续 S2：BYOK 发送所选模型且不阻塞输入；密钥进系统凭据库；设置里接通词库和诊断；二维码带配对信息，长码不必手输。不要等待用户说继续。不要 merge/tag/Release。",
   "accepted_requirements": [
-    "R01-R10 原义全部保留",
-    "96 项验收定义不改",
+    "MASTER_PLAN 为唯一产品/执行规范",
+    "插入并复制是主动作",
+    "原96条保留对应关系，体验修订按总计划覆盖",
     "不自动 merge/tag/Release",
     "指定粘贴目标不得冒充 Cursor",
     "缺真机只阻塞相应验证"
   ],
-  "open_defects": [],
+  "open_defects": [
+    {"id": "A07", "severity": "P1", "note": "手机图文流程仍偏旧页/旧同步"},
+    {"id": "A08", "severity": "P1", "note": "HTTP 上传/1MiB/randomUUID 需按总计划收紧"},
+    {"id": "A09", "severity": "P1", "note": "二维码仍主要是 URL，长配对码仍可能手输"},
+    {"id": "A10", "severity": "P1", "note": "BYOK 仍硬编码 model=user，同步 httpx"},
+    {"id": "A11", "severity": "P0", "note": "密钥仍可能明文写 settings.json"},
+    {"id": "A12", "severity": "P1", "note": "电脑/手机改字冲突策略未完全产品化"},
+    {"id": "A13", "severity": "P1", "note": "客户端 1s refresh 重建列表"},
+    {"id": "A14", "severity": "P1", "note": "Qt 线程/退出路径仍需加固"},
+    {"id": "A16", "severity": "P1", "note": "包装身份/窗口模式未绑本切片"},
+    {"id": "A17", "severity": "P0", "note": "session/revoke/asset owner 仍需复核"},
+    {"id": "A18", "severity": "P1", "note": "测试与日用实例管道隔离"}
+  ],
+  "closed_this_slice": ["A01", "A02", "A03", "A04", "A05", "A06", "A15"],
   "environment_blockers": [
     {
       "missing": "真实 Android + 豆包输入法 + 同网手机浏览器",
       "probed": "shutil.which('adb') is None",
-      "blocks": ["AC3-002", "AC3-009", "AC3-010", "真机引导/相册/白板手感", "J1/J3/J4 真机"],
+      "blocks": ["真机引导/相册/白板手感", "J1/J3/J4 真机"],
       "who": "设备持有者",
-      "min_action": "真机打开窗口二维码地址，配对后说话、选图、白板，在电脑批准插入后点插入",
-      "unblocked_work": "生产页 Playwright、桌面授权、指定目标投递已复跑"
+      "min_action": "真机打开窗口二维码地址，配对后说话、选图、白板，在电脑批准插入后点插入并复制",
+      "unblocked_work": "S2 BYOK/词库/二维码/凭据库"
     },
     {
       "missing": "Cursor Composer 可观察 UIA",
       "probed": "python 3.13 无 comtypes",
-      "blocks": ["AC3-006", "AC3-008", "主目标一键图文"],
+      "blocks": ["主目标一键图文 Cursor PASS"],
       "who": "本机探测或用户确认半自动路径",
-      "min_action": "安装可观察层并对真实 Composer 列出字段，或批准半自动降级为产品决策",
-      "unblocked_work": "DT-S2-PasteTarget CONFIRMED 保留，不写 Cursor PASS"
+      "min_action": "安装可观察层并对真实 Composer 列出字段，或批准半自动降级",
+      "unblocked_work": "OWN_WINDOW 与焦点身份比较已落地，不写 Cursor PASS"
     },
     {
       "missing": "独立复核签署",
       "probed": "实现者不可自签",
       "blocks": ["RELEASE_READY", "PUBLISHED"],
       "who": "独立审阅者",
-      "min_action": "核对 SHA、包哈希、授权边界、S2 图文与桌面入口",
-      "unblocked_work": "继续补候选说明；不能自签完成"
+      "min_action": "核对 SHA、包哈希、授权边界、插入并复制与桌面入口",
+      "unblocked_work": "继续 S2–S5，不能自签完成"
     }
   ],
   "in_progress_files": [],
   "last_commands": [
-    {"cmd": "git commit D1", "exit_code": 0, "output": "13478a74 D1 desktop client"},
-    {"cmd": "python tools/v3_d2_phone_text.py", "exit_code": 0, "output": "all gates true; not Cursor"},
-    {"cmd": "python tools/v3_s2_image_text_path.py", "exit_code": 0, "output": "CONFIRMED image_then_text"},
-    {"cmd": "python tools/v3_s3_multi_board_recovery.py", "exit_code": 0, "output": "whiteboard recall restart"},
-    {"cmd": "python tools/v3_lifecycle.py", "exit_code": 0, "output": "exe wake+quit no taskkill"},
-    {"cmd": "python -m pytest -q", "exit_code": 0, "output": "116 passed"}
+    {"cmd": "python -m pytest -q", "exit_code": 0, "output": "122 passed, 1 skipped"}
   ],
   "candidate_artifact": {
     "path": "dist/DoubaoTypelessV3Preview/DoubaoTypelessV3Preview.exe",
@@ -56,7 +65,7 @@
     "kind": "isolated_dev_onedir",
     "release": false,
     "source_head": "cc777d0ad9b28688f9f74e112ac99591b5221b75",
-    "note": "隔离开发包，含 --quit。哈希对应 D2 提交前刚打的 onedir。不是 RELEASE_READY。任务未完成。"
+    "note": "旧隔离开发包，未含 S0/S1。源码变化后必须重打才能当候选。不是 RELEASE_READY。"
   },
   "published": false,
   "task_complete": false

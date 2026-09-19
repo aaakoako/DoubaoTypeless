@@ -152,12 +152,16 @@ class ReviewPanel:
         keep = QPushButton("保留电脑稿")
         keep.setObjectName("ghost")
         keep.clicked.connect(self.keep_pc)
-        insert = QPushButton("插入")
+        copy = QPushButton("复制")
+        copy.setObjectName("ghost")
+        copy.clicked.connect(self.copy_only)
+        insert = QPushButton("插入并复制")
         insert.setObjectName("primary")
         insert.clicked.connect(self.insert)
         row.addWidget(use_phone)
         row.addWidget(keep)
         row.addStretch(1)
+        row.addWidget(copy)
         row.addWidget(insert)
         layout.addLayout(row)
         self.widget = w
@@ -191,13 +195,18 @@ class ReviewPanel:
         self.banner.hide()
         self.app.review_editing = True
 
+    def copy_only(self) -> None:
+        self.app.draft.text = self.editor.toPlainText()
+        self.app.review_editing = False
+        self.app._save_draft()
+        self.app.copy_text()
+
     def insert(self) -> None:
         self.app.draft.text = self.editor.toPlainText()
         self.app.draft.revision += 1
-        self.app._last_attempt = None
         self.app.review_editing = False
         self.app._save_draft()
-        self.app.insert_last()
+        self.app.insert_current()
         self.widget.hide()
 
     def show(self) -> None:
@@ -290,7 +299,7 @@ class ClientWindow:
         cl.addLayout(self.grant_row)
         cl.addWidget(QLabel("本机练习框（引导用，不是 Cursor）"))
         self.practice = QPlainTextEdit()
-        self.practice.setPlaceholderText("点这里，再按 Alt+I 练习插入。")
+        self.practice.setPlaceholderText("点这里，再按 Alt+I 练习插入并复制。")
         self.practice.setFixedHeight(88)
         cl.addWidget(self.practice)
         foot = QHBoxLayout()
@@ -314,7 +323,7 @@ class ClientWindow:
         sl = QFormLayout(settings)
         self.hotkey_insert = QLineEdit(str(stored.get("hotkey_insert") or "<alt>+i"))
         self.hotkey_recall = QLineEdit(str(stored.get("hotkey_recall") or "<alt>+<shift>+i"))
-        sl.addRow("插入", self.hotkey_insert)
+        sl.addRow("插入并复制", self.hotkey_insert)
         sl.addRow("召回上次", self.hotkey_recall)
         self.autostart = QCheckBox("登录 Windows 时启动（到托盘）")
         self.autostart.setChecked(bool(stored.get("autostart")))
@@ -395,7 +404,7 @@ class ClientWindow:
             self.widget,
             "帮助与诊断",
             "1. 手机浏览器打开上面的地址或扫码。\n"
-            "2. 电脑点允许插入后，手机说话，电脑点目标再按 Alt+I。\n"
+            "2. 电脑点允许插入后，手机说话，电脑点目标再按 Alt+I 插入并复制。\n"
             "3. 不要改 JSON、不要设环境变量、不必打开 pc.html。\n"
             f"日志：{log}",
         )
@@ -546,11 +555,18 @@ class ClientWindow:
         bundle = self._selected_bundle()
         if bundle is None:
             return
-        copied = self.app.history.copy_to_new_draft(bundle)
-        self.app.draft.text = copied["text"]
-        self.app.draft.assets = list(copied.get("assets") or [])
-        self.app.draft.revision += 1
-        self.app._save_draft()
+        status = self.app.restore_history(bundle)
+        if status != "ask":
+            return
+        from PySide6.QtWidgets import QMessageBox
+
+        box = QMessageBox(self.widget)
+        box.setWindowTitle("当前稿还在")
+        box.setText("恢复上次会替换当前稿。当前稿不会自动丢掉，除非你确认替换。")
+        box.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+        if box.exec() != QMessageBox.Ok:
+            return
+        self.app.restore_history(bundle, replace=True)
 
     def replay_snapshot(self) -> None:
         bundle = self._selected_bundle()
@@ -632,6 +648,8 @@ class DesktopShell:
             QTimer.singleShot(0, self.client.refresh)
         elif event == "expand":
             QTimer.singleShot(0, self.review.show)
+        elif event in {"hide_after_insert", "new_draft"}:
+            QTimer.singleShot(0, self.review.widget.hide)
 
     def _ask_recovery(self) -> None:
         mode = RecoveryDialog(self.client.widget).exec()
@@ -712,7 +730,7 @@ def run_desktop(argv: list[str] | None = None) -> int:
 
             stored = load_settings(app.data_dir)
             start = start_hotkeys(
-                on_insert=app.insert_last,
+                on_insert=app.insert_current,
                 on_recall=app.recall_last,
                 on_region=app.capture_region,
                 insert_combo=str(stored.get("hotkey_insert") or "<alt>+i"),

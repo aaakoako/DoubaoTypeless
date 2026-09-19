@@ -1,0 +1,939 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DoubaoTypeless V3 · 完整产品总计划</title><style>*{box-sizing:border-box}body{margin:0;background:#f5f5f1;color:#1d2826;font:15px/1.8 system-ui,"Microsoft YaHei",sans-serif}aside{position:fixed;left:0;top:0;bottom:0;width:235px;overflow:auto;background:white;border-right:1px solid #dbe2de;padding:24px 18px}aside b{display:block;color:#167d71;margin-bottom:15px}aside a{display:block;font-size:12px;padding:7px 0;color:#52665c;text-decoration:none}main{max-width:1150px;margin-left:235px;padding:36px 45px 70px}h1{font-size:29px;line-height:1.4}h2{font-size:23px;margin-top:50px;padding-top:20px;border-top:1px solid #cbd8d0;scroll-margin-top:16px}h3{font-size:18px;margin-top:30px}h4{font-size:16px;margin-top:28px}p{margin:12px 0}a{color:#167d71}blockquote{margin:20px 0;border-left:3px solid #167d71;padding:8px 18px;background:#eaf2ed}table{border-collapse:collapse;background:#fff;width:100%;font-size:12px;margin:18px 0;display:block;overflow-x:auto}th,td{border:1px solid #dbe2de;padding:9px 10px;vertical-align:top;min-width:85px}th{background:#eaf2ed;text-align:left}td:nth-child(2){min-width:130px}code{font-size:12px;background:#e9eeea;padding:2px 4px;border-radius:4px;overflow-wrap:anywhere}pre{padding:18px;background:#202b29;color:#eaf0ed;overflow:auto;border-radius:8px}pre code{background:transparent;color:inherit}li{margin:4px 0}.status{font-size:12px;color:#65776c;background:white;padding:12px;border:1px solid #dbe2de;border-radius:8px}@media(max-width:850px){aside{position:static;width:100%;border:0}aside a{display:inline-block;margin:3px 12px 3px 0}main{margin:0;padding:22px}h1{font-size:24px}}@media print{aside{display:none}main{margin:0;max-width:none;padding:0}table{display:table;font-size:10px}h2,h3,h4{break-after:avoid}body{background:#fff}}</style></head><body><aside><b>V3 完整产品总计划</b><a href="#section-0">0. 先读这页：范围、来源和用法</a><a href="#section-1">1. 最新审查：已经有的东西和仍不能放行的东西</a><a href="#section-2">2. 能力总盘点：旧版 → 当前 → 完整V3</a><a href="#section-3">3. 最终界面：同一个产品的两端，不是两个演示</a><a href="#section-4">4. 插入、复制、新稿、召回：一次定义清楚</a><a href="#section-5">5. 图片、网络与数据：把正式路径接上</a><a href="#section-6">6. 面向Grok的实施顺序：沿用S0–S5，持续推进到整个产品完成</a><a href="#section-7">7. 开发与验收都必须走的真实用户故事</a><a href="#section-8">8. Grok如何持续完成，而不是每次交阶段说明</a><a href="#section-9">9. 最终完成定义与发布控制</a><a href="#section-10">10. 交付包和来源说明</a><hr><a href="UI_BOARD.html">打开界面设计参考</a><a href="GROK_PROMPT.md">Grok 启动指令</a></aside><main><div class="status">方案与审查资料，不是新版程序。源级审查基线 4eb8c445…；没有新的产品通过声明。</div><h1>DoubaoTypeless V3｜完整产品收敛与 Grok 执行总计划</h1>
+<p><strong>日期：2026-09-19 · 审查基线：<code>4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a</code> · 交付对象：Grok / 接手开发者。</strong></p>
+<blockquote>
+<p>重构的是整个 Windows 客户端与手机工作区；必须保住旧版“说话 → 看清/改字 → 插入并复制 → 收窗 → 手机开始下一段”的便利，再补完整图文。不是重写几个模块，不是只做手机网页，不是交付一个有界面的工程壳。</p>
+</blockquote>
+<p>这是本次唯一的产品与执行主入口。<strong>不要让用户再次发送旧包或逐卡下令。</strong> 在当前工程继续修复、整合、完成，不从零另建V4或换一套技术栈。内部可以多轮、多提交、小切片，外部目标始终是完整可发布候选。</p>
+<h2 id="section-0">0. 先读这页：范围、来源和用法</h2>
+<h3>0.1 冻结对象</h3>
+<table>
+<thead>
+<tr>
+<th>对象</th>
+<th>固定位置 / 说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>旧版功能基线</td>
+<td><code>aaakoako/DoubaoTypeless@e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5</code>；旧版能力盘点依据已读取的源码，不等于所有旧行为本轮重新实机通过</td>
+</tr>
+<tr>
+<td>master</td>
+<td><code>6bf98e7b26598db8e53ebe1abf3991fa44f3241c</code>；图文README提交应保留，不能合并时退回旧首页</td>
+</tr>
+<tr>
+<td>V3主开发线</td>
+<td><code>v3/00-baseline@4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a</code>；相比55d03cc新增3提交，桌面D1/D2已提交</td>
+</tr>
+<tr>
+<td>D2运行源码点</td>
+<td><code>cc777d0ad9b28688f9f74e112ac99591b5221b75</code>；到4eb只变更两处文档，不因不同SHA自动宣称运行源码过期</td>
+</tr>
+<tr>
+<td>独立旧安全分支</td>
+<td><code>secure-bridge-pair-token@98fe3102853001bfb9e45fd43c4bc01076821443</code>；旧bridge的query token补丁，不是整合后的V3；不得整支盲合</td>
+</tr>
+<tr>
+<td>本次未做</td>
+<td>没有运行用户EXE、没有重算实际包哈希、没有真实Android/豆包/Cursor验收、没有完整克隆/重跑仓库测试、没有修改远端</td>
+</tr>
+<tr>
+<td>本次实际做</td>
+<td>GitHub固定提交关键源文件阅读、分支/提交差异、最新CI原始日志、旧规格和最新体验修订核对；词库LF/CRLF哈希复算</td>
+</tr>
+</tbody>
+</table>
+<p>这是<strong>范围明确的产品/代码复核</strong>，不是穷尽安全审计。文中源码问题与CI观察、用户反馈、待实测风险分别标注。没有新产品PASS。报告涉及的问题在更新代码后要重新跑相应回归，不能永远沿用本结论。</p>
+<h3>0.2 哪些旧指令被本计划替代</h3>
+<table>
+<thead>
+<tr>
+<th>旧条款</th>
+<th>本计划的最终决定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>“只做V3-00/只修R0R1/每卡完成后停止”</td>
+<td>完成完整V3；一个切片通过后继续下个可执行工作。只有会话额度、授权、安全、真实环境阻塞才保存断点</td>
+</tr>
+<tr>
+<td>“桌面只是投递器”被解释成不做客户端</td>
+<td>必须有正常原生客户端、托盘、设置、图文审阅、恢复、退出；空闲HUD隐藏不等于无客户端</td>
+</tr>
+<tr>
+<td>HUD永远两行、不自适应、尾部200字</td>
+<td>正文模型保全；预览有上限自动增高；内部滚动和主动全文编辑</td>
+</tr>
+<tr>
+<td>UNKNOWN必须一直占着手机输入框</td>
+<td>接收证据与草稿轮换分离；符合条件的纯文字操作保全上一段后开始新稿，结果仍是UNKNOWN</td>
+</tr>
+<tr>
+<td>主操作只有“插入”</td>
+<td><strong>主操作“插入并复制”</strong>；只复制独立，不清稿。图文动作提示图片数，完成后保留文字或最后图片</td>
+</tr>
+<tr>
+<td>扫二维码之后仍手抄长码</td>
+<td>正常扫码零手输；四位数字只作短时、限流、待本机批准的备用渠道</td>
+</tr>
+<tr>
+<td>BYOK仅三个裸字段</td>
+<td>保留服务商/模型便利、用途说明、手动术语入口、可回退建议、词库与高级折叠</td>
+</tr>
+<tr>
+<td>工具自测/文件存在=产品PASS</td>
+<td>回归按正式入口和可观察结果，组件、原生、真机、独立复核分开</td>
+</tr>
+<tr>
+<td>“96项永远不能改任何字”</td>
+<td>保留原96条身份/期望快照；已由用户反馈改变的行为用显式覆盖说明映射，不强行把新UX塞回旧两行规则</td>
+</tr>
+</tbody>
+</table>
+<p>原V3的图像工具范围、安全约束、先图后文、不发Enter、草稿版本保护、明确发布审批继续有效。<code>COVERAGE.json</code>保留原96条和本次补充场景；不得为变绿静默删条。旧原型仅做视觉参考，与本计划冲突以本计划为准。</p>
+<p>开发者在首次接手时，把<code>AGENTS.md</code>的V3入口和<code>.cursor/rules/v3-delivery.mdc</code>指向本目录。给旧包/旧执行入口加“历史参考，已被本计划覆盖”的导航说明，<strong>保留原始证据，不反复复制出第四套规则</strong>。只更新相关指引，不覆盖仓库其他约束。</p>
+<h3>0.3 用户最终拿到什么</h3>
+<p>一个完整Windows图形包及配套手机网页：无需Python/Node/ADB、环境变量、pc.html、pair.txt或手改JSON；能完成普通文字和图文工作，并保留旧版高频好体验。开发环境可用上述工具，但不得成为普通用户前置条件。</p>
+<p><strong>RELEASE_READY</strong>意味着原定必需功能、真实支持目标、最终制品与独立复核达标。实际merge/tag/Release由用户针对源SHA＋版本＋完整包hash另行批准。本计划不是发布授权。没有任何文档能保证任意模型只要重复运行若干轮就自动正确；可信终点来自实际验收，不来自声明和任务数量。</p>
+<h2 id="section-1">1. 最新审查：已经有的东西和仍不能放行的东西</h2>
+<h3>1.1 明确承认本轮进展</h3>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/src/doubao_typeless/ui/desktop.py#L1-L741">src/doubao_typeless/ui/desktop.py · 1-741</a> 已有真正连接窗口、设置、可编辑文字详情、恢复选择和托盘。<code>run_desktop</code>接到V3App，不是纯静态网页。HUD的后台show转发也有修补。不能继续把“完全无桌面、ask永远落到full”照搬成当前结论。</p>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/src/doubao_typeless/services/assets.py#L16-L58">src/doubao_typeless/services/assets.py · 16-58</a> 增加了<code>resolve_asset_refs</code>，旧“完全不解析引用”已部分修正。但真实前端仍有漏图和受保护图片加载断点；解析只把现有文件当photo，还需素材归属、成品角色和版本保护。</p>
+<p>原生退出记录 <a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/docs/evidence/v3-lifecycle/result.json">docs/evidence/v3-lifecycle/result.json</a> 写明使用EXE、二次启动exit0、首实例继续服务、退出后HTTP关闭且没有taskkill。这是有用的实现者记录；对应工具使用<code>--quit</code>，并不单独证明托盘鼠标点击体验。最终仍从正常入口验证。</p>
+<h3>1.2 真实CI结果（不是本轮本地跑的）</h3>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/actions/runs/35421285278">GitHub Actions run 35421285278</a>，head就是<code>4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a</code>。前端typecheck/build通过；证据检查器18项自测通过；产品/单元pytest结果是 <strong>5 failed / 108 passed / 3 skipped，exit 1</strong>。后续Windows最小打包job跳过。</p>
+<p>五个失败：词库静态文件哈希；Linux导入<code>ctypes.windll</code>；两个测试缺PySide6；未知结果恢复测试预期有paste但没有。最后一项需结合平台替身重新定位，不能直接删断言。Pillow已安装，<strong>不能再写“仍缺Pillow”</strong>。</p>
+<p>词库项不是已证明日用数据损坏：仓库blob仍为<code>3202354060f4e2e32b1e9d62a9e9afb2178f4c3d</code>。LF内容SHA256是<code>791f1096…</code>，CRLF内容是<code>8fcb2b8c…</code>，恰好对应日志两值。本次实际复算见<code>evidence/REVIEW_OBSERVATIONS.json</code>。对仓库源文件统一换行/按Git blob验证；对真实用户数据保留原字节做同机前后对比，<strong>不要把用户文件规范化后再声称没改</strong>。</p>
+<h3>1.3 逐项缺陷与返修出口</h3>
+<p>以下是源码可确认的缺口/风险和CI结果，不把未跑的原生效果写成已实机复现。对应源文件链接集中在本节末；方法名为定位依据。</p>
+<h4>A01 · P0 · 当前稿与上次图文仍混用</h4>
+<p>**当前证据：**app.insert_last先读last_bundle，仅为空才冻结当前稿；ReviewPanel保存电脑改字后仍调用该入口。可能继续拿A而不是当前B。</p>
+<p><strong>定位：</strong><code>app.py::insert_last; desktop.py::ReviewPanel.insert</code>。</p>
+<p>**必须改为：**当前插入始终冻结当前稿；召回独立加载不可变历史；不得靠清_last_attempt掩盖。</p>
+<p>**实施归属：**S1；回归至少映射 AC3-013,016,064,065,069，并补本计划具体场景。</p>
+<h4>A02 · P1 · 插入后的收窗、复制、新稿不是统一事务</h4>
+<p><strong>当前证据：</strong>_on_intent只在CONFIRMED归档本机draft；手机attempt.status只改提示；通用observe_text始终unknown；没有所有入口共同的完成/轮换回执。</p>
+<p><strong>定位：</strong><code>app.py::_on_intent; web/src/app.ts::ws.onmessage</code>。</p>
+<p>**必须改为：**按第4节拆开复制结果、注入结果、接收证据、草稿轮换和窗口可见性。</p>
+<p>**实施归属：**S1；回归至少映射 AC3-016,025,026,030,037,039，并补本计划具体场景。</p>
+<h4>A03 · P1 · 长文被固定高度与200字符尾部限制</h4>
+<p>**当前证据：**hud仍是360×88/132，QLabel只取text[-200:]。原设计确实这样写，本次属于已批准的体验修订。</p>
+<p><strong>定位：</strong><code>ui/hud.py::_apply_show</code>。</p>
+<p>**必须改为：**按排版有上限增高；不截断模型中的正文；滚动阅读不被追尾。</p>
+<p>**实施归属：**S1；回归至少映射 AC3-029,030,040,091，并补本计划具体场景。</p>
+<h4>A04 · P0 · 打开审阅/恢复窗口后的目标交接缺失</h4>
+<p>**当前证据：**ReviewPanel先调用insert_last再隐藏；恢复选择在活动对话框中调用投递；read_focus只回顶层class/title，没有明确保存、恢复和验证用户选中的外部控件。</p>
+<p><strong>定位：</strong><code>ui/desktop.py::ReviewPanel.insert,DesktopShell._ask_recovery; platform/windows/clipboard.py::read_focus</code>。</p>
+<p>**必须改为：**本应用窗口绝不作为投递目标；记录上次明确外部目标，主动编辑后恢复并实测验证；不能猜一个旧窗口。</p>
+<p>**实施归属：**S1；回归至少映射 AC3-005,007,034,063,065，并补本计划具体场景。</p>
+<h4>A05 · P0 · 目标变化检查仍只比较类别</h4>
+<p>**当前证据：**delivery.py与旧审计版本blob一致；同类Composer切换可能继续发；等待修饰键后没有立即复核，已有图片步骤也可能回报NO_STEPS。</p>
+<p><strong>定位：</strong><code>services/delivery.py::run</code>。</p>
+<p>**必须改为：**具体目标指纹、逐步日志、等待后再检查；已发任何一步不回退零步骤。</p>
+<p>**实施归属：**S1/S2；回归至少映射 AC3-007,034,035,036,062,063,067，并补本计划具体场景。</p>
+<h4>A06 · P0 · 恢复历史会直接覆盖当前草稿</h4>
+<p>**当前证据：**ClientWindow.restore_as_draft直接写共享draft.text/assets；界面文字却说不会覆盖。重投还会清_last_attempt，失去历史不确定结果上下文。</p>
+<p><strong>定位：</strong><code>ui/desktop.py::restore_as_draft,replay_snapshot; services/history.py</code>。</p>
+<p>**必须改为：**恢复先保全当前非空稿再建新ID/epoch，或明确选择；重投保留原Bundle和Attempt，不能丢掉manifest身份。</p>
+<p>**实施归属：**S3；回归至少映射 AC3-065,066,067,069,070，并补本计划具体场景。</p>
+<h4>A07 · P1 · 手机图片流程没有随D1/D2更新</h4>
+<p>**当前证据：**web/src/app.ts blob与55d03cc相同：未上传附件被assetRefs过滤；上传失败后回主页；多选图连续覆盖编辑器；截图URL直接加载无自定义鉴权头。</p>
+<p><strong>定位：</strong><code>web/src/app.ts::assetRefs,finishEditor,openEditor; web/src/editor/canvas.ts::loadImage</code>。</p>
+<p>**必须改为：**每图显式状态；不能静默漏图；源图→可编辑场景→输出分开；鉴权fetch→blob；多选先入队不反复抢编辑器。</p>
+<p>**实施归属：**S2/S3；回归至少映射 AC3-021,038,041,045,046,047,056,057,060，并补本计划具体场景。</p>
+<h4>A08 · P1 · HTTP安全上下文与1MiB边界仍需修</h4>
+<p>**当前证据：**页面仍用crypto.randomUUID；默认服务app未显式扩大body上限，CHUNK仍1MiB。旧反例适用于相同组合，但本轮未运行当前HTTP反例。</p>
+<p><strong>定位：</strong><code>web/src/app.ts::sendBtn; services/assets.py::CHUNK; services/bridge_v3.py::make_app</code>。</p>
+<p>**必须改为：**真实非loopback HTTP生产页面测试；合法安全随机ID兼容；显式协调有限请求大小与分块，不靠测试环境覆盖变量。</p>
+<p>**实施归属：**S2；回归至少映射 AC3-021,022,027,039,041,085，并补本计划具体场景。</p>
+<h4>A09 · P1 · 二维码只含地址，长码仍需人工输入</h4>
+<p>**当前证据：**qr_pixmap(url)，code单独展示；AuthService URLsafe8；刷新每秒重新生成QR并可能开启新挑战；会话不等于记住设备。</p>
+<p><strong>定位：</strong><code>ui/desktop.py::phone_url,refresh; storage/credentials.py</code>。</p>
+<p>**必须改为：**普通扫码零手输；临时邀请与长期凭据分开；短码只是受限备用；已连接页收起扫码和练习区。</p>
+<p>**实施归属：**S0/S4；回归至少映射 AC3-017,018,019,020,077,080，并补本计划具体场景。</p>
+<h4>A10 · P1 · BYOK有表单但不是完整可用辅助</h4>
+<p>**当前证据：**byok_model只保存没有注入请求；probe同步httpx.post阻塞Qt；ByokService默认no_transport，写死model=user/input。未见审阅“检查术语”闭环。</p>
+<p><strong>定位：</strong><code>ui/desktop.py::save_settings,probe_byok; services/byok.py; app.py::__init__</code>。</p>
+<p>**必须改为：**同一异步配置/请求通道给probe和正文；真实所选model；明确用途和手动按钮；局部建议接受/拒绝/撤回。</p>
+<p>**实施归属：**S4；回归至少映射 AC3-072,073,074,075,076,077，并补本计划具体场景。</p>
+<h4>A11 · P0 · 密钥明文入settings，配置变更缺统一安全边界</h4>
+<p>**当前证据：**settings_store保存byok_api_key明文。原子写json不等于安全存储；不同UI路径对更换host/旧key处理需统一。</p>
+<p><strong>定位：</strong><code>storage/settings_store.py::save_settings; ui/desktop.py::save_settings</code>。</p>
+<p>**必须改为：**OS凭据库，配置只存引用；不可用回会话模式；更换主机重新授权，不复制Key到证据。</p>
+<p>**实施归属：**S0/S4；回归至少映射 AC3-072,074,080,086,092，并补本计划具体场景。</p>
+<h4>A12 · P1 · 手机/电脑编辑冲突只拦显示，没建立完整写入协议</h4>
+<p>**当前证据：**bridge先_apply_draft_fields再_on_activity；review_editing时回调返回但共享草稿已经变化；测试直接调_on_activity未走真实WS。</p>
+<p><strong>定位：</strong><code>services/bridge_v3.py::_handle; app.py::_on_activity; tests/test_v3_desktop.py</code>。</p>
+<p>**必须改为：**唯一状态写入者；电脑编辑分支与手机pending独立；显式采纳/保留；真实WS自动化验证，不只检查QPlainTextEdit。</p>
+<p>**实施归属：**S1/S3；回归至少映射 AC3-014,016,025,064,069，并补本计划具体场景。</p>
+<h4>A13 · P1 · 原生UI持续轮询、列表选择易丢</h4>
+<p>**当前证据：**ClientWindow每秒refresh；每次生成QR、查IP、clear重建recent_list，隐藏窗口也继续。详情只有图数，无预览/复制；练习框固定在主页。</p>
+<p><strong>定位：</strong><code>ui/desktop.py::refresh,ClientWindow.__init__,ReviewPanel</code>。</p>
+<p>**必须改为：**事件驱动更新，列表保留选择和滚动；可见时仅更新倒计时；补缩略图/复制，练习后置；完整控件状态样式。</p>
+<p>**实施归属：**S1/S4；回归至少映射 AC3-029,030,040,069,077,081,091，并补本计划具体场景。</p>
+<h4>A14 · P1 · 新GUI跨线程通知与退出需要按真实入口重验</h4>
+<p>**当前证据：**HUD.show改为有context的singleShot是进展；DesktopShell._from_service却使用无接收context的singleShot；hide直接调控件。stop只关bridge和锁。</p>
+<p><strong>定位：</strong><code>ui/desktop.py::_from_service,_on_ipc,quit; ui/hud.py; app.py::stop</code>。</p>
+<p>**必须改为：**统一QObject queued signal或有接收者的调度；timer在所属线程；退出停止热键/线程/DB再退出；不能仅靠Python状态变量。</p>
+<p>**实施归属：**S1/S5；回归至少映射 AC3-005,030,035,070,087,091，并补本计划具体场景。</p>
+<h4>A15 · P1 · 最新CI真实失败，不再是旧Pillow问题</h4>
+<p>**当前证据：**当前run35421285278前端构建通过，pytest=5 failed/108 passed/3 skipped，Windows job跳过；Linux导入WinAPI、缺PySide6、恢复测试及LF/CRLF基线差异。</p>
+<p><strong>定位：</strong><code> .github/workflows/preview-v3.yml; tests/test_v3_00_baseline.py; tests/test_v3_desktop.py</code>。</p>
+<p>**必须改为：**隔离纯逻辑与native测试；Windows执行native而非全skip；安装正确依赖；修EOL基线方式，不随意改成通过。</p>
+<p>**实施归属：**S0/S5；回归至少映射 AC3-004,034,043,065,085,087,088，并补本计划具体场景。</p>
+<h4>A16 · P1 · 包身份、发布文档和真正完成状态未统一</h4>
+<p>**当前证据：**CHECKPOINT.open_defects为空；current_head=cc777合理因4eb仅文档；checkpoints和checksums可能不同代包；exe哈希不覆盖onedir中DLL/网页资源。</p>
+<p><strong>定位：</strong><code>docs/v3-delivery/CHECKPOINT.json; docs/release/checksums.txt; packaging/v3_preview.spec</code>。</p>
+<p>**必须改为：**重开真实缺陷；唯一候选清单绑定源提交、构建输入/完整ZIP与文件manifest；最终无控制台包，不发布旧spec构建。</p>
+<p>**实施归属：**S0/S5；回归至少映射 AC3-084,085,088,093,094,095,096，并补本计划具体场景。</p>
+<h4>A17 · P0 · 权限与会话边界仍需全链路复核</h4>
+<p>**当前证据：**已有握手鉴权和本机批准是进展，但后续draft.update只依赖连接authorized标记；授权撤销/过期、会话绑定、素材归属及截图使用sessions[-1]仍缺一致约束。</p>
+<p><strong>定位：</strong><code>services/bridge_v3.py::_handle; storage/credentials.py::revoke; app.py::_on_capture</code>。</p>
+<p>**必须改为：**撤销关闭相应WS；每次数据变更/动作验证绑定会话；截屏使用已授权的发起会话，资产按所有者解析；不把任意局域网Origin当本站。</p>
+<p>**实施归属：**S0/S2；回归至少映射 AC3-017,018,019,020,024,044,080,092，并补本计划具体场景。</p>
+<h4>A18 · P1 · 回归测试覆盖仍绕开日常连续使用</h4>
+<p>**当前证据：**桌面测试直接调用方法；S2专用target只能证明该target；CHECKPOINT拿缺adb/comtypes概括阻塞，仍有未完成开发。</p>
+<p><strong>定位：</strong><code>tests/test_v3_desktop.py; docs/v3-delivery/CHECKPOINT.json; docs/evidence/v3-d2/</code>。</p>
+<p>**必须改为：**所有入口分别执行连续A/B/C、复制、新稿、撤销、真实WS、真目标；开发依赖可安装不算物理缺设备；原型自测不累计产品通过。</p>
+<p>**实施归属：**S0–S5；回归至少映射 AC3-002,006,037,039,073,083,089,090,091,094,095，并补本计划具体场景。</p>
+<h3>1.4 固定源码入口</h3>
+<ul>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/src/doubao_typeless/ui/desktop.py#L1-L741">src/doubao_typeless/ui/desktop.py · 1-741</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/src/doubao_typeless/app.py">src/doubao_typeless/app.py</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/src/doubao_typeless/ui/hud.py">src/doubao_typeless/ui/hud.py</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/web/src/app.ts">web/src/app.ts</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/web/src/editor/canvas.ts">web/src/editor/canvas.ts</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/src/doubao_typeless/services/delivery.py#L45-L142">src/doubao_typeless/services/delivery.py · 45-142</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/src/doubao_typeless/platform/windows/clipboard.py#L20-L35">src/doubao_typeless/platform/windows/clipboard.py · 20-35</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/src/doubao_typeless/storage/settings_store.py">src/doubao_typeless/storage/settings_store.py</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/src/doubao_typeless/services/byok.py">src/doubao_typeless/services/byok.py</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/src/doubao_typeless/services/history.py">src/doubao_typeless/services/history.py</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/src/doubao_typeless/services/bridge_v3.py">src/doubao_typeless/services/bridge_v3.py</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/src/doubao_typeless/services/assets.py#L16-L58">src/doubao_typeless/services/assets.py · 16-58</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/docs/v3-delivery/CHECKPOINT.json">docs/v3-delivery/CHECKPOINT.json</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a/.github/workflows/preview-v3.yml">.github/workflows/preview-v3.yml</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5/gui.py#L430-L660">gui.py · 430-660</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5/main.py#L650-L920">main.py · 650-920</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5/config.py">config.py</a></p>
+</li>
+<li>
+<p><a href="https://github.com/aaakoako/DoubaoTypeless/blob/e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5/providers_registry.py">providers_registry.py</a></p>
+</li>
+</ul>
+<h2 id="section-2">2. 能力总盘点：旧版 → 当前 → 完整V3</h2>
+<p>“当前”是源级盘点和已读取证据，不等于已由本轮实测通过。下表是一份总范围，不是允许只交付前半部分的MVP。</p>
+<table>
+<thead>
+<tr>
+<th>能力</th>
+<th>旧版</th>
+<th>当前V3</th>
+<th>最终处理</th>
+<th>归属</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>插入并复制</td>
+<td>主按钮＋Alt+I，最终保留文本到剪贴板</td>
+<td>仅“插入”标签；有写剪贴板底层但流程不完整</td>
+<td>恢复主动作及结果语义；不是只改按钮名</td>
+<td>S1</td>
+</tr>
+<tr>
+<td>只复制文字</td>
+<td>有独立复制，不插入</td>
+<td>详情缺独立复制入口</td>
+<td>一次点击复制，不新稿不清图，不冒充已投递</td>
+<td>S1</td>
+</tr>
+<tr>
+<td>当前稿与上次图文</td>
+<td>旧有文字历史可恢复</td>
+<td>last_bundle优先，混稿风险</td>
+<td>当前总是当前；上次独立不可变，安全恢复</td>
+<td>S1/S3</td>
+</tr>
+<tr>
+<td>插入后收窗</td>
+<td>旧按钮先hide</td>
+<td>无统一完成控制</td>
+<td>大浮窗先隐藏，结束短反馈再隐藏</td>
+<td>S1</td>
+</tr>
+<tr>
+<td>手机开始下一段</td>
+<td>旧发无版本cleared</td>
+<td>手机只toast，普通目标unknown卡住</td>
+<td>非破坏性轮换＋精确回执＋可召回</td>
+<td>S1</td>
+</tr>
+<tr>
+<td>长文可读</td>
+<td>可调整审阅窗/全文编辑</td>
+<td>固定88/132高度、尾200字</td>
+<td>有上限自适应＋全文详情，不缩字号</td>
+<td>S1</td>
+</tr>
+<tr>
+<td>电脑改字与标准编辑</td>
+<td>有编辑/选中/撤销等</td>
+<td>有QPlainTextEdit，真实冲突不完整</td>
+<td>完整保留，手机来稿不覆盖编辑分支</td>
+<td>S1/S3</td>
+</tr>
+<tr>
+<td>热键与冲突</td>
+<td>插入/唤起、可自定义</td>
+<td>插入/召回部分可配；展开/截图配置不足</td>
+<td>四动作统一注册反馈，保存失败保留旧绑定</td>
+<td>S1/S4</td>
+</tr>
+<tr>
+<td>焦点与外部目标</td>
+<td>保存前台窗口并尝试恢复</td>
+<td>只看class/title；自家窗口可能成为目标</td>
+<td>明确外部控件、文档/会话身份，每步复核</td>
+<td>S1/S2</td>
+</tr>
+<tr>
+<td>剪贴板保护</td>
+<td>有设置，插入路径keep_in_clipboard=True</td>
+<td>无完整策略UI</td>
+<td>主“插入并复制”保留结果；保护用户中途复制；其他恢复模式另命名</td>
+<td>S1</td>
+</tr>
+<tr>
+<td>手动清空/新稿</td>
+<td>有清空</td>
+<td>没有完整多端语义</td>
+<td>保全上一版，可撤销；不删历史或晚来的新稿</td>
+<td>S1/S3</td>
+</tr>
+<tr>
+<td>首次连接与二维码</td>
+<td>设置可扫码</td>
+<td>原生入口已接，仍扫码后长码</td>
+<td>零手输配对，短码备用，本机批准，可记住设备</td>
+<td>S0/S4</td>
+</tr>
+<tr>
+<td>完整原生客户端</td>
+<td>旧Tk设置/审阅</td>
+<td>Qt主窗、托盘、详情已接</td>
+<td>保留已有实现完善，不退回pc.html/CLI</td>
+<td>S1/S4</td>
+</tr>
+<tr>
+<td>自启动与托盘</td>
+<td>有</td>
+<td>V3隔离注册项与二次唤起已实现</td>
+<td>自启到托盘、手动开窗口、真点击退出、重复开只唤起</td>
+<td>S4/S5</td>
+</tr>
+<tr>
+<td>手机IME原路径</td>
+<td>原textarea与同步</td>
+<td>网页仍有文字入口</td>
+<td>真实composition/回改/末尾字符不丢，不再造ASR</td>
+<td>S1</td>
+</tr>
+<tr>
+<td>会话重连与持久草稿</td>
+<td>有重连和文本历史但弱</td>
+<td>服务端有快照，手机版恢复不足</td>
+<td>正文/图序/scene持久化，重连不重发系统动作</td>
+<td>S1/S3</td>
+</tr>
+<tr>
+<td>手机相册多图</td>
+<td>新增</td>
+<td>入口有，多选/未上传状态不足</td>
+<td>独立每图状态、方向/裁剪/重排/重编辑、不漏图</td>
+<td>S2/S3</td>
+</tr>
+<tr>
+<td>电脑截图到手机</td>
+<td>新增</td>
+<td>原生捕获有，鉴权加载/主动推送不足</td>
+<td>手机和PC热键都到手机正确编辑页，授权范围可控</td>
+<td>S2</td>
+</tr>
+<tr>
+<td>裁剪与隐私遮挡</td>
+<td>新增</td>
+<td>有部分画布实现</td>
+<td>源图可逆编辑；只发完成成品；真实像素遮挡</td>
+<td>S2/S3</td>
+</tr>
+<tr>
+<td>手机笔刷和图形</td>
+<td>新增</td>
+<td>部分Konva工具/undo已补</td>
+<td>3笔刷、箭头、线/矩形/椭圆/文字/编号/移动/橡皮可用</td>
+<td>S3</td>
+</tr>
+<tr>
+<td>轻量白板</td>
+<td>新增，用户本轮要求</td>
+<td>已有单画布和简单线框</td>
+<td>横/竖/方画布、网格可隐藏、组件可编辑、能重开</td>
+<td>S3</td>
+</tr>
+<tr>
+<td>编号与文字说明</td>
+<td>新增</td>
+<td>显示图序但关联能力不足</td>
+<td>编号绑定图片ID；调整图序后说明不串；用户确认才插说明</td>
+<td>S3</td>
+</tr>
+<tr>
+<td>手机边画边说</td>
+<td>新增，原V3有说明抽屉</td>
+<td>已读页面未形成抽屉</td>
+<td>编辑器内文字抽屉，原输入法说说明不来回跳页</td>
+<td>S3</td>
+</tr>
+<tr>
+<td>桌面图片预览</td>
+<td>新增</td>
+<td>仅图数量QLabel</td>
+<td>缩略图、图序、放大查看；不另做电脑绘画软件</td>
+<td>S2/S4</td>
+</tr>
+<tr>
+<td>图像上传/大小限制</td>
+<td>新增</td>
+<td>refs解析已补，默认1MiB边界仍风险</td>
+<td>二进制鉴权上传、完整校验、限流、失效引用明确拒绝</td>
+<td>S2</td>
+</tr>
+<tr>
+<td>主目标一键图文</td>
+<td>新增</td>
+<td>专用target有记录；真实Cursor未完成</td>
+<td>当前聊天网页和Cursor能力分别验证；主目标不能永久半自动冒充一键</td>
+<td>S2/S5</td>
+</tr>
+<tr>
+<td>部分/未知安全重试</td>
+<td>新增</td>
+<td>有真实对话框，目标和接线不足</td>
+<td>完整重贴/只补文/取消实际执行；不清目标原内容</td>
+<td>S3</td>
+</tr>
+<tr>
+<td>最近内容</td>
+<td>旧文字历史</td>
+<td>图文列表有，每秒重建；恢复覆盖</td>
+<td>缩略图首句时间，选择稳定，恢复新稿不丢正在写的稿</td>
+<td>S3/S4</td>
+</tr>
+<tr>
+<td>服务商与模型预设</td>
+<td>旧版有</td>
+<td>三个裸字段</td>
+<td>预设＋自定义，模型值贯穿probe和实际纠错</td>
+<td>S4</td>
+</tr>
+<tr>
+<td>每服务商Key</td>
+<td>旧有Key分桶但明文</td>
+<td>单明文Key</td>
+<td>电脑OS凭据库＋配置引用，跨host重新授权</td>
+<td>S0/S4</td>
+</tr>
+<tr>
+<td>手动术语辅助</td>
+<td>旧有建议采纳拒绝</td>
+<td>服务有空transport/错误字段</td>
+<td>真实手动入口，选中文本或当前稿，局部建议可撤回</td>
+<td>S4</td>
+</tr>
+<tr>
+<td>词库管理</td>
+<td>旧有词典/术语管理</td>
+<td>只有hints基础，不是管理器</td>
+<td>查看/新增/编辑/禁用/导入，歧义词默认仅提示</td>
+<td>S4</td>
+</tr>
+<tr>
+<td>高级模型参数</td>
+<td>旧有prompt/timeout/temperature等</td>
+<td>缺省掉</td>
+<td>折叠保留prompt/timeout/支持参数，默认简单</td>
+<td>S4</td>
+</tr>
+<tr>
+<td>模型错误与测试</td>
+<td>旧有probe</td>
+<td>同步阻塞、未用所选model</td>
+<td>异步可取消，结构化401/404/429/超时/TLS/空返回</td>
+<td>S4</td>
+</tr>
+<tr>
+<td>后台学习/自动改写</td>
+<td>旧有双通道与学习队列</td>
+<td>已弱化</td>
+<td>本轮主流程关闭，不恢复默认后台学习；旧数据可读保留</td>
+<td>有意精简</td>
+</tr>
+<tr>
+<td>连接诊断与日志</td>
+<td>旧有自检/导出</td>
+<td>图形help主要日志路径</td>
+<td>一键诊断/导出，无Key/token/正文/图片，不常驻调试字段</td>
+<td>S4</td>
+</tr>
+<tr>
+<td>版本与更新</td>
+<td>旧有更新机制</td>
+<td>无完整V3UI闭环</td>
+<td>版本/检查更新/公开下载页；不静默覆日用或预览转正式</td>
+<td>S4/S5</td>
+</tr>
+<tr>
+<td>主题、控件与图标</td>
+<td>旧有资源；用户要求重做</td>
+<td>局部样式与旧icon混用</td>
+<td>平面全状态、深浅主题、完整图标/托盘变体、无装饰阴影</td>
+<td>S4</td>
+</tr>
+<tr>
+<td>构建/依赖/许可证</td>
+<td>旧有Windows发行</td>
+<td>CI已增但红；包仍consoleTrue</td>
+<td>锁定依赖、无控制台正式候选、完整ZIP与资源清单</td>
+<td>S0/S5</td>
+</tr>
+<tr>
+<td>日用隔离/迁移/回退</td>
+<td>旧日用数据必须保护</td>
+<td>preview目录隔离与锁已有</td>
+<td>隔离测试；只读导入确认；旧数据/启动项不被覆盖</td>
+<td>S0/S5</td>
+</tr>
+<tr>
+<td>macOS/Linux/公网隧道</td>
+<td>用户后续方向</td>
+<td>未完成</td>
+<td>接口可扩展；本轮不承诺、不用占位入口宣称支持</td>
+<td>明确后置</td>
+</tr>
+</tbody>
+</table>
+<h2 id="section-3">3. 最终界面：同一个产品的两端，不是两个演示</h2>
+<p>所有尺寸为设计基准而非对所有DPI写死的物理像素。字体缩放、窗口工作区小于基准、无障碍大字号时允许响应式调整，不能裁掉动作。完整视觉参见同包 <code>UI_BOARD.html</code>；这是设计板，不连接系统、不证明产品通过。实现必须为原生Qt控件与正式手机页面，不把设计HTML嵌进WebEngine冒充客户端。</p>
+<h3>3.1 Windows连接窗口</h3>
+<p>基准560×600，原生标题栏和缩放/关闭行为；标题为DoubaoTypeless。顶部“连接手机 / 常用设置 / 最近内容”使用平面文字导航和细下划线，不使用凸起阴影页签。正常双击默认打开这个窗口；已运行再双击唤起同一实例；系统自启动带明确来源标记时默认静默到托盘。用户可另选“手动启动也到托盘”，默认关闭，未完成首次连接时不应用这个选项。</p>
+<p>未连接页：一句功能介绍，二维码、手机地址和“复制地址”，小型“其他连接方式/连接帮助”。扫码之后只在电脑确认设备；不让用户再次抄长码。连接中显示真实阶段：等待手机/待批准/已连接/连接中断；不把一条WebSocket打开当作授权完成。</p>
+<p>已连接页：顶部设备昵称与最近连通状态；二维码区域默认收起，提供“添加/重新连接”。插入、截图权限分组显示；记住设备由用户明确选择；撤销有确认。截图范围说明放权限旁，不常显token、session_id、JSON或倒计时。首次教程可有“一分钟上手”，测试完成后只在帮助中打开，<strong>本机练习框不能永久占连接页</strong>。</p>
+<p>连接错误给可执行动作：同一局域网检查、换网络地址、重新扫码、重试服务、导出诊断。端口变动由程序协调并更新二维码，不能叫普通用户改配置文件。多网络适配器的候选地址隐藏在“连接帮助”高级区，不默默选一个不可达地址当成功。</p>
+<h3>3.2 自动输入浮窗与主动审阅</h3>
+<p><strong>纯自动HUD：默认宽400 DIP，短文总高104 DIP，按实际排版逐行增长；总高上限min(300 DIP，工作区高度35%)。</strong> 有图增加52 DIP缩略图行，但总高仍受上限。字号14，行高约21；小屏优先保证动作能点到，不缩小文字硬塞。底边锚定任务栏工作区上方16 DIP、向上长高，记住用户拖动位置；宽度不随文字跳变。</p>
+<p>标题“手机输入中”；正文自动换行；用户停在底部时跟随新文字，否则保持其阅读位置。正文数据不截断，HUD内部滚动，超上限显示“展开全文”。有图显示最多3张真实缩略图＋剩余数量，每张可查看，不用“N张图”替代预览。</p>
+<p>动作条只有：<strong>插入并复制 Alt+I</strong>（主按钮）、复制（次按钮）、展开（图标＋短标签），清空/恢复等低频项在更多里。窄宽度时次动作进入更多，不重叠正文。没有图片不留空行，没有术语建议不留空白建议框。</p>
+<p>收到真实内容变化/添图才显示；心跳、重新收到旧回执不显示。同一段输入静止6秒隐藏，草稿保留；用户主动滚动、选字、拖动、改稿时暂停隐藏。点主动作后先收起大浮窗，必要时只有252×44短进度条；终态500–900ms后隐藏。失败也不永久挡屏，详细提示在手机和恢复入口保留。</p>
+<p><strong>主动详情面板</strong>默认420×320，可调宽高。点击展开或Ctrl+Shift+U出现，能编辑全文、预览图片和检查术语；复制、撤销、选择、全选和上下文菜单正常。主动编辑期间不套用HUD6秒消失。关闭保留编辑分支；再次打开不能无提示reload覆盖未保存内容。插入前冻结明确版本，不直接把共享draft的几个字段临时写一遍就发。</p>
+<p>焦点规则：自动HUD不激活；详情、设置、权限对话框是用户主动操作可激活。本应用窗口从不作为最终投递目标。详情编辑结束要恢复用户之前明确选中的外部目标并验证，目标失效提示用户点正确输入框；不能往自己的文本框贴，也不能猜窗口标题。</p>
+<h3>3.3 常用设置：能力保留，参数分组</h3>
+<p>只保留一个主滚动区域，分组标题＋说明，不做嵌套卡片/大型仪表盘。各组内默认只显示日常选项，高级项点开才出现。切换标签不得丢弃未保存更改；全局保存有真实成功/失败反馈，能恢复默认并撤销未保存修改。</p>
+<table>
+<thead>
+<tr>
+<th>组</th>
+<th>默认可见</th>
+<th>高级/按需</th>
+<th>必须可验证的结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>使用习惯</td>
+<td>登录Windows时启动、登录后到托盘、手动启动显示窗口、插入后新稿、长文自适应</td>
+<td>关闭窗口行为、浮窗位置重置、剪贴板结果策略</td>
+<td>改设置真实生效；恢复默认不碰日用版</td>
+</tr>
+<tr>
+<td>快捷键</td>
+<td>插入并复制、召回上次、展开全文、区域截图</td>
+<td>录制按键、恢复默认、冲突提示</td>
+<td>保存失败继续用原有效绑定；不能仅解析语法后显示注册成功</td>
+</tr>
+<tr>
+<td>AI文字辅助</td>
+<td>功能说明、关闭/手动模式、服务商、模型、Key、测试连接</td>
+<td>Base URL、提示词、超时、供应商支持参数</td>
+<td>测试和实际术语检查使用同一份配置，UI不冻结</td>
+</tr>
+<tr>
+<td>词库</td>
+<td>搜索、错识→正确、仅建议/已确认固定替换、编辑/禁用</td>
+<td>导入旧词库预览冲突、导出无密钥词库</td>
+<td>可回滚导入，重复/歧义不静默覆盖</td>
+</tr>
+<tr>
+<td>连接与隐私</td>
+<td>设备授权、记住设备、截图范围、最近记录保留方式</td>
+<td>存储目录/清理、诊断脱敏信息</td>
+<td>会话撤销立刻生效，私密正文不入日志</td>
+</tr>
+<tr>
+<td>帮助</td>
+<td>版本、检查更新、连接诊断、日志、上手测试</td>
+<td>导出脱敏诊断/打开正式下载入口</td>
+<td>不要求用户读pair.txt或手开pc.html</td>
+</tr>
+</tbody>
+</table>
+<p>**“AI文字辅助”固定说明：**只在你点“检查术语”时处理选中的文字或当前稿，给出可接受/拒绝的建议。它不负责手机输入法听写，不负责截图、画图、传图，也不替你选择聊天页面或Cursor使用的模型。不配置，所有核心输入功能可用。</p>
+<p>“检查术语”在主动审阅里出现；无Key时给“配置AI文字辅助”入口，不用弹窗打断普通插入。有图的稿可只发送其文字，明确说明图片不会送到辅助模型。返回结果只给局部修改候选，接受/拒绝/撤回都存在；旧请求在编辑/插入/换稿后失效。原文始终可复制或插入。</p>
+<p>服务商预设复用旧版数据结构与价值，不盲复制旧名单为“最新兼容”。先审实际供应商协议：本轮至少完整支持选定的OpenAI兼容Chat Completions线路与自定义端点；原生不同协议不能仅换域名就称支持。预设模型列表注明来源/更新时间并始终可手填。Key按服务商和目标主机隔离存入OS凭据库；不能换主机自动携旧Key过去。</p>
+<h3>3.4 最近内容与恢复</h3>
+<p>列表项包含缩略图、时间、正文首行和可读结果；不要直接显示CONFIRMED/UNKNOWN工程枚举。选择、滚动和焦点必须稳定，数据没变化不重建列表。点击有完整预览；支持复制文字、复制单图、恢复为新稿、重投快照和删除。</p>
+<p>“恢复为新稿”：当前为空则创建新draft_id/epoch；当前非空先保全当前草稿，再明确提示“保留当前并恢复/取消”，不能覆盖用户正在写的B。不是把历史对象同一引用塞进当前Draft。历史里的图缺失就明确显示缺失，不用空数组装成原包。</p>
+<p>“重投快照”：复用原图文、顺序和成品版本，不修改当前B；保留上次Attempt不确定/部分结果，重新采集目标并按第4节恢复规则。不能设置_last_attempt=None把风险清零。</p>
+<p>默认最近记录20份/24小时/256MiB，提供会话模式和关闭持久保存选项。未完成Attempt和当前草稿引用的资产受保护；磁盘预算冲突暂停新增并解释，不强行删活跃素材。数据库删除、内存列表和资产引用计数必须一致。</p>
+<h3>3.5 手机：一个Composer＋一个共用图片编辑器</h3>
+<p>页面基准390宽，验证360/390/430；边距16、正文16、最小命中44×44。顶部设备/连接状态及最近/设置短标签，不用“近”“设”这种用户难懂的单字占位。正文用原生textarea承接输入法，不增加网页录音或自建ASR，不显示假录音波形。</p>
+<p>主页面顺序：连接状态 → 有图时的附件条 → 文字区 → 截电脑/相册/白板 → 主动作。无图时不出现附件空框。有图时主按钮文案“插入2张图和文字”，无文时“插入2张图”；无图可显示“插入并复制”。旁注“只放入输入框，不会替你发送”。</p>
+<p>每张附件都有独立状态：编辑中/准备上传/传输进度/电脑已收到/需要重试。存在未完成、失败、缺失资产时主动作先明确处理，不用filter把它们偷偷扔掉；用户主动移除失败图才允许转成纯文字。图片加入顺序可拖动并有左移/右移替代；删除5秒可撤销。</p>
+<p>图片编辑全屏：上方返回、标题、撤销、重做、完成；画布占主体；下方常用6项“画笔/箭头/方框/编号/裁剪/更多”，颜色/粗细二级行。更多中提供记号笔、荧光笔、线、椭圆、文字、选择/移动、橡皮、实心遮挡、线框组件。绘画时键盘收起，“补充说明”抽屉可直接继续使用手机输入法，回画布不丢笔画。</p>
+<p>三类入口共用编辑器：相册取本地图片；截电脑请求电脑原生服务；白板新建有限画布。白板提供横1600×1000、竖1000×1600、方1200×1200三个起点，白/浅纸背景；简单按钮/容器/文字线/图片占位组合可移动、缩放和编辑，不发展成专业设计器。</p>
+<p>裁剪提供自由范围与比例、八个可点手柄、恢复全图、90度旋转；裁剪不销毁源图和可编辑标注。完成后点缩略图必须能继续改箭头/文字，不把扁平图当新的唯一源图。源图/场景/最终渲染的身份必须分开。导出按场景像素坐标离屏绘制，与手机视图缩放无关；网格/选框/工具条不导出。实心遮挡必须真正烘入最终像素，只发送用户选择的成品图，不附隐藏原图。</p>
+<h3>3.6 统一视觉和图标交付</h3>
+<p>沿用克制青绿而非重新探索三套风格。浅色背景#F5F5F1，面板白，文字#1D2826，次文字#63716D，主色#167D71；深色背景#141C1B，面板#202B29，正文#EAF0ED。布局间距4/8/12/16/24，控件圆角8、面板12、HUD14。文字对比目标4.5:1，交互边界3:1，按实际组合测而不是只写数字。</p>
+<p><strong>导航/按钮不允许装饰性投影、凸起边、重渐变。</strong> 原生窗口系统阴影可保留，不能把它和按钮做旧效果混为一谈。Qt需要显式覆盖tab、button、input、checkbox、combobox、scrollbar的normal/hover/pressed/disabled/focus/checked/error状态；不能只改背景色留下系统默认凸起框。焦点环可见，去阴影不是去反馈。</p>
+<p>图标必须同轮交付：简洁“输入光标/图文转接”主符号，可融合一条笔画，不堆麦克风、AI星光、二维码和多层小元素，不使用豆包官方商标冒充关联。提交SVG源、应用PNG/ICO和明暗托盘简化图；16/20/24/32/48/64/128/256实际尺寸验收。UI_BOARD中DT只是占位，不是已经完成图标。无图形生成工具时仍可用矢量工具实现简单原创符号，不得复制未授权品牌资源。</p>
+<h2 id="section-4">4. 插入、复制、新稿、召回：一次定义清楚</h2>
+<h3>4.1 动作合同</h3>
+<table>
+<thead>
+<tr>
+<th>用户动作</th>
+<th>对目标输入框</th>
+<th>对系统剪贴板</th>
+<th>对当前稿</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>插入并复制（默认Alt+I/主按钮）</td>
+<td>本轮图像依序后文字；不按Enter</td>
+<td>成功完成步骤后保留本轮文字；只有图则最后一张图</td>
+<td>满足4.3条件时保全上一段后切新稿</td>
+</tr>
+<tr>
+<td>只复制文字</td>
+<td>不操作目标</td>
+<td>当前实际编辑文字逐字写入</td>
+<td>不轮换、不清图、不显示“插入成功”</td>
+</tr>
+<tr>
+<td>复制单图</td>
+<td>不操作目标</td>
+<td>所选成品图实际像素</td>
+<td>不改变图序/草稿</td>
+</tr>
+<tr>
+<td>清空并开始新稿</td>
+<td>不操作目标</td>
+<td>不改剪贴板</td>
+<td>先保留可恢复副本，清匹配当前稿；不删历史</td>
+</tr>
+<tr>
+<td>召回并重试（Alt+Shift+I）</td>
+<td>用上次实际尝试的冻结图文，在当前重新确认的目标执行</td>
+<td>按本次已完成投递步骤记录</td>
+<td>当前正在准备的新稿B保持不变</td>
+</tr>
+<tr>
+<td>恢复历史为新稿</td>
+<td>不直接操作目标</td>
+<td>不改剪贴板</td>
+<td>保全非空当前稿后建新ID/epoch，不覆盖原历史</td>
+</tr>
+</tbody>
+</table>
+<p>默认“插入并复制”不可同时偷偷恢复旧剪贴板。若保留“插入后还原受支持的旧剪贴板”选项，必须是明确另一个模式，主动作标签显示“插入（还原剪贴板）”，用户切回默认即可保留结果；不声称支持所有应用私有格式。无论何种模式，用户投递中复制了别的内容，都不得再覆盖回旧数据。</p>
+<p>若操作中途停止，剪贴板可能停在最后尝试的图；提示真实情况，提供“复制文字”，不要仍声称本次文字已复制。复制结果与粘贴结果分别记录。</p>
+<h3>4.2 唯一生产调度入口（建议职责，不要求机械使用类名）</h3>
+<p>所有UI和热键只调用同一个应用命令层：<code>insert_current</code>、<code>copy_text</code>、<code>recall_last</code>、<code>restore_history</code>、<code>start_new_draft</code>。只有命令层可以创建Intent并向投递队列排一次动作。手机WS不直接绕开状态层改几个共享字段；窗口也不自己写app.draft。</p>
+<p>建议把现有V3App拆出一个生命周期明确的<code>ComposerSession</code>/reducer和<code>DeliveryCoordinator</code>，保持Python+Qt+aiohttp与既有资产/存储，不全工程换语言。以下状态只有一个所有者：</p>
+<ul>
+<li>Draft：当前draft_id/epoch/revision/text/有序图片引用；不得用last_bundle代表当前。</li>
+<li>EditBuffer：电脑主动编辑的私有分支；手机来稿进入pending，不覆盖它。</li>
+<li>FrozenBundle：插入前冻结的真实成品图文，内含每图render_revision/hash；独立于后续Draft。</li>
+<li>Attempt：本次intent、目标指纹、逐图/文字步骤和错误；多次重试不覆盖过去事实。</li>
+<li>RecoveryStore：实际动作前写入可恢复快照，完成/失败都可定位；不能等粘贴结束才第一次存历史。</li>
+<li>WorkspaceState：当前显示哪份稿、是否轮换；和接收是否CONFIRMED分离。</li>
+<li>WindowState：HUD/详情/设置显示情况，和稿件存活分离。</li>
+</ul>
+<p>Qt窗口/剪贴板/原生交互在所属GUI线程；aiohttp一个受管理的asyncio线程；跨线程只发有类型消息/queued signal。投递等待/网络/图像导出不能阻塞Qt事件循环。Actor/锁/队列择一保持明确，不让同一Draft被多个线程无保护写入。</p>
+<h3>4.3 插入完成与手机新稿算法</h3>
+<ol>
+<li>捕获明确的当前版本与外部目标；检查所有附件都已有成品、已校验且属于当前会话。用户仍在IME组词时先等待提交或提示，不靠“停顿”猜录音停止。</li>
+<li>将FrozenBundle和待执行Attempt持久化，失败则保留稿、不清空、不悄悄开始投递。允许用户另按“只复制”自救。</li>
+<li>收起自家可编辑窗口，恢复/验证用户明确外部目标；等待修饰键释放后再次验证。任何一步失败停止，不投给本应用窗口。</li>
+<li>逐图写剪贴板→再次检查目标/剪贴板归属→提交按键→等待本次新附件可用→下一张。最后文字同样验证。写入前后日志只含动作和哈希，不含用户正文或像素。</li>
+<li>所有入口的结果进入同一<code>attempt.finished</code>处理；本地快捷键也必须通知来源手机。进度与结果短暂显示，不因为UNKNOWN永久悬浮。</li>
+<li>已确认整包完成：若手机/电脑当前身份、revision、内容hash、图片render版本与冻结版本匹配，原子归档并创建空白新稿。任何期间产生的新输入B保留。重复或乱序回执幂等，不在新稿复活旧HUD。</li>
+<li><strong>本轮修订的纯文字兼容策略</strong>：明确本地操作、目标验证未变、原文已安全保留、系统提交粘贴事件成功且无异常，但外部控件无法确认接收，可非破坏性轮换开始新稿。仍记录UNKNOWN/“已尝试”，绝不标CONFIRMED；上次可找回，不能自动重贴。系统动作返回必须来自真实平台结果，不由空回调成功代替。该策略不能泛化为未知远程目标允许插入。</li>
+<li>图片未知、部分完成、目标变化、明确失败：停止余下内容，默认保留当前图文，显示恢复或“保留本次，开始新稿”。不能套用纯文规则假装整包完成；用户明确新稿时仍保存不确定Attempt。</li>
+<li>插入期间的手机后续输入无法明确分离成新稿时，保留完整现有文本并提示“上一段已保留，当前有新修改”，不能靠前缀相减删字。正常串行A→插入→空白→B不能被这一保守分支拖慢。</li>
+<li>完成事件含来源设备/草稿/epoch/revision/content_hash/bundle_id/attempt_id/轮换决策；断线重连可查询最新结果，<strong>只同步数据不重放系统按键</strong>。</li>
+</ol>
+<p>默认设置“插入后开始新一段：开；上一段保留在上次图文”。关闭后保持当前稿，但下次插入同内容必须明确避免重复误操作。复制、同步ACK和上传成功都不触发自动新稿。</p>
+<h3>4.4 目标适配与结果真实性</h3>
+<p>恢复一个明确的外部目标，不等于仅看进程名或窗口标题。目标上下文至少包含HWND、PID/进程启动身份、控件identity、适配器、已观察的文档/聊天身份（能够获得时）、采集时间。不能取不到文档ID就伪造；此时能力降级必须明确。</p>
+<p>本地显式纯文字保留旧版“在正常编辑框粘贴”用途；不要把所有非Composer文本框都永久禁用。已识别终端/命令执行区域需要明确选择和风险提示，不自动Enter；手机远端插入在未知目标下拒绝。绝不把“标题里有composer”当可靠安全边界。</p>
+<p>主支持场景包括用户当前使用的<strong>聊天网页输入框</strong>与原定<strong>Cursor Agent/Composer</strong>。实际浏览器/应用/模型版本由开发环境与用户机器采集，不凭名字宣称图像能力。先尽早实验这两类真实目标；各自建立支持矩阵，不能以自建PasteTarget代替。若某主目标确实只能通过额外扩展或不同交互实现，给出实际实验与最小变更方案请求一次具体决定；不得擅自删掉或永久半自动却称一键完成。</p>
+<p>无法观察的目标可提供半自动逐图确认、复制图片/文字/导出文件作为退路；这些是能力降级而不是主要一键验收通过。不得用固定sleep后直接CONFIRMED。OS返回事件数不是目标接收证明，平台权限也可能阻止输入。</p>
+<h3>4.5 重试规则</h3>
+<p>没有步骤实际发出：重新选目标后直接完整重试。已确认所有图进入但文字未发、且仍同一输入文档：只补文字。仅确认前k张、同目标且状态仍可观察：从下一张继续。其余部分/未知/换目标：一次真实恢复选择，默认取消，不自动重贴。</p>
+<p>选择框列出上次图片数、正文首句、已知步骤；“完整重贴 / 只贴文字 / 取消”必须分别接命令，不能都落入full。已完成过的内容重贴应提示重复风险。不自动Ctrl+A/Delete/Ctrl+Z清理目标；它可能原来就有用户文字。</p>
+<p>按住热键只建一次intent；同UUID重传只查状态；BUSY时不排队等焦点变了再执行。重启后未完成Attempt为UNKNOWN而不是NO_STEPS，保留实际已发步骤。当前B与上次A两条链互不覆盖。</p>
+<h2 id="section-5">5. 图片、网络与数据：把正式路径接上</h2>
+<h3>5.1 草稿协议与写入者</h3>
+<p>统一schema或TypeScript/Python协议测试，版本3内的小改需要明确协议revision。每个事件含message_id、绑定会话、draft_id、epoch、revision，连接服务端赋设备身份；客户端不能冒用别的device_id。服务端是当前共享稿唯一仲裁者，不让GUI和WS直接同时改同一对象。</p>
+<p>手机号或真实设备ID不必要，不收集。最多一个当前编辑租约；另一设备连接可查看已授权状态，不能同名revision互相覆盖。电脑主动编辑启动独立分支，pending手机稿只暂存；放弃/采纳/保留都由命令层应用并广播一致版本。离开编辑窗口须释放租约或保全可恢复编辑分支。</p>
+<p>ACK区分“已接收”和“已保存”：真正事务提交才durable=true。内存模式必须false并在设置解释重启不可恢复，不能返回假durable。与手机IndexedDB保存状态分开。ACK不得被不相关活动提示覆盖；相同内容输入法最终提交标记也要处理，不仅比较字符串。</p>
+<p>断线复连先session.ready交换server_boot_id和草稿游标；再合并/恢复未结束编辑，不用新的revision0覆盖服务端。草稿与场景保存在手机IndexedDB，权限凭据使用与安全模式相符的会话存储；对象URL不能充当可持久图片。浏览器被清理时明确恢复能力，不能承诺锁屏永远保持WebSocket。</p>
+<h3>5.2 图片资产合同</h3>
+<p>每张图片必须区分source_asset_id、document_id、scene_revision、rendered_asset_id和render_revision。相册文件/PC截图是源图；编辑器完成后生成可投递输出；未完成的scene不进入Bundle。冻结顺序由有序refs确定，服务器解析可信元数据并检查所有者、完整性、可用版本、role=已完成输出；不能默认所有文件都是photo可投递。</p>
+<p>默认最多6张、单张8MiB、合计24MiB、文字UTF-8 64KiB、解码48MP上限保留。超限有可操作提示，不能静默删图、截字或失真压缩。正常图导出适配2560长边并预览清晰度，细小UI文字需要用户可选更清晰输出并受限额约束；不以截图手机屏幕代替规范输出。</p>
+<p>上传：带会话鉴权的二进制HTTP，分块默认可选512KiB以避开旧1MiB边界；服务端上限显式配置而且有限，写前校验每块/总量；上传ID绑定会话，重传同块幂等，过期临时块清理。大图达到body限制时返回明确错误，不由环境变量偷偷缩块让测试过。完整图片校验和解码通过后才asset.ready/可持久引用。</p>
+<p>引用缺失就返回缺失清单，不过滤遗漏。多选相册先把全部项入附件队列，再由用户逐项处理；未完成项可显示待编辑而不能当已上传。上传失败保留场景/源图/可重试输出，不隐藏错误后发送其余文字。服务器不能接受客户端伪造bytes_data替代图片下载；测试也不能偷偷额外带内部assets对象。</p>
+<p>PC截图经已授权请求在本机执行，具体会话和范围在请求上下文传递；不能使用最后一个sessions[-1]代替发起方。PC热键截图完成要推送给明确的当前配对手机；本机截图成功不等于手机已拿到。屏幕锁定/权限撤销/请求过期不执行；不后台持续截屏。</p>
+<h3>5.3 连接、二维码、权限与HTTP兼容</h3>
+<p>二维码携带短时随机邀请（建议128bit以上），只允许申请连接；电脑展示设备请求并批准后发正式凭据。邀请放URL片段时立即消费并清理地址，不能写访问日志或作为永久动作权限。四位数字备用码与强随机邀请/session token不同：有效120秒、每挑战最多5次失败、IP与全局限速、本机最终批准、一次性；不能只截短现有session token。</p>
+<p>记住设备是用户显式选择；系统重启后凭据续接与权限范围可撤销，不每次抄长码。重新配对令旧邀请失效；拒绝截图仍可语音，拒绝远端插入仍可用户本地快捷键操作。每次动作确认设备绑定，定期过期；撤销立刻关闭其连接并拒绝后续数据变更。不能留一个authorized=True给已撤销的WS永久改稿。</p>
+<p>局域网HTTP模式必须明确仅供用户信任的网络，不声称加密或端到端保护；公共/不可信网络不建议启用，公网隧道本轮不开放。普通手机HTTP访问私网IP不是localhost，crypto.randomUUID/subtle不可用须提供受审安全随机数与哈希兼容路径或真实可信HTTPS部署，不能要求关闭浏览器安全策略。邀请/令牌随机性不使用Math.random。</p>
+<p>Host/Origin规则精确匹配本服务可信来源与允许的本地管理路径，而不是所有私网IP都算本站。对可合法缺Origin的同源GET，以会话凭据与资源所有者验证，不能统一拒绝导致图片/历史正常fetch不可用；跨站敏感变更仍要CSRF/来源和权限校验。带凭据图片通过鉴权fetch→blob→对象URL加载，及时释放对象URL。Key/正文不放查询串；现有/v3/terms?q=完整正文应改本地处理或受鉴权请求体。</p>
+<h3>5.4 持久化、Key、迁移</h3>
+<p>应用配置仅保存普通设置和credential reference，不存明文APIKey。用Windows系统凭据库保存Key；本地近期正文/图像使用受凭据库保护的应用密钥加密（沿用原V3隐私目标）。密钥库不可用默认会话模式，明确告知重启恢复受限，不悄悄降级明文。正式配置数据来自唯一SettingsService，原生窗/兼容pc页若保留也必须调用同一验证逻辑。</p>
+<p>旧config、词库、历史只读导入：先预览数量/冲突/功能调整，用户确认才写入新隔离区。旧自动学习队列保留归档、不自动启动花费。旧Key迁入凭据库成功才清理新配置副本的明文字段，旧文件不擅自删除；敏感备份留本机，不进git/报告。用户设置“禁用持久历史”时各缓存和DB行为一致，不能只关一处json而DB照存。</p>
+<p>获取预览实例锁再启动写入服务，预览端口/互斥对象/自启动注册项与日用版区分。检测热键被日用版占用时提示暂时禁用候选键，不杀旧进程，不抢旧目录。实际用户数据前后按原字节哈希；仓库源文件跨平台EOL检查另算，不能混为一谈。</p>
+<h2 id="section-6">6. 面向Grok的实施顺序：沿用S0–S5，持续推进到整个产品完成</h2>
+<p>下面是内部执行顺序，不是六次只做一段就交差。每阶段同时覆盖产品表现、正式接线、失败恢复、测试和实际截图。UI不能全部留到最后，只修后端/审核文件不是本计划完成。</p>
+<h3>S0｜接管工程，修真实缺陷与测试底座</h3>
+<p><strong>涉及</strong>：AGENTS/.cursor规则、CHECKPOINT、preview-v3.yml、平台导入边界、settings/credentials、现有证据索引。先git status和完整HEAD；有新提交先比较，不reset/覆盖。保存当前源码基线与当前配置隔离状态。</p>
+<p>把第1节真实缺陷写回open_defects；保留旧PASS材料但标被测源与观察范围，不能覆盖原始证据。测试依赖按平台拆开：Linux纯核心/协议/browser；Windows Qt/WinAPI/打包。纯scope解析移出顶层WinAPI加载。Qt测试如果跨平台运行需安装PySide6并offscreen；不能为绿把所有桌面测试skip而Windows也没跑。</p>
+<p>修LF/CRLF基线检查、当前恢复失败原因；Windows包依赖补实际用到的qrcode/httpx等并锁定。加入每次失败仍上传脱敏junit/报告，普通CI使用只读发布权限。现有18项checker自测单独展示，不累计产品统计。</p>
+<p>落实会话鉴权/撤销、素材所有权、Key安全存储和实例隔离；原安全补丁只参考不要盲合旧querytoken日志行为。<strong>出口</strong>：当前可执行检查真正跑过，授权/隔离反例拒绝，最小图形开发包可启动；真实设备缺口具体记录。结束后继续S1，不要求用户再批准一次。</p>
+<h3>S1｜恢复旧版高频体验：完整纯文字闭环</h3>
+<p><strong>涉及</strong>：app命令层、core/draft/bundle/attempt、bridge回执、desktop ReviewPanel/History、hud、clipboard/focus/hotkeys、手机state。</p>
+<p>先建立A/B/C连续插入、只复制不清稿、电脑改字、插入期间新来B、错误焦点不丢稿的生产入口回归，再实现第4节事务。分离insert_current与recall_last；客户端所有按钮统一走命令层。主按钮恢复“插入并复制”；实际剪贴板为刚插的内容，不只是标签变了。</p>
+<p>实现bounded HUD、正文全文缓存/滚动、详情编辑、外部目标捕获/恢复；按下插入先收自家窗。纯文兼容轮换仅按第4.3真实平台结果，结果unknown不伪造confirmed。传递device/draft身份的完成事件，手机原子新稿并保全上次；旧回执/后来的输入法回改不能删新稿。</p>
+<p><strong>出口演示</strong>：同一正常启动包，手机生产页输入A→本地Alt+I→目标文本A且剪贴板A→HUD隐藏→手机空新稿；B/C分别正确；复制不发键；从详情改字再插也正确；上次可找回。可先在真实普通文本框集成，不能冒称真实豆包/目标网页已验。</p>
+<h3>S2｜一张真正处理图＋文字，从三个入口都走通</h3>
+<p><strong>涉及</strong>：web/app+upload+editor、serverassets/bridge/capture、目标适配器、desktop图片预览。</p>
+<p>截图、相册、白板不能只共用一个mock上传：分别拿到真实源图，编辑/导出，上传校验，Bundle包含处理图hash，桌面缩略图可查看，目标实际出现该图后再出现文字。修HTTP上下文/默认分块/Origin/鉴权图片读取，去掉assetRefs过滤失败项的静默行为。</p>
+<p>尽早在用户当前聊天网页与Cursor实验目标识别、附件就绪、DOM/UIA可观察边界，记录具体版本。支持能力通过适配器返回，而非某窗口title恰好叫测试target。第三方应用数据读取只到必要输入区域，不抓整个聊天历史/截图后台OCR。若需要新的扩展或系统授权，给清楚的最小变更而不把主目标缩减为只复制。</p>
+<p><strong>出口演示</strong>：三种来源各一张已处理图，主目标按“图片→文字”放入；故意上传失败时不发残缺文字；中途切目标立即停；目标中的图片像素/方向/裁剪正确。独立复核集中检查这条真实路径，不每改一个按钮让用户签字。</p>
+<h3>S3｜完整编辑、轻量白板、图文恢复和历史</h3>
+<p><strong>涉及</strong>：canvas拆分document/tools/gestures/undo/export、手机IndexedDB、history/db、recovery。</p>
+<p>多图全部独立完成；编号绑定图片；重新编辑源图与scene而非重复在扁平图上画。Undo在操作前建立事务，pointercancel不提交；两指平移缩放锚点正确，无幽灵笔画。选择/移动/文字/图形/三笔刷/八裁剪手柄/遮挡/线框组件都完成，不拿type枚举存在充数。导出固定像素并过滤网格/临时选框。</p>
+<p>场景与生成图像版本持久化；崩溃在每个before-send/sent/observed点都能恢复正确UNKNOWN/部分状态，不自动补发。当前B不被召回A覆盖。最近列表不每秒重建；恢复前保全当前，重投保留manifest/attempt身份；从已确认前k张继续要传真实跳过集合。</p>
+<p><strong>出口演示</strong>：两张相册＋一张白板，重排、编辑第一张、撤销重做、回去再改、投递；关程序重开内容仍可恢复；A失败→写B→召回A不吞B；部分/未知真实选择能执行取消/只文/全量。</p>
+<h3>S4｜完整客户端体验、保留设置与统一视觉</h3>
+<p><strong>涉及</strong>：desktop拆分复用组件、Qt主题、图标资源、AI/provider/terms/settings/diagnostics、手机对应组件。</p>
+<p>先按UI_BOARD原生实现连接/AI设置/长文HUD三个关键表面，统一全状态风格后铺全部页面。不是先出一套新HTML再说原生以后做。移走常驻练习框，二维码零手输、已连接简洁页、短码备用；设备昵称与权限文案清楚。</p>
+<p>服务商/模型/Key分组、安全存储、真实异步probe和术语检查共享客户端。选中的model必须进入真实请求；自动拼接URL规则明示，已经完整路径不重复/v1。空内容、HTML报错页、reasoning-only不能当可用修改结果。应用返回局部建议，可拒绝/撤销，网络慢不挡插入。词库可管理且迁移旧数据；高级参数按需展开，主流程仍默认无自动调用。</p>
+<p>完善自启动/静默托盘/重复启动唤起/热键热更新或清楚需重启提示/真正点击退出/诊断导出/检查更新。默认用户界面无原始session、JSON、no_transport、BLOCKED_NATIVE等开发用语。图标同轮完成，小尺寸验收。关闭窗口不丢编辑稿，隐藏时停止无用QR/列表刷新。</p>
+<p><strong>出口</strong>：第2节所有保留能力和新增能力有真实可达入口；主界面、图文、手机、AI/词库、错误态风格一致；所有差异有原生截图，未完成项仍列开发缺陷。不能用“图像新功能多”解释旧快捷复制和词库没做。</p>
+<h3>S5｜完成最终产品，而不只生成EXE</h3>
+<p><strong>涉及</strong>：完整回归、性能、原生和真机证据、release候选构建与迁移回退。</p>
+<p>从已提交固定源码/锁定依赖构建最终无控制台Windows包；调试console包另命名，不能悄悄只改consoleFalse藏掉错误。测试实际发行入口而非source main或专用harness。排除DT_V3_TARGET_STATE/测试观察器等开发开关对正式确认语义的影响，不让环境变量把测试目标当真实接收。</p>
+<p>把整份onedir压成ZIP，保存ZIP SHA256、EXE SHA256、内部文件路径/大小/hash（含DLL、网页、icons、许可证、版本）；源码、前端资源和依赖锁定位于同一构建清单。源码commit不等于包hash，没有“二者相等”要求。doc-only变化可单独说明；build input变化必须重建/重验。签名状态如实，无签名不伪称已签名。</p>
+<p>真实主环境从零连接，完整执行第7节故事和COVERAGE原96与新体验场景。集中一次设备脚本与最少授权，不把所有调试扔给用户。真机缺失只阻塞真机项目；安装测试依赖、补UI、修CI、写实际适配器都不是“等设备”。</p>
+<p>独立复核功能、安全、视觉与包；代码全部写完但原生/真机未验，状态仍是待验证，不是RELEASE_READY。主功能缺失、错目标/丢图/吞稿/重复、未授权访问等不得靠known_limits放行。小的非关键瑕疵可明确说明并由用户接受，不能无限加新花样拖发布。</p>
+<p><strong>最终交付</strong>：可运行完整包＋清楚入门指南＋功能/支持矩阵＋确实执行的结果＋已知限制＋迁移/回退＋发布说明＋具体审批对象。公开merge/tag/Release仍需用户明确批准；无许可先交真正可发布候选，不把“禁止发布”当不开发的理由。</p>
+<h2 id="section-7">7. 开发与验收都必须走的真实用户故事</h2>
+<p>以下故事用作每轮端到端观察，不替代96项细项。工具注入可用在单测，不能在生产页面E2E里偷偷补前端缺失字段；自建PasteTarget只证明该测试目标，不能说真实Cursor/聊天网页通过。</p>
+<table>
+<thead>
+<tr>
+<th>故事</th>
+<th>操作</th>
+<th>必须观察的内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>J1 连续输入</td>
+<td>A短句、B长段、C带换行分别插入并复制</td>
+<td>每轮目标是当轮，剪贴板是当轮，收窗/手机新稿/上次恢复都正确；不是A+B粘两遍</td>
+</tr>
+<tr>
+<td>J2 编辑与只复制</td>
+<td>手机稿到电脑改字，复制；再插入</td>
+<td>复制不发键不清稿；插入用编辑后的确切版本；不会贴给自家详情窗</td>
+</tr>
+<tr>
+<td>J3 新输入并发</td>
+<td>插入A期间手机追加/改写B</td>
+<td>旧完成回执不清B，不按前缀删字；恢复A不覆盖B</td>
+</tr>
+<tr>
+<td>J4 截图说明</td>
+<td>手机截电脑，裁剪、遮挡、箭头，补说明</td>
+<td>不暴露原图，目标实际成品图；拒绝截图仍可用文字</td>
+</tr>
+<tr>
+<td>J5 相册多图</td>
+<td>同选2张，分别处理、交换顺序、重编辑第一张</td>
+<td>没有只留最后一张；未上传图不被过滤；图序真实一致</td>
+</tr>
+<tr>
+<td>J6 白板</td>
+<td>三种笔刷、图形、编号、文字、组件、两指、50次撤销重做</td>
+<td>无幽灵笔画/视图漂移；组件可改；重开仍可编辑；输出不受缩放影响</td>
+</tr>
+<tr>
+<td>J7 真目标图文</td>
+<td>当前聊天网页/选定Cursor版本各放入2图+文字</td>
+<td>图在前、文在后、不发Enter、不自动发送；与目标原有草稿共存</td>
+</tr>
+<tr>
+<td>J8 失焦与恢复</td>
+<td>图1后切窗口/同进程另一聊天，改目标召回</td>
+<td>停剩余步骤；恢复选择一次；不Ctrl+A/Delete；不以类别相同当同目标</td>
+</tr>
+<tr>
+<td>J9 断网与崩溃</td>
+<td>上传中断、完成回执丢失、sent附近重启</td>
+<td>数据恢复，不自动再次插入；日志记录未知，不伪装零步骤</td>
+</tr>
+<tr>
+<td>J10 配对与撤销</td>
+<td>扫码、备用短码过期/5次错、拒绝/撤销/重启</td>
+<td>零手输正常路径；被撤销WS不能写稿/读图/截图/投递；权限不暗中扩大</td>
+</tr>
+<tr>
+<td>J11 AI与词库</td>
+<td>选定模型测试和检查术语，401/429/超时、期间新输入</td>
+<td>模型配置有效、原文不被阻塞或旧结果覆盖；词库可管理；Key不泄漏</td>
+</tr>
+<tr>
+<td>J12 程序生命周期</td>
+<td>首启/手动启动/系统自启/关闭到托盘/重复启动/点退出/再开</td>
+<td>真实用户入口正常，无控制台，旧日用目录/注册项不受影响</td>
+</tr>
+<tr>
+<td>J13 视觉和可达性</td>
+<td>每页普通/hover/disabled/focus/error，360–430手机宽，Windows多DPI</td>
+<td>不混原生凸起阴影，文字不截断，主动作始终可点，缩略图真实</td>
+</tr>
+<tr>
+<td>J14 最终发行包</td>
+<td>干净Windows解压同一ZIP复做J1–J13</td>
+<td>没有开发目录/工具依赖，哈希与清单一致，许可证/图标/网页资源齐全</td>
+</tr>
+</tbody>
+</table>
+<h3>7.1 原96项怎么保持，哪些明确变更</h3>
+<p>同包<code>COVERAGE.json</code>保留原始定义对象（来自最初设计附件，不采用实现者已自动填绿的JSON）及每条S阶段映射。现有产品结果另存，不覆盖旧证据。</p>
+<p>明确覆盖：AC3-029/030/091里的旧固定HUD视觉以第3节自适应为准；AC3-016/025/030/037的收尾增加第4.3非破坏性纯文轮换，仍不能假CONFIRMED；AC3-077/080的扫码流程明确零手输、教程后置；AC3-073/074/076补完整模型用途与真实配置；其余安全/范围不减。新增UX-*是已明确用户需求的细化，<strong>不是另一套版本或阶段</strong>。</p>
+<p>每项分开写实现状态、集成状态、组件证据、Windows/手机/目标证据、独立复核。没有结果就是NOT_RUN；已经静态确定矛盾写SOURCE_GAP并必须修；真机资源缺失BLOCKED_ENV只约束对应层。测试成功但使用mock的结果是组件通过，不升级产品通过。</p>
+<h3>7.2 性能沿用原目标，不增加无关优化工程</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>目标与记录</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>电脑空闲10分钟</td>
+<td>可见自动浮窗0；总CPU归一化中位≤0.3%、P95≤1%；Private bytes≤180MiB目标，超过250MiB先定位。记录硬件/电源/OS，目标值不是当前成绩</td>
+</tr>
+<tr>
+<td>文字到HUD</td>
+<td>本机P95≤100ms；LAN同步目标150ms，时钟校准/ACK往返说明，不直接相减两台不同时钟</td>
+</tr>
+<tr>
+<td>纯文投递</td>
+<td>目标已通过、修饰键释放之后到平台发键P95≤150ms；不将接收未知变成功</td>
+</tr>
+<tr>
+<td>绘画</td>
+<td>实际手机2MP/200笔，响应P95目标≤32ms；不能用桌面浏览器成绩替代手感</td>
+</tr>
+<tr>
+<td>导出</td>
+<td>常见2560长边图本地≤1s目标；慢设备提供进度和取消，网络另算</td>
+</tr>
+<tr>
+<td>稳定性</td>
+<td>连续2小时/200轮混合文字图文，无丢稿、错误清空或重复发键；失败不能用均值掩盖</td>
+</tr>
+<tr>
+<td>资源体积</td>
+<td>便携ZIP≤150MiB目标；输入首屏JS gzip≤150KiB，画布按需加载≤500KiB目标；不要为了达预算换整套技术栈</td>
+</tr>
+</tbody>
+</table>
+<p>隐藏窗口不重绘QR，不刷新不变列表；缩略图用小缓存，大图按需解码；编辑器脱离页面调用destroy，释放对象URL、事件和Canvas；Key测试放异步任务可取消。先Profiler定位再优化，不以“轻量”删高频功能。</p>
+<h2 id="section-8">8. Grok如何持续完成，而不是每次交阶段说明</h2>
+<p>首次读取START_HERE、MASTER_PLAN第0–2与当前阶段、COVERAGE、真实HEAD/CHECKPOINT。之后每轮只载入短规则、当前工作、相关接口与未解决缺陷；不让每个小改动反复读完所有旧包。</p>
+<p>循环：选一个最高价值可执行切片→写能暴露缺口的回归→修正式实现→从正常入口验证→提交隔离分支→更新缺陷与断点→继续。整体目标不变，小切片是降低返工的方法，不是降低交付范围的方法。</p>
+<p>禁止：为了满足报告制作新的假入口；一直完善审计工具不修产品；因为包已存在就切到“S5只整理说明”；为了守96旧字面要求保留已经被用户否定的固定两行；把可安装的comtypes/PySide/qrcode缺失写成必须设备持有者解决；把部分真实测试结果挂到另一份包上。</p>
+<p>会话/额度结束时停止工具并保存断点，不能承诺后台继续跑。断点最少：完整HEAD、工作区变化、当前命令、失败复现、真正未解决问题、下一具体开发动作、对应需求/用例、已执行层级和环境缺口。<strong>下一次用户说“继续V3”就应接着做，不重问产品目标。</strong> 内部阶段完成不主动要求用户说继续，只有新的费用、系统授权、权限变更、确实影响需求的设计取舍和最终发布需要询问。</p>
+<p>开发者自己承担所有可执行测试：安装缺失开发依赖、CI、正常GUI点击和退出、浏览器事件、上传导出、模拟错误。用户只承担不能替代的设备授权/少量真实语音与触控手感/最终具体发布许可；集中准备一个脚本和样例素材，不能让用户反复收集本来就能自动采集的字段。</p>
+<p>进展报告先回答“本轮用户能完成什么、哪条老体验恢复了、还差什么”，再附SHA/包/测试。不能以“116变成150个测试通过”作为主结论。最终汇报是否达标逐项给事实；没有独立审阅或真机验证就如实等待对应验证，但继续其他未完成开发。</p>
+<h2 id="section-9">9. 最终完成定义与发布控制</h2>
+<p>完整范围无缺失：第2节41项中除有意精简/明确后置项外均完成，COVERAGE全部必需测试达到规定层级。文档遗留或次要视觉问题允许列出并请求用户接受，不能把核心缺失塞到known_limits。</p>
+<p>三个维度同时成立：<strong>功能完整、日常顺手、制品可靠</strong>。安全/错目标/丢图/吞稿/重贴等不放行；复制、手机新稿、收窗、扫码、词库、BYOK和完整客户端不能缺。</p>
+<p>公开发布仅在用户批准的具体源SHA、版本号、ZIP/EXE hash和动作范围执行。V3是重构代号，不自动改应用版本成v3.0.0。实际发布workflow必须构建或推广批准的V3入口与资源，不能沿用根目录旧main.py的旧Release spec误发旧程序。修改发布输入后重新构建/复验。审批空着说明未授权，不是开发工作已经完毕。</p>
+<p>预览和稳定更新通道隔离，初版提供清楚检查更新/下载入口即可，不再写危险静默覆盖脚本。正式升级/回退必须保护旧配置、词库、历史、凭据和Run注册项。用户明确批准后才切换日用，不能靠启动候选顺便改旧默认。</p>
+<h2 id="section-10">10. 交付包和来源说明</h2>
+<p>本包只有一个规范正文MASTER_PLAN；START_HERE和GROK_PROMPT是执行入口；COVERAGE是需求/验证索引；UI_BOARD是该规范的视觉辅助而非另一份行为规格；evidence保存本次复核观察，不是新产品测试。</p>
+<p>本次来源：通过GitHub读取固定提交的desktop/app/hud/history/settings/credentials/bridge/delivery/clipboard/BYOK/手机页面等关键文件、分支差异及Actions原始日志；结合旧版固定源码与原设计、产品交付定义和体验修订附件。不是整个仓库穷尽审计，不保证未读代码没有其他缺陷。</p>
+<p>官方接口校对入口（开发时记录实际使用版本）：</p>
+<ul>
+<li>Qt线程与信号：https://doc.qt.io/qt-6/threads-qobject.html</li>
+<li>Qt QTimer接收上下文：https://doc.qt.io/qt-6/qtimer.html</li>
+<li>Windows SendInput返回的是事件数而非目标接收：https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendinput</li>
+<li>Web安全上下文：https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Secure_Contexts</li>
+<li>randomUUID限制：https://developer.mozilla.org/en-US/docs/Web/API/Crypto/randomUUID</li>
+<li>选定兼容Chat Completions的官方协议：https://api-docs.deepseek.com/api/create-chat-completion/</li>
+</ul>
+<p>这些链接用于校验技术约束，不代表已实测某个当前供应商或所有目标软件。复制旧模型名单不能当兼容证明。</p>
+</main></body></html>

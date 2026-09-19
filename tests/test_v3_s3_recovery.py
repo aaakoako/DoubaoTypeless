@@ -60,10 +60,22 @@ def test_recall_does_not_swallow_current_draft(tmp_path):
     assert app.bridge.last_bundle["bundle_id"] == "bundle-a"
 
 
+def _stub_os_delivery(app, pasted, focus=("DT-S2-PasteTarget", "chatinput")):
+    app._read_focus = lambda: focus
+    app._saved_target = focus
+    app.delivery._read_focus = lambda: focus
+    app.delivery._paste = lambda: pasted.append("paste")
+    app.delivery._set_text = lambda _t: None
+    app.delivery._read_clipboard_text = None
+    app.delivery._wait_modifiers = lambda: True
+    app.delivery._is_locked = lambda: False
+    app.delivery._observe_text = lambda: "unknown"
+
+
 def test_unknown_result_does_not_auto_replay(tmp_path):
     app = V3App(data_dir=tmp_path / "data", port=0)
     pasted: list[str] = []
-    app.delivery._paste = lambda: pasted.append("paste")
+    _stub_os_delivery(app, pasted)
     app.bridge.last_bundle = {"bundle_id": "b", "text": "frozen A", "assets": []}
     app._last_attempt = Attempt("a", "i", "b", "s2_paste_target", result="UNKNOWN")
     app.insert_last()
@@ -98,3 +110,32 @@ def test_target_change_stops_remaining_images():
     assert out.error_code == "TARGET_CHANGED"
     assert "text" not in pasted
     assert pasted.count("image") == 1
+
+
+def test_two_unknown_windows_count_as_target_change():
+    focuses = iter([
+        ("DT-S2-PasteTarget", "notes-a"),
+        ("DT-S2-PasteTarget", "notes-a"),
+        ("DT-S2-PasteTarget", "notes-b"),
+    ])
+    pasted = []
+    svc = DeliveryService(
+        paste=lambda: pasted.append("paste"),
+        set_clipboard_image=lambda _b: pasted.append("image"),
+        set_clipboard_text=lambda _t: pasted.append("text"),
+        read_focus=lambda: next(focuses),
+        observe_image=lambda: "observed",
+        observe_text=lambda: "observed",
+    )
+    out = svc.run(
+        Attempt("a", "i", "b", "generic"),
+        {
+            "text": "should not appear",
+            "assets": [
+                {"asset_id": "1", "bytes_data": b"\x89PNG"},
+                {"asset_id": "2", "bytes_data": b"\x89PNG"},
+            ],
+        },
+    )
+    assert out.error_code == "TARGET_CHANGED"
+    assert "text" not in pasted

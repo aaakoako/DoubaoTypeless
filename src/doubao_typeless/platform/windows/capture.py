@@ -3,11 +3,16 @@ from __future__ import annotations
 
 import ctypes
 import io
+import sys
 from ctypes import wintypes
 from typing import Callable
 
-user32 = ctypes.windll.user32
-shcore = getattr(ctypes.windll, "shcore", None)
+if sys.platform == "win32":
+    user32 = ctypes.windll.user32
+    shcore = getattr(ctypes.windll, "shcore", None)
+else:
+    user32 = None
+    shcore = None
 
 
 def ensure_dpi_aware() -> str:

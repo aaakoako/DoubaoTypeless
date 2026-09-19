@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ctypes
+import sys
 import time
 from typing import Callable
 
@@ -13,8 +14,11 @@ VK_RWIN = 0x5C
 
 
 def key_down(vk: int, *, get_async: Callable[[int], int] | None = None) -> bool:
-    probe = get_async or (lambda code: ctypes.windll.user32.GetAsyncKeyState(code))
-    return bool(probe(vk) & 0x8000)
+    if get_async is None:
+        if sys.platform != "win32":
+            return False
+        get_async = lambda code: ctypes.windll.user32.GetAsyncKeyState(code)
+    return bool(get_async(vk) & 0x8000)
 
 
 def wait_modifiers_up(*, timeout_s: float = 1.5, now: Callable[[], float] | None = None, get_async=None) -> bool:

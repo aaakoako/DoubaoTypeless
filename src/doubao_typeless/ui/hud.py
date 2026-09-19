@@ -8,8 +8,12 @@ TOKENS = {
     "surface": "#FFFFFF",
     "ink": "#1D2826",
     "muted": "#63716D",
-    "text_size": (360, 88),
-    "image_size": (360, 132),
+    "width": 400,
+    "min_text_h": 88,
+    "min_image_h": 132,
+    "max_h": 300,
+    "text_size": (400, 88),
+    "image_size": (400, 132),
     "idle_ms": 6000,
 }
 
@@ -57,9 +61,10 @@ class HudController:
         expand.setStyleSheet("background:#E7EEEC; color:#1D2826; border:0; border-radius:9px; padding:6px 10px;")
         expand.clicked.connect(lambda: self._on_expand and self._on_expand())
         self._expand = expand
-        btn = QPushButton("插入 Alt+I")
+        btn = QPushButton("插入并复制")
         btn.setStyleSheet(f"background:{TOKENS['accent']}; color:white; border:0; border-radius:9px; padding:6px 10px;")
         btn.clicked.connect(lambda: self._on_insert and self._on_insert())
+        self._insert = btn
         row.addWidget(self._body, 1)
         row.addWidget(expand, 0)
         row.addWidget(btn, 0)
@@ -87,12 +92,28 @@ class HudController:
             return
         self._apply_show()
 
+    def _max_height(self) -> int:
+        max_h = TOKENS["max_h"]
+        try:
+            from PySide6.QtGui import QGuiApplication
+
+            screen = QGuiApplication.primaryScreen()
+            if screen is not None:
+                max_h = min(TOKENS["max_h"], int(screen.availableGeometry().height() * 0.35))
+        except Exception:
+            pass
+        return max(TOKENS["min_text_h"], max_h)
+
     def _apply_show(self) -> None:
         if self._widget is None:
             return
-        w, h = TOKENS["image_size"] if self.image_count else TOKENS["text_size"]
-        self._widget.resize(w, h)
-        self._body.setText(self.text[-200:] if self.text else (f"{self.image_count} 图" if self.image_count else ""))
+        body = self.text if self.text else (f"{self.image_count} 图" if self.image_count else "")
+        self._body.setText(body)
+        self._body.setWordWrap(True)
+        hint = self._body.sizeHint().height()
+        min_h = TOKENS["min_image_h"] if self.image_count else TOKENS["min_text_h"]
+        height = max(min_h, min(self._max_height(), hint + 64))
+        self._widget.resize(TOKENS["width"], height)
         self._widget.show()
         if self._timer:
             self._timer.start(TOKENS["idle_ms"])

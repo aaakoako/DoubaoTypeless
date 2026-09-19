@@ -50,7 +50,8 @@ class DeliveryService:
         mode: str = "full",
         skip_asset_ids: set[str] | None = None,
     ) -> Attempt:
-        class_name, control = self._read_focus()
+        focus = self._read_focus()
+        class_name, control = focus
         kind = classify_focus(class_name, control)
         assets = list(bundle.get("assets") or [])
         skip_asset_ids = skip_asset_ids or set()
@@ -76,8 +77,8 @@ class DeliveryService:
             return attempt
         index = 0
         for asset in assets:
-            class_name, control = self._read_focus()
-            if classify_focus(class_name, control) != kind:
+            current = self._read_focus()
+            if current != focus:
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "TARGET_CHANGED"
                 return attempt
@@ -107,8 +108,7 @@ class DeliveryService:
             index += 1
         text = bundle.get("text") or ""
         if text:
-            class_name, control = self._read_focus()
-            if classify_focus(class_name, control) != kind:
+            if self._read_focus() != focus:
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "TARGET_CHANGED"
                 return attempt

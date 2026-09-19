@@ -1,4 +1,6 @@
-# V3 完整交付：唯一执行入口
+# V3 完整交付：历史执行入口
+
+> **当前唯一产品/执行规范是 [`docs/v3-product/START_HERE.md`](../v3-product/START_HERE.md) 与 [`MASTER_PLAN.md`](../v3-product/MASTER_PLAN.md)。** 本目录只保留执行契约、检查器和已有证据，不再作为开发入口。不要用本页的旧“只做V3-00 / 每卡后停止”措辞覆盖总计划。
 
 **这是执行流程修订，不是 V4 产品设计。** 沿用既有 Pocket Composer v3 的页面、交互、R01–R10、24 张任务卡与 96 项验收。它不把白板、BYOK、召回或设置删出范围。
 

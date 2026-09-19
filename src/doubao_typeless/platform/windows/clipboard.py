@@ -27,11 +27,38 @@ def read_focus() -> tuple[str, str]:
 
 
 def send_paste() -> None:
+    if sys.platform != "win32":
+        return
     user32 = ctypes.windll.user32
     user32.keybd_event(VK_CONTROL, 0, 0, 0)
     user32.keybd_event(VK_V, 0, 0, 0)
     user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
     user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+
+
+def restore_focus(class_name: str, title: str) -> bool:
+    if sys.platform != "win32":
+        return False
+    matches: list[int] = []
+
+    def _enum(hwnd, _):
+        if not win32gui.IsWindowVisible(hwnd):
+            return True
+        got_class = win32gui.GetClassName(hwnd) or ""
+        got_title = win32gui.GetWindowText(hwnd) or ""
+        if got_class == class_name and got_title == title:
+            matches.append(hwnd)
+        return True
+
+    win32gui.EnumWindows(_enum, None)
+    if not matches:
+        return False
+    hwnd = matches[0]
+    try:
+        win32gui.SetForegroundWindow(hwnd)
+        return True
+    except Exception:
+        return False
 
 
 def read_clipboard_text() -> str | None:
