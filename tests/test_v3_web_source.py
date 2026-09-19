@@ -33,9 +33,13 @@ def test_vite_konva_sources_exist():
     assert "device.remembered" in app
     assert "recall.last" in app
     assert "rebindSource" in canvas
+    assert "midX" in canvas
     upload = (WEB / "src" / "transport" / "upload.ts").read_text(encoding="utf-8")
     assert "/v3/assets/init" in upload
     assert "chunks" in upload
+    protocol = (WEB / "src" / "transport" / "protocol.ts").read_text(encoding="utf-8")
+    assert "sha256Bytes" in protocol
+    assert "settingsStatus" in app
 
 
 def test_image_queue_and_finish_policy_scripts():

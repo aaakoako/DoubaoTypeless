@@ -49,9 +49,11 @@ class DeliveryService:
         *,
         mode: str = "full",
         skip_asset_ids: set[str] | None = None,
+        remote: bool = False,
     ) -> Attempt:
         focus = self._read_focus()
-        class_name, control = focus
+        class_name = focus[0] if focus else ""
+        control = focus[1] if len(focus) > 1 else ""
         kind = classify_focus(class_name, control)
         assets = list(bundle.get("assets") or [])
         skip_asset_ids = skip_asset_ids or set()
@@ -71,7 +73,7 @@ class DeliveryService:
             attempt.error_code = "TARGET_ELEVATED"
             return attempt
         wants_images = bool(assets)
-        if not may_inject(kind, wants_images=wants_images):
+        if not may_inject(kind, wants_images=wants_images, remote=remote):
             attempt.result = "NO_STEPS"
             attempt.error_code = "NEEDS_TARGET"
             return attempt

@@ -42,10 +42,12 @@ def is_own_window(class_name: str, title: str = "", automation_id: str = "") -> 
     return any(token in blob for token in OWN_WINDOW_MARKERS)
 
 
-def may_inject(kind: FocusKind, *, wants_images: bool) -> bool:
+def may_inject(kind: FocusKind, *, wants_images: bool, remote: bool = False) -> bool:
     if kind in {"composer", "paste"}:
         return True
     if kind in {"code", "terminal"}:
+        return False
+    if kind == "unknown" and remote:
         return False
     return not wants_images
 

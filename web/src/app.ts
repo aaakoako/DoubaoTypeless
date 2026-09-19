@@ -3,7 +3,13 @@ import { applyReady, applyRotated } from "./sync.js";
 import { looksLikeKeyScript, newId } from "./transport/protocol";
 import { uploadPng } from "./transport/upload";
 
-type Session = { session_id: string; token: string; device_id?: string };
+type Session = {
+  session_id: string;
+  token: string;
+  device_id?: string;
+  allow_insert?: boolean;
+  allow_capture?: boolean;
+};
 type AssetStatus = "queued" | "editing" | "ready" | "failed";
 type Asset = {
   id: string;
@@ -103,6 +109,18 @@ export function boot(root: HTMLElement): void {
   let ws: WebSocket | null = null;
   let editor: SharedEditor | null = null;
   let currentId = "";
+  const blobUrls: string[] = [];
+
+  function rememberBlob(url: string): string {
+    if (url.startsWith("blob:")) blobUrls.push(url);
+    return url;
+  }
+
+  function forgetBlobs(): void {
+    while (blobUrls.length) {
+      URL.revokeObjectURL(blobUrls.pop()!);
+    }
+  }
   const $ = (id: string) => document.getElementById(id)!;
   const headers = (): Record<string, string> =>
     state.session
@@ -426,7 +444,7 @@ export function boot(root: HTMLElement): void {
         let src = asset.source || asset.preview;
         if (src.startsWith("/v3/assets/") && state.session) {
           const res = await fetch(src, { headers: headers() });
-          if (res.ok) src = URL.createObjectURL(await res.blob());
+          if (res.ok) src = rememberBlob(URL.createObjectURL(await res.blob()));
         }
         editor.rebindSource(src);
       }
@@ -442,7 +460,7 @@ export function boot(root: HTMLElement): void {
           asset.status = "failed";
           return;
         }
-        src = URL.createObjectURL(await res.blob());
+        src = rememberBlob(URL.createObjectURL(await res.blob()));
       }
       editor.loadImage(src, asset.w || 1600, asset.h || 1000);
     }
@@ -485,7 +503,7 @@ export function boot(root: HTMLElement): void {
       return;
     }
     const blob = await editor.exportBlob();
-    const preview = URL.createObjectURL(blob);
+    const preview = rememberBlob(URL.createObjectURL(blob));
     const item = state.assets.find((a) => a.id === currentId);
     if (item) {
       item.caption = ($("captionInput") as HTMLTextAreaElement).value.trim();
@@ -699,12 +717,29 @@ export function boot(root: HTMLElement): void {
     };
   };
   $("settingsBtn").onclick = () => {
-    $("sheetCard").innerHTML = `<h2>简单设置</h2>
-      <p>密钥只存在电脑；不配 Key 也能画图和投递。拒绝截图仍可同步文字。Alt+Shift+I 是召回，不再是跳过纠错。</p>
-      <p>插入 / 召回：Alt+I / Alt+Shift+I</p>
-      <p>最近图文：20份 · 24小时</p>
-      <p>AI 纠错：可选 · 电脑 BYOK</p>`;
-    $("sheet").classList.add("show");
+    void (async () => {
+      let statusText = "未读到电脑状态";
+      try {
+        const res = await fetch("/v3/status");
+        if (res.ok) {
+          const st = await res.json();
+          statusText = `协议 ${st.protocol} · 草稿 r${st.revision}`;
+        }
+      } catch {
+        statusText = "电脑未连接";
+      }
+      const grant = state.session
+        ? `插入 ${state.session.allow_insert ? "已开" : "未开"} · 截图 ${state.session.allow_capture ? "已开" : "未开"}`
+        : "尚未配对";
+      $("sheetCard").innerHTML = `<h2>简单设置</h2>
+        <p id="settingsStatus">${statusText}</p>
+        <p id="settingsGrant">${grant}</p>
+        <p>密钥只在电脑设置。手机不能改 Key。不配 Key 也能画图和投递。</p>
+        <p>插入 / 召回：Alt+I / Alt+Shift+I</p>
+        <p>最近图文：20份 · 24小时</p>
+        <p>AI 纠错：电脑 BYOK，过期结果不会盖住新稿</p>`;
+      $("sheet").classList.add("show");
+    })();
   };
   $("sheet").onclick = (e) => {
     if (e.target === $("sheet")) $("sheet").classList.remove("show");

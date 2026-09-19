@@ -41,9 +41,15 @@ def send_paste() -> None:
     user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
 
 
-def restore_focus(class_name: str, title: str) -> bool:
+def restore_focus(class_name: str, title: str, hwnd: int = 0) -> bool:
     if sys.platform != "win32":
         return False
+    if hwnd:
+        try:
+            win32gui.SetForegroundWindow(int(hwnd))
+            return True
+        except Exception:
+            pass
     matches: list[int] = []
 
     def _enum(hwnd, _):

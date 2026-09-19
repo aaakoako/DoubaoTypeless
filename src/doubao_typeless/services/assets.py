@@ -37,6 +37,8 @@ def resolve_asset_refs(store: AssetStore, refs: object) -> list[dict]:
             raise ValueError("unknown asset_ref") from exc
         image = Image.open(io.BytesIO(payload))
         image.load()
+        stored = store.meta(asset_id) if hasattr(store, "meta") else {}
+        role = str(stored.get("role") or "photo")
         resolved.append(
             {
                 "asset_id": asset_id,
@@ -46,7 +48,7 @@ def resolve_asset_refs(store: AssetStore, refs: object) -> list[dict]:
                 "bytes": len(payload),
                 "width": image.width,
                 "height": image.height,
-                "role": "photo",
+                "role": role,
             }
         )
     return resolved
@@ -69,6 +71,7 @@ class UploadService:
         height: int,
         chunk_size: int | None = None,
         owner_session_id: str = "",
+        role: str = "photo",
     ) -> dict:
         if total_bytes <= 0 or total_bytes > MAX_BYTES:
             raise ValueError("asset too large")
@@ -87,6 +90,7 @@ class UploadService:
             "sha256": sha256,
             "width": width,
             "height": height,
+            "role": role or "photo",
             "chunk_size": size,
             "expected": expected,
             "chunks": {},
@@ -159,11 +163,13 @@ class UploadService:
                 "bytes": len(payload),
                 "width": image.width,
                 "height": image.height,
-                "role": "photo",
+                "role": str(session.get("role") or "photo"),
             }
             self._purge(session)
             return session["completed"]
-        meta = self.store.put_png(payload, width=image.width, height=image.height, role="photo")
+        meta = self.store.put_png(
+            payload, width=image.width, height=image.height, role=str(session.get("role") or "photo")
+        )
         self.db.upsert_asset(
             meta["asset_id"],
             meta["sha256"],

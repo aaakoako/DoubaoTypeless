@@ -505,6 +505,7 @@ class V3Bridge:
                 height=int(body.get("height") or 1),
                 chunk_size=int(body["chunk_size"]) if body.get("chunk_size") else None,
                 owner_session_id=owner.session_id,
+                role=str(body.get("role") or "photo"),
             )
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
@@ -714,13 +715,19 @@ class V3Bridge:
                     await ws.send_json({"type": "draft.ack", **ack})
                     return True
                 self._apply_draft_fields(data)
+                durable = False
+                if self.data_dir is not None:
+                    from doubao_typeless.storage.draft_snapshot import save_draft
+
+                    save_draft(self.data_dir, self.draft)
+                    durable = True
                 if self._on_activity and should_wake("draft.update"):
                     self._on_activity(self.draft.text, len(self.draft.assets))
                 await ws.send_json(
                     {
                         "type": "draft.ack",
                         "revision": self.draft.revision,
-                        "durable": True,
+                        "durable": durable,
                         "hash": self.draft.acked_hash,
                     }
                 )

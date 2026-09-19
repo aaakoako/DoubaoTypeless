@@ -34,7 +34,7 @@ export class SharedEditor {
   private undoStack: Snapshot[] = [];
   private redoStack: Snapshot[] = [];
   private pointers = new Map<number, { x: number; y: number }>();
-  private pinch: { dist: number; scale: number; x: number; y: number } | null = null;
+  private pinch: { dist: number; scale: number; x: number; y: number; midX: number; midY: number } | null = null;
   private bg: Konva.Image | null = null;
   private source = { w: 1600, h: 1000 };
   private sourceUrl = "";
@@ -214,6 +214,8 @@ export class SharedEditor {
         scale: this.stage.scaleX(),
         x: this.stage.x(),
         y: this.stage.y(),
+        midX: (pts[0].x + pts[1].x) / 2,
+        midY: (pts[0].y + pts[1].y) / 2,
       };
       if (this.drawing) {
         this.drawing.destroy();
@@ -299,7 +301,10 @@ export class SharedEditor {
     } else if (this.tool === "line") {
       this.drawing = new Konva.Line({ points: [p.x, p.y, p.x + 1, p.y + 1], stroke: this.color, strokeWidth: this.width });
     }
-    if (this.drawing) this.layer.add(this.drawing);
+    if (this.drawing) {
+      this.pushUndo();
+      this.layer.add(this.drawing);
+    }
   }
 
   private onPointerMove(ev: PointerEvent): void {
@@ -310,7 +315,13 @@ export class SharedEditor {
       const pts = [...this.pointers.values()];
       const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       const scale = Math.max(0.25, Math.min(4, this.pinch.scale * (dist / Math.max(this.pinch.dist, 1))));
+      const midX = (pts[0].x + pts[1].x) / 2;
+      const midY = (pts[0].y + pts[1].y) / 2;
       this.stage.scale({ x: scale, y: scale });
+      this.stage.position({
+        x: this.pinch.x + (midX - this.pinch.midX),
+        y: this.pinch.y + (midY - this.pinch.midY),
+      });
       this.stage.batchDraw();
       return;
     }
@@ -365,13 +376,14 @@ export class SharedEditor {
           this.drawing.name("cropGuide");
         } else {
           this.drawing.destroy();
+          this.undoStack.pop();
         }
       } else {
-        this.pushUndo();
         this.ops += 1;
       }
     } else if (this.drawing && cancel) {
       this.drawing.destroy();
+      this.undoStack.pop();
     }
     this.drawing = null;
   }

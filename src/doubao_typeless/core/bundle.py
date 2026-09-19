@@ -60,6 +60,9 @@ def freeze_bundle(draft: Draft, *, bundle_id: str) -> dict[str, Any]:
     if len(text.encode("utf-8")) > TEXT_UTF8_LIMIT:
         raise ValueError("text byte limit")
     assets = copy.deepcopy(draft.assets)
+    processed = [a for a in assets if str(a.get("role") or "") not in {"screenshot", "source"}]
+    if processed and len(processed) < len(assets):
+        assets = processed
     if len(assets) > MAX_ASSETS:
         raise ValueError("more than six")
     if not text.strip() and not assets:

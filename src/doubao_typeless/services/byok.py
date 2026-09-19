@@ -109,7 +109,14 @@ class ByokService:
                 "message": ERROR_LABELS[reason],
                 "text": text,
             }
-        if draft_id != current_draft_id or revision != current_revision:
+        live_draft = current_draft_id
+        live_rev = current_revision
+        getter = getattr(self, "current", None)
+        if callable(getter):
+            live = getter() or {}
+            live_draft = str(live.get("draft_id") or live_draft)
+            live_rev = int(live.get("revision") or live_rev)
+        if draft_id != live_draft or revision != live_rev:
             return {"status": "stale", "reason": "draft moved after response", "text": None}
         out = extract_model_text(body or {}, text)
         if not out:

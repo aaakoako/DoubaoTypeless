@@ -1,4 +1,4 @@
-import { hexSha256 } from "./protocol";
+import { hexSha256, sha256Bytes } from "./protocol";
 
 export type AssetMeta = {
   asset_id: string;
@@ -18,7 +18,7 @@ export async function uploadPng(
   role = "photo"
 ): Promise<AssetMeta> {
   const buf = new Uint8Array(await blob.arrayBuffer());
-  let digest = "pending";
+  let digest = sha256Bytes(buf);
   if (globalThis.crypto?.subtle) {
     digest = hexSha256(await crypto.subtle.digest("SHA-256", buf));
   }

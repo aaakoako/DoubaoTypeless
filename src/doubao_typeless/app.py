@@ -94,6 +94,10 @@ class V3App:
             timeout=_optional_float(stored.get("byok_timeout")) or 8.0,
             post=_httpx_json_post,
         )
+        self.byok.current = lambda: {
+            "draft_id": self.draft.draft_id,
+            "revision": self.draft.revision,
+        }
         self._last_suggestion = None
         self.hud = HudController(
             on_insert=self.insert_current,
@@ -189,7 +193,7 @@ class V3App:
             focus = self._read_focus()
         except Exception:
             return
-        if focus and not is_own_window(*focus):
+        if focus and not is_own_window(*focus[:2]):
             self._saved_target = focus
 
     def _restore_external_target(self) -> tuple[str, str]:
@@ -197,18 +201,20 @@ class V3App:
             current = self._read_focus()
         except Exception:
             current = ("", "")
-        if is_own_window(*current) and self._saved_target:
+        if is_own_window(*current[:2]) and self._saved_target:
             try:
                 from doubao_typeless.platform.windows.clipboard import restore_focus
 
-                restore_focus(*self._saved_target)
+                saved = self._saved_target
+                hwnd = int(saved[2]) if len(saved) > 2 else 0
+                restore_focus(saved[0], saved[1], hwnd)
             except Exception:
                 pass
             try:
                 current = self._read_focus()
             except Exception:
                 current = self._saved_target
-        return current
+        return (str(current[0] if current else ""), str(current[1] if current and len(current) > 1 else ""))
 
     def apply_phone_update(self, data: dict, *, allow_server_assets: bool = False) -> dict:
         if self.review_editing:
@@ -378,9 +384,9 @@ class V3App:
             return None
 
     def _read_focus(self):
-        from doubao_typeless.platform.windows.clipboard import read_focus
+        from doubao_typeless.platform.windows.clipboard import read_focus_fp
 
-        return read_focus()
+        return read_focus_fp()
 
     def _paste(self) -> None:
         from doubao_typeless.platform.windows.clipboard import send_paste
@@ -548,6 +554,7 @@ class V3App:
         if is_own_window(class_name, control):
             self.ledger.finish(intent_id, "NO_STEPS")
             return {"result": "NO_STEPS", "error_code": "OWN_WINDOW"}
+        remote = str(intent.get("trigger") or "") not in {"insert_current", "recall_retry", "hotkey"}
         kind = classify_focus(class_name, control)
         if kind == "paste":
             adapter_id = "s2_paste_target"
@@ -568,7 +575,9 @@ class V3App:
         mode = str(intent.get("recovery_mode") or "full")
         skip = set(intent.get("skip_asset_ids") or [])
         try:
-            result = self.delivery.run(attempt, hydrated, mode=mode, skip_asset_ids=skip)
+            result = self.delivery.run(
+                attempt, hydrated, mode=mode, skip_asset_ids=skip, remote=remote
+            )
         except Exception:
             self.ledger.finish(intent_id, "UNKNOWN")
             raise
@@ -757,6 +766,12 @@ class V3App:
                 return None
             if plan["mode"] in {"text_only", "remaining_verified", "full"}:
                 intent["recovery_mode"] = plan["mode"]
+                if plan["mode"] == "remaining_verified":
+                    intent["skip_asset_ids"] = [
+                        s.asset_id
+                        for s in self._last_attempt.steps
+                        if s.kind == "image" and s.state == "observed" and s.asset_id
+                    ]
         self._recovery_needed = False
         return self.deliver_and_finish(intent, bundle)
 
@@ -787,11 +802,13 @@ class V3App:
         if self.draft.text != kept_text or [a.get("asset_id") for a in self.draft.assets] != kept_assets:
             raise RuntimeError("recall must not swallow current draft")
         self._save_draft()
-        if plan["mode"] == "ask" or (self._last_attempt and self._last_attempt.result in {"UNKNOWN", "PARTIAL"}):
+        previous = self._last_attempt.result if self._last_attempt else ""
+        if previous in {"NO_STEPS", ""}:
+            return self.insert_last(user_mode="full")
+        if previous in {"UNKNOWN", "PARTIAL"} or plan["mode"] == "ask":
             self._recovery_needed = True
             self._notify_ui("recovery_ask")
             return
-        self.insert_last()
 
     def capture_region(self) -> None:
         from doubao_typeless.ui.region import select_region
