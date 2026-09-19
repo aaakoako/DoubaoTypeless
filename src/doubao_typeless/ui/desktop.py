@@ -10,7 +10,7 @@ from typing import Callable
 from doubao_typeless.runtime import lan_ip
 from doubao_typeless.storage.settings_store import load_settings, save_settings
 from doubao_typeless.ui.filelog import FileLogger
-from doubao_typeless.ui.single_instance import listen_for_show, request_show
+from doubao_typeless.ui.single_instance import listen_for_commands, request_quit, request_show
 from doubao_typeless.ui.v3_startup import apply_v3_autostart
 
 TOKENS = {
@@ -591,7 +591,7 @@ class DesktopShell:
         self.tray.setToolTip("DoubaoTypeless")
         self.tray.activated.connect(self._tray_activated)
         self.tray.show()
-        self._wake = listen_for_show(lambda: QTimer.singleShot(0, self.client.show_window))
+        self._wake = listen_for_commands(self._on_ipc)
         self.app.ui_hook = self._from_service
         if app.hud._widget is not None:
             expand = getattr(app.hud, "_expand", None)
@@ -602,6 +602,14 @@ class DesktopShell:
         if not load_settings(self.app.data_dir).get("tray_explained"):
             self.tray.showMessage("DoubaoTypeless", "已在托盘运行。点图标可再打开窗口。")
             save_settings(self.app.data_dir, {"tray_explained": True})
+
+    def _on_ipc(self, command: str) -> None:
+        from PySide6.QtCore import QTimer
+
+        if command == "show":
+            QTimer.singleShot(0, self.client.show_window)
+        elif command == "quit":
+            QTimer.singleShot(0, self.quit)
 
     def _tray_activated(self, reason) -> None:
         from PySide6.QtWidgets import QSystemTrayIcon
@@ -672,6 +680,8 @@ def run_desktop(argv: list[str] | None = None) -> int:
     qt = QApplication.instance() or QApplication(argv)
     qt.setQuitOnLastWindowClosed(False)
     apply_ui_font(qt)
+    if "--quit" in argv:
+        return 0 if request_quit() else 1
     if request_show():
         return 0
 

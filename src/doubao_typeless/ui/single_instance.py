@@ -1,10 +1,10 @@
-"""Wake the running desktop client instead of starting a second service."""
+"""Wake or stop the running desktop client. Same process never starts a second service."""
 from __future__ import annotations
 
 PIPE = "DoubaoTypelessV3Preview"
 
 
-def request_show(timeout_ms: int = 400) -> bool:
+def request_command(command: str, timeout_ms: int = 800) -> bool:
     try:
         from PySide6.QtNetwork import QLocalSocket
     except ImportError:
@@ -14,14 +14,22 @@ def request_show(timeout_ms: int = 400) -> bool:
     if not sock.waitForConnected(timeout_ms):
         sock.close()
         return False
-    sock.write(b"show\n")
+    sock.write(f"{command}\n".encode("utf-8"))
     sock.waitForBytesWritten(timeout_ms)
     sock.disconnectFromServer()
     sock.close()
     return True
 
 
-def listen_for_show(on_show, parent=None):
+def request_show(timeout_ms: int = 400) -> bool:
+    return request_command("show", timeout_ms=timeout_ms)
+
+
+def request_quit(timeout_ms: int = 800) -> bool:
+    return request_command("quit", timeout_ms=timeout_ms)
+
+
+def listen_for_commands(on_command, parent=None):
     try:
         from PySide6.QtNetwork import QLocalServer
     except ImportError:
@@ -37,10 +45,14 @@ def listen_for_show(on_show, parent=None):
             return
         if sock.bytesAvailable() == 0:
             sock.waitForReadyRead(500)
-        payload = bytes(sock.readAll()).decode("utf-8", errors="replace")
+        payload = bytes(sock.readAll()).decode("utf-8", errors="replace").strip().lower()
         sock.close()
-        if "show" in payload:
-            on_show()
+        if payload in {"show", "quit"}:
+            on_command(payload)
 
     server.newConnection.connect(_incoming)
     return server
+
+
+def listen_for_show(on_show, parent=None):
+    return listen_for_commands(lambda cmd: on_show() if cmd == "show" else None, parent=parent)

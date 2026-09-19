@@ -124,13 +124,13 @@ def test_pause_blocks_draft_without_dropping_text(tmp_path):
 
 def test_wake_pipe_is_preview_specific_and_false_without_server():
     from PySide6.QtNetwork import QLocalServer
-    from doubao_typeless.ui.single_instance import PIPE, request_show
+    from doubao_typeless.ui.single_instance import PIPE, request_quit, request_show
+    from doubao_typeless.ui.v3_startup import V3_RUN_NAME
 
     assert PIPE == "DoubaoTypelessV3Preview"
+    assert V3_RUN_NAME == "DoubaoTypelessV3Preview"
+    assert V3_RUN_NAME != "DoubaoTypeless"
     _qt_app()
     QLocalServer.removeServer(PIPE)
     assert request_show() is False
-    from doubao_typeless.ui.v3_startup import V3_RUN_NAME
-
-    assert V3_RUN_NAME == "DoubaoTypelessV3Preview"
-    assert V3_RUN_NAME != "DoubaoTypeless"
+    assert request_quit() is False

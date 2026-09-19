@@ -1,8 +1,8 @@
 {
-  "started_at": "2026-09-18T12:56:21.865029+00:00",
+  "started_at": "2026-09-19T03:28:30.098848+00:00",
   "sample": "遮住保密区后只投成品，不要原图",
   "source": {
-    "path": "G:\\AgentStorage\\Temp\\User\\dt-v3-s2\\s2-source.png",
+    "path": "G:\\AgentStorage\\Temp\\User\\dt-v3-s2-d2\\s2-source.png",
     "sha256": "6a3edf37e6f05f4551c381c9e167d833e390c44e2a61907c96423572cf8206ba",
     "bytes": 3762,
     "width": 400,
@@ -42,7 +42,7 @@
   },
   "upload_complete_ok": true,
   "upload_meta": {
-    "asset_id": "24603e58-b313-4b27-87c8-9ebc26886ae2",
+    "asset_id": "26956775-fa1d-480d-a7e7-7bac72630ef6",
     "render_revision": 1,
     "sha256": "cf1361e5caf275483cf78923ed73394412f1e717b9869fbb52a00f339b09d029",
     "mime": "image/png",
@@ -52,14 +52,14 @@
     "role": "photo"
   },
   "pair_posts": [
-    "{\"code\":\"zqZVwKHuTPE\"}"
+    "{\"code\":\"2BbDM5bWpUs\"}"
   ],
   "chunk_puts": 2,
   "completes": 1,
   "draft_text": "遮住保密区后只投成品，不要原图",
   "draft_assets": [
     {
-      "asset_id": "24603e58-b313-4b27-87c8-9ebc26886ae2",
+      "asset_id": "26956775-fa1d-480d-a7e7-7bac72630ef6",
       "render_revision": 1,
       "sha256": "cf1361e5caf275483cf78923ed73394412f1e717b9869fbb52a00f339b09d029",
       "mime": "image/png",
@@ -71,7 +71,7 @@
   ],
   "last_bundle_assets": [
     {
-      "asset_id": "24603e58-b313-4b27-87c8-9ebc26886ae2",
+      "asset_id": "26956775-fa1d-480d-a7e7-7bac72630ef6",
       "render_revision": 1,
       "sha256": "cf1361e5caf275483cf78923ed73394412f1e717b9869fbb52a00f339b09d029",
       "mime": "image/png",
@@ -86,8 +86,8 @@
     "DT-V3-HUD"
   ],
   "focus_after_sync": [
-    "TkTopLevel",
-    "DT-S2-PasteTarget"
+    "Chrome_WidgetWin_1",
+    "ChatGPT - 豆包浏览器"
   ],
   "target_focused": true,
   "focus_before_insert": [
@@ -100,7 +100,7 @@
     "images": [
       {
         "sha256": "b9dcbb66b2f30cb26f22b0e92aed1d9f619e4fbc99e43c9956778c78c394b9b7",
-        "path": "G:\\AgentStorage\\Temp\\User\\dt-v3-s2\\pasted\\1-b9dcbb66b2f3.png",
+        "path": "G:\\AgentStorage\\Temp\\User\\dt-v3-s2-d2\\pasted\\1-b9dcbb66b2f3.png",
         "width": 250,
         "height": 220,
         "bytes": 2342
@@ -109,14 +109,14 @@
     "events": [
       {
         "kind": "image",
-        "t": 1789736181.5243585,
+        "t": 1789788509.8347516,
         "sha256": "b9dcbb66b2f30cb26f22b0e92aed1d9f619e4fbc99e43c9956778c78c394b9b7",
         "width": 250,
         "height": 220
       },
       {
         "kind": "text",
-        "t": 1789736181.5841775,
+        "t": 1789788509.8744056,
         "text": "遮住保密区后只投成品，不要原图"
       }
     ],
@@ -124,16 +124,16 @@
   },
   "enter_count": 0,
   "attempt": {
-    "attempt_id": "f35caca1-9585-451e-ab83-e5aa1cc36dfa",
-    "intent_id": "fe2f77fb-97e3-48e6-9f9a-9b611427c902",
-    "bundle_id": "e1eb68b4-ba90-4399-b8be-18ab56af3ef8",
+    "attempt_id": "943c8ed8-e33b-4091-be0e-4191aa77920e",
+    "intent_id": "1999132c-9c1f-4762-aa7a-2732da1d0724",
+    "bundle_id": "59d2b059-af35-4064-90aa-a37d04623353",
     "adapter_id": "s2_paste_target",
     "result": "CONFIRMED",
     "steps": [
       {
         "index": 0,
         "kind": "image",
-        "asset_id": "24603e58-b313-4b27-87c8-9ebc26886ae2",
+        "asset_id": "26956775-fa1d-480d-a7e7-7bac72630ef6",
         "state": "observed",
         "evidence": "target_attachment"
       },
@@ -162,7 +162,5 @@
     "not_cursor": true,
     "adapter_not_cursor": true
   },
-  "ok": true,
-  "observation_note": "指定目标 DT-S2-PasteTarget，适配器 s2_paste_target，不是 Cursor。成品 250×220，源图 400×300；品红保密区源图 7029 像素、投递后 0。剪贴板 DIB 往返后 PNG 哈希会变，所以用解码尺寸和像素而不是字节相等。手机 /v3/nonce 无插入授权被拒绝属实，PC 热键路径完成投递。独立复核尚未签署。",
-  "independent_review": "WAITING"
+  "ok": true
 }

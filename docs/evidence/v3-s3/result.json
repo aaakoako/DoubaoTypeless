@@ -1,5 +1,5 @@
 {
-  "started_at": "2026-09-18T15:44:42.615478+00:00",
+  "started_at": "2026-09-19T03:28:38.180531+00:00",
   "error": null,
   "cursor_claimed": false,
   "android_claimed": false,
@@ -7,9 +7,9 @@
   "restart": {
     "text": "这是当前稿B，召回不得吞掉",
     "asset_ids": [
-      "5bd5616f-c2bf-494b-b179-a994247d93ff",
-      "9cf4a144-45dc-4a01-a3d8-372ffb985849",
-      "dacc4227-05de-4d0c-a66e-0eddb5e41404"
+      "2aa68fba-a043-40b3-9a8f-172d87916735",
+      "746d0d33-2dbd-41b6-9d5e-000563e70182",
+      "ed8770d9-6bc2-48bc-9d48-6a82b0c5db8c"
     ],
     "bytes_ok": [
       true,
@@ -29,7 +29,7 @@
       "undo": 1
     },
     "meta": {
-      "asset_id": "9cf4a144-45dc-4a01-a3d8-372ffb985849",
+      "asset_id": "746d0d33-2dbd-41b6-9d5e-000563e70182",
       "render_revision": 1,
       "sha256": "8316463a5786dca77b9b53c5e49a0375894a17f6b5009f7f21a4e385dc0da02f",
       "mime": "image/png",
@@ -45,7 +45,7 @@
       "undo": 1
     },
     "meta": {
-      "asset_id": "5bd5616f-c2bf-494b-b179-a994247d93ff",
+      "asset_id": "2aa68fba-a043-40b3-9a8f-172d87916735",
       "render_revision": 1,
       "sha256": "f8e0183bc464b3fd46a3e64854f0cca60af127c422559b3ae55a51003cd38ce6",
       "mime": "image/png",
@@ -81,7 +81,7 @@
   },
   "new_stroke_clears_redo": true,
   "board_meta": {
-    "asset_id": "f39d5cdf-0410-4cac-9b9f-08a80eb5170f",
+    "asset_id": "79320b8e-0f9a-4125-8c58-6f06e87db3a4",
     "render_revision": 1,
     "sha256": "57e06a553f2f926b1ce93a500b6ea145bf5ac2aa065336d8d7f488302b3563c6",
     "mime": "image/png",
@@ -100,9 +100,9 @@
     "photo"
   ],
   "draft_ids": [
-    "5bd5616f-c2bf-494b-b179-a994247d93ff",
-    "9cf4a144-45dc-4a01-a3d8-372ffb985849",
-    "dacc4227-05de-4d0c-a66e-0eddb5e41404"
+    "2aa68fba-a043-40b3-9a8f-172d87916735",
+    "746d0d33-2dbd-41b6-9d5e-000563e70182",
+    "ed8770d9-6bc2-48bc-9d48-6a82b0c5db8c"
   ],
   "target_focused": true,
   "after_insert": {
@@ -111,21 +111,21 @@
     "images": [
       {
         "sha256": "ef32000644703ede0b0197916e22ad7db63bd15d7dc12006aa2a60a08af046c0",
-        "path": "G:\\AgentStorage\\Temp\\User\\dt-v3-s3\\pasted\\1-ef3200064470.png",
+        "path": "G:\\AgentStorage\\Temp\\User\\dt-v3-s3-d2\\pasted\\1-ef3200064470.png",
         "width": 160,
         "height": 120,
         "bytes": 1411
       },
       {
         "sha256": "763bb482997905a1f5ee7e549f14a0b4ea0b3767f8b7e2fd5d662c4e048fab73",
-        "path": "G:\\AgentStorage\\Temp\\User\\dt-v3-s3\\pasted\\2-763bb4829979.png",
+        "path": "G:\\AgentStorage\\Temp\\User\\dt-v3-s3-d2\\pasted\\2-763bb4829979.png",
         "width": 160,
         "height": 120,
         "bytes": 1343
       },
       {
         "sha256": "6ed8e351b590594fe7df275e9114af7fd6b97865733f6c47e0048031338415cc",
-        "path": "G:\\AgentStorage\\Temp\\User\\dt-v3-s3\\pasted\\3-6ed8e351b590.png",
+        "path": "G:\\AgentStorage\\Temp\\User\\dt-v3-s3-d2\\pasted\\3-6ed8e351b590.png",
         "width": 320,
         "height": 200,
         "bytes": 7213
@@ -134,28 +134,28 @@
     "events": [
       {
         "kind": "image",
-        "t": 1789746281.8596375,
+        "t": 1789788517.3138044,
         "sha256": "ef32000644703ede0b0197916e22ad7db63bd15d7dc12006aa2a60a08af046c0",
         "width": 160,
         "height": 120
       },
       {
         "kind": "image",
-        "t": 1789746281.8987346,
+        "t": 1789788517.4033737,
         "sha256": "763bb482997905a1f5ee7e549f14a0b4ea0b3767f8b7e2fd5d662c4e048fab73",
         "width": 160,
         "height": 120
       },
       {
         "kind": "image",
-        "t": 1789746281.954497,
+        "t": 1789788517.4596834,
         "sha256": "6ed8e351b590594fe7df275e9114af7fd6b97865733f6c47e0048031338415cc",
         "width": 320,
         "height": 200
       },
       {
         "kind": "text",
-        "t": 1789746282.008813,
+        "t": 1789788517.515027,
         "text": "两图加白板，编号跟顺序走"
       }
     ],
@@ -166,34 +166,34 @@
   "last_bundle_after_recall": "两图加白板，编号跟顺序走",
   "current_kept": true,
   "pair_posts": [
-    "{\"code\":\"XwSl7XYwjPI\"}"
+    "{\"code\":\"4umazkHV1HM\"}"
   ],
   "enter_count": 0,
   "attempt": {
-    "attempt_id": "d0676229-4579-4500-b2cf-7b40a6f3bbea",
-    "intent_id": "566fdc7b-3bf8-4a50-b817-5169dce53d1f",
-    "bundle_id": "5185b455-78e2-445a-b098-cd0660cb6fbe",
+    "attempt_id": "424b4926-cd6a-4533-8cb0-8604206c32a9",
+    "intent_id": "fdc29c11-eaf0-482b-8415-586472ce3730",
+    "bundle_id": "20012447-2d23-473a-b0f9-c2e2c742c7bf",
     "adapter_id": "s2_paste_target",
     "result": "CONFIRMED",
     "steps": [
       {
         "index": 0,
         "kind": "image",
-        "asset_id": "5bd5616f-c2bf-494b-b179-a994247d93ff",
+        "asset_id": "2aa68fba-a043-40b3-9a8f-172d87916735",
         "state": "observed",
         "evidence": "target_attachment"
       },
       {
         "index": 1,
         "kind": "image",
-        "asset_id": "9cf4a144-45dc-4a01-a3d8-372ffb985849",
+        "asset_id": "746d0d33-2dbd-41b6-9d5e-000563e70182",
         "state": "observed",
         "evidence": "target_attachment"
       },
       {
         "index": 2,
         "kind": "image",
-        "asset_id": "dacc4227-05de-4d0c-a66e-0eddb5e41404",
+        "asset_id": "ed8770d9-6bc2-48bc-9d48-6a82b0c5db8c",
         "state": "observed",
         "evidence": "target_attachment"
       },
@@ -223,7 +223,5 @@
     "zero_enter": true,
     "not_cursor": true
   },
-  "ok": true,
-  "observation_note": "指定目标 DT-S2-PasteTarget，不是 Cursor。两张相册图重排后蓝图在前，白板空内容不能完成，撤销/重做后新笔画清 redo，完成后再编辑增加笔划。先三图后文字，Enter=0。召回上次 A 时当前稿 B 仍在。重启快照字节与 SHA 吻合。真机相册/触控仍 BLOCKED。",
-  "independent_review": "S2 still WAITING; S3 not self-signed as product PASS for Android"
+  "ok": true
 }

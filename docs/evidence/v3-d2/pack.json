@@ -1,0 +1,8 @@
+{
+  "exe": "dist/DoubaoTypelessV3Preview/DoubaoTypelessV3Preview.exe",
+  "sha256": "d5aceb632946e1c78a5de27f147610b5939be6227a16cf539c9b6b911a4b8246",
+  "built_from": "working tree after D2 quit/text/image verification, before this evidence commit",
+  "lifecycle": "docs/evidence/v3-lifecycle/result.json",
+  "taskkill_used": false,
+  "release": false
+}

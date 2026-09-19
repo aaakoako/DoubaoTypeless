@@ -1,0 +1,15 @@
+{
+  "captured_at": "2026-09-19T03:28:49.234161+00:00",
+  "byok_status": "error",
+  "byok_text": "原文必须留下",
+  "byok_message": "模型超时，原文仍可插入",
+  "labels_keep_original": true,
+  "plan_mode": "ask",
+  "auto_replay": false,
+  "ui_asked": [
+    "recovery_ask"
+  ],
+  "recovery_choice": "text_only",
+  "cursor_claimed": false,
+  "ok": true
+}

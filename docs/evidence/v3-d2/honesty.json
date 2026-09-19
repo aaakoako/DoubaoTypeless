@@ -1,0 +1,20 @@
+{
+  "slice": "D2_phone_image_quit",
+  "task_complete": false,
+  "release_ready": false,
+  "console_false_only": false,
+  "developer_verified": {
+    "production_frontend_text_via_desktop_grant": true,
+    "review_panel_shows_draft": true,
+    "settings_save_isolated": true,
+    "s2_image_then_text_specified_target": true,
+    "s3_whiteboard_recall_restart": true,
+    "byok_keeps_original_on_error": true,
+    "recovery_ask_no_auto_replay": true,
+    "packed_exe_second_launch_wake": true,
+    "packed_exe_quit_without_taskkill": true
+  },
+  "not_cursor": true,
+  "not_real_phone": true,
+  "specified_targets_only": ["DT-S1-TextTarget", "DT-S2-PasteTarget"]
+}

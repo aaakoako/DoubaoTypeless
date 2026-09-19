@@ -1,69 +1,63 @@
 {
   "schema_version": 1,
-  "product_goal": "V3 = 重构后的 Windows 图形客户端 + 手机图文工作区。工程预览；桌面产品交付未完成。目标仍是 R01-R10 可发布候选，实际公开发布另行批准。",
+  "product_goal": "完整 V3 可发布候选（R01-R10）。当前任务未完成：缺真机主流程、缺 Cursor 一键图文、缺独立复核。",
   "review_base": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
-  "current_head": "55d03cc965652c3a8e019174d9d8463575446acc",
-  "working_tree": "committing D1 desktop entry on v3/00-baseline",
-  "last_completed_slice": "D1_desktop_entry",
-  "active_slice": "phone_text_from_desktop_entry",
-  "next_action": "D1 提交后继续：托盘正常退出（禁止 taskkill 冒充）、正式前端文字、图文/白板、召回恢复、BYOK。不要 merge/tag/Release。任务未完成。",
+  "current_head": "13478a74c2e25ac687b3fb15ed248a9c3fb6a975",
+  "working_tree": "D2 quit/text/image verification uncommitted",
+  "last_completed_slice": "D2_desktop_flows_reverified",
+  "active_slice": "S5_candidate_after_native_gaps",
+  "next_action": "继续不受阻工作：整理候选说明与迁移回退材料；真机与 Cursor 保持 BLOCKED_NATIVE。不要等待用户说继续。不要 merge/tag/Release。任务未完成。",
   "accepted_requirements": [
     "R01-R10 原义全部保留",
     "96 项验收定义不改",
     "不自动 merge/tag/Release",
-    "不常驻不等于无客户端",
-    "缺真机只阻塞相应验证，不阻塞未实现的桌面界面",
-    "本入口替代逐卡停止，不替代发布审批"
+    "指定粘贴目标不得冒充 Cursor",
+    "缺真机只阻塞相应验证"
   ],
-  "open_defects": [
-    {
-      "id": "D1-TRAY-QUIT-E2E",
-      "severity": "verify",
-      "detail": "隔离包已启动并二次唤起；本次用 Stop-Process 结束，不是托盘「退出」点击录屏。",
-      "status": "OPEN"
-    }
-  ],
+  "open_defects": [],
   "environment_blockers": [
     {
-      "missing": "真实 Android + 豆包输入法",
+      "missing": "真实 Android + 豆包输入法 + 同网手机浏览器",
       "probed": "shutil.which('adb') is None",
-      "blocks": ["AC3-002", "AC3-009", "真机主流程"],
+      "blocks": ["AC3-002", "AC3-009", "AC3-010", "真机引导/相册/白板手感", "J1/J3/J4 真机"],
       "who": "设备持有者",
-      "min_action": "真机打开候选页完成引导与图文",
-      "unblocked_work": "桌面入口、设置、恢复对话、托盘生命周期可在无手机时继续做和测"
+      "min_action": "真机打开窗口二维码地址，配对后说话、选图、白板，在电脑批准插入后点插入",
+      "unblocked_work": "生产页 Playwright、桌面授权、指定目标投递已复跑"
     },
     {
       "missing": "Cursor Composer 可观察 UIA",
       "probed": "python 3.13 无 comtypes",
       "blocks": ["AC3-006", "AC3-008", "主目标一键图文"],
       "who": "本机探测或用户确认半自动路径",
-      "min_action": "安装/探测 UIAutomation 并对真实 Cursor Composer 列出可验证字段",
-      "unblocked_work": "指定粘贴目标证据保留，不冒充 Cursor"
+      "min_action": "安装可观察层并对真实 Composer 列出字段，或批准半自动降级为产品决策",
+      "unblocked_work": "DT-S2-PasteTarget CONFIRMED 保留，不写 Cursor PASS"
     },
     {
-      "missing": "S2 与最终候选独立复核签署",
-      "probed": "实现者不可自签；桌面入口已打进工程预览包，但完整 V3 流程与独立复核都未完成",
+      "missing": "独立复核签署",
+      "probed": "实现者不可自签",
       "blocks": ["RELEASE_READY", "PUBLISHED"],
-      "who": "独立审阅者（在桌面包与流程验证之后）",
-      "min_action": "先完成桌面包启动到退出，再按独立复核单核对",
-      "unblocked_work": "继续实现与打包；不能把当前状态写成 WAITING_INDEPENDENT_REVIEW only"
+      "who": "独立审阅者",
+      "min_action": "核对 SHA、包哈希、授权边界、S2 图文与桌面入口",
+      "unblocked_work": "继续补候选说明；不能自签完成"
     }
   ],
   "in_progress_files": [],
   "last_commands": [
-    {"cmd": "python -m pytest -q --tb=line", "exit_code": 0, "output": "116 passed"},
-    {"cmd": "python -m PyInstaller --noconfirm packaging/v3_preview.spec", "exit_code": 0, "output": "Build complete onedir"},
-    {"cmd": "Start-Process DoubaoTypelessV3Preview.exe isolated DT_V3_DATA_DIR", "exit_code": 0, "output": "protocol 3; second exit 0; first still serving; daily unchanged; file log present"}
+    {"cmd": "git commit D1", "exit_code": 0, "output": "13478a74 D1 desktop client"},
+    {"cmd": "python tools/v3_d2_phone_text.py", "exit_code": 0, "output": "all gates true; not Cursor"},
+    {"cmd": "python tools/v3_s2_image_text_path.py", "exit_code": 0, "output": "CONFIRMED image_then_text"},
+    {"cmd": "python tools/v3_s3_multi_board_recovery.py", "exit_code": 0, "output": "whiteboard recall restart"},
+    {"cmd": "python tools/v3_lifecycle.py", "exit_code": 0, "output": "exe wake+quit no taskkill"},
+    {"cmd": "python -m pytest -q", "exit_code": 0, "output": "116 passed"}
   ],
   "candidate_artifact": {
     "path": "dist/DoubaoTypelessV3Preview/DoubaoTypelessV3Preview.exe",
-    "sha256": "4f0361219e51d531f04617fbfaa7e1ec87ba76b5e580fcd9750cbdc870e2aa43",
+    "sha256": "d5aceb632946e1c78a5de27f147610b5939be6227a16cf539c9b6b911a4b8246",
     "kind": "isolated_dev_onedir",
     "release": false,
-    "source_head": "55d03cc965652c3a8e019174d9d8463575446acc",
-    "includes_uncommitted_d1": true,
-    "stale_vs_working_tree": false,
-    "note": "工程预览包，含桌面窗口；console 仍为 True。二次启动 exit 0 且首实例继续服务。不是 RELEASE_READY。"
+    "source_head": "pending_d2_commit",
+    "note": "含 --quit 正常退出。绑定将在 D2 提交后回写。不是 RELEASE_READY。"
   },
-  "published": false
+  "published": false,
+  "task_complete": false
 }
