@@ -143,13 +143,12 @@ def count_color(path: Path, target: tuple[int, int, int], slop: int = 18) -> int
     return hit
 
 
-async def drive(port: int) -> None:
+async def drive(port: int, code: str) -> None:
     async with ClientSession() as session:
-        challenge = (await (await session.get(f"http://127.0.0.1:{port}/v3/pair")).json())["challenge"]
         creds = await (
             await session.post(
                 f"http://127.0.0.1:{port}/v3/pair",
-                json={"code": challenge, "allow_insert": True, "allow_capture": False},
+                json={"code": code},
             )
         ).json()
         async with session.ws_connect(f"http://127.0.0.1:{port}/ws") as ws:
@@ -217,7 +216,11 @@ def main() -> int:
     try:
         if not port:
             raise RuntimeError("pack did not write pair.txt")
-        asyncio.run(drive(port))
+        pair_lines = [line.strip() for line in pair_text.splitlines() if line.strip()]
+        code = pair_lines[1] if len(pair_lines) > 1 else ""
+        if not code:
+            raise RuntimeError("pair.txt missing desktop challenge")
+        asyncio.run(drive(port, code))
         time.sleep(1.2)
         windows_long = enum_windows()
         shots = {}

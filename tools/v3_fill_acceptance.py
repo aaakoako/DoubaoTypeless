@@ -57,7 +57,7 @@ MAP = {
             "docs/evidence/v3-review/counterexamples.json",
             "docs/evidence/v3-auth/result.json",
         ],
-        "旧证据仅 AuthService mismatch；本批补未鉴权 WS 改稿/资源下载与非环回挑战隔离",
+        "COMPONENT：GET /v3/pair 一律 403，挑战只由电脑 AuthService 发放。不是真机扫码手感",
     ),
     "AC3-018": (
         "NOT_RUN",
@@ -71,7 +71,7 @@ MAP = {
             "tests/test_v3_auth_isolation.py::test_lan_pair_post_cannot_self_grant_insert_or_capture",
             "docs/evidence/v3-review/counterexamples.json",
         ],
-        "旧证据仅授权表；本批禁止非环回 POST 自授 insert/capture，默认不再 True",
+        "COMPONENT：HTTP POST /v3/pair 忽略请求体 allow_*，权限只经电脑 set_grants。不是真机授权手感",
     ),
     "AC3-020": (
         "PASS",
@@ -213,7 +213,11 @@ MAP = {
         "旧证据为 V3ComposerTarget 产品窗先图后文与协议浸泡，不是已验证 Cursor Composer",
     ),
     "AC3-062": ("PASS", ["tests/test_v3_core_services.py::test_delivery_unknown_image_does_not_paste_text_or_enter"]),
-    "AC3-063": ("PASS", ["tests/test_v3_runtime.py::test_delivery_stops_remaining_when_target_changes"]),
+    "AC3-063": (
+        "NOT_RUN",
+        ["tests/test_v3_runtime.py::test_delivery_stops_remaining_when_target_changes"],
+        "旧证据只把 Composer 换成 Scintilla 分类；同类同标题不同 HWND 未测。独立复核 R05 针对 9dd3a369",
+    ),
     "AC3-064": ("PASS", ["tests/test_v3_runtime.py::test_frozen_bundle_ignores_later_draft_edits"]),
     "AC3-065": (
         "NOT_RUN",
@@ -225,7 +229,11 @@ MAP = {
         ["src/doubao_typeless/core/policy.py"],
         "旧证据为 policy 函数，未在真实目标做只补文字召回",
     ),
-    "AC3-067": ("PASS", ["tests/test_v3_remaining.py::test_unknown_recovery_never_ctrl_a_delete"]),
+    "AC3-067": (
+        "NOT_RUN",
+        ["tests/test_v3_remaining.py::test_unknown_recovery_never_ctrl_a_delete"],
+        "旧证据为 policy 不发 Ctrl+A；UNKNOWN 恢复选择 UI 与 ask 不落入 full 未在原生窗口验收",
+    ),
     "AC3-068": ("PASS", ["tests/test_v3_core_services.py"]),
     "AC3-069": ("PASS", ["tests/test_v3_runtime.py::test_history_last_is_not_current_draft", "tests/test_v3_sqlite_history.py"]),
     "AC3-070": ("PASS", ["tests/test_v3_sqlite_history.py"]),
@@ -236,9 +244,17 @@ MAP = {
         "旧证据为源码，未模拟凭据库不可用并导出无 key 诊断包",
     ),
     "AC3-073": ("BLOCKED_NATIVE", ["docs/evidence/v3-product/result.json", "docs/evidence/v3-ime/result.json"]),
-    "AC3-074": ("PASS", ["tests/test_v3_runtime.py::test_byok_skips_without_key_and_rejects_images"]),
+    "AC3-074": (
+        "NOT_RUN",
+        ["tests/test_v3_runtime.py::test_byok_skips_without_key_and_rejects_images"],
+        "旧证据为无 Key 跳过/拒图，不是 mock 401/404/429/超时/TLS 分类提示",
+    ),
     "AC3-075": ("PASS", ["tests/test_v3_runtime.py::test_terms_hint_never_auto_replaces"]),
-    "AC3-076": ("PASS", ["tests/test_v3_runtime.py::test_byok_stale_revision_does_not_overwrite"]),
+    "AC3-076": (
+        "NOT_RUN",
+        ["tests/test_v3_runtime.py::test_byok_stale_revision_does_not_overwrite"],
+        "旧证据在调用前传入过期 revision；未覆盖 post 期间改稿后重新读取当前版本",
+    ),
     "AC3-077": ("BLOCKED_NATIVE", ["docs/evidence/v3-ime/result.json"]),
     "AC3-078": (
         "NOT_RUN",
@@ -280,7 +296,7 @@ MAP = {
             "tests/test_v3_auth_isolation.py::test_start_stops_without_writers_when_lock_held",
             "docs/evidence/v3-review/counterexamples.json",
         ],
-        "旧证据仅锁文件互斥；本批补 start() 失败即停且不写 pair.txt。不是稳定版 exe 与候选 exe 同机对打",
+        "COMPONENT：V3App.__init__ 先获锁再开 sqlite/history；获锁失败不写 pair.txt/v3.sqlite。不是稳定版与候选 exe 同机对打",
     ),
     "AC3-088": ("NOT_RUN", []),
     "AC3-089": ("BLOCKED_NATIVE", ["docs/evidence/v3-cursor/result.json"]),
@@ -311,6 +327,10 @@ MAP = {
 }
 
 
+# 本脚本只允许降级或补注。不得把未 PASS 的用例写成 PASS。
+REFUSE_PASS_MINT = True
+
+
 def _unpack(entry):
     if len(entry) == 2:
         return entry[0], entry[1], None
@@ -320,12 +340,18 @@ def _unpack(entry):
 def main() -> int:
     cases = json.loads(AC_PATH.read_text(encoding="utf-8"))
     counts = {"PASS": 0, "FAIL": 0, "BLOCKED_NATIVE": 0, "NOT_RUN": 0, "DEFERRED": 0}
+    refused_upgrades: list[str] = []
     for case in cases:
         raw = MAP.get(case["id"])
         if raw is None:
             status, evidence, note = case["status"], case.get("evidence") or [], case.get("note")
         else:
             status, evidence, note = _unpack(raw)
+        if status == "PASS" and case.get("status") != "PASS":
+            refused_upgrades.append(case["id"])
+            status = case["status"]
+            evidence = case.get("evidence") or evidence
+            note = case.get("note") or note
         case["status"] = status
         case["evidence"] = evidence
         if note:
@@ -335,6 +361,9 @@ def main() -> int:
         counts[status] = counts.get(status, 0) + 1
     AC_PATH.write_text(json.dumps(cases, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(counts, ensure_ascii=False))
+    if refused_upgrades:
+        print("refused to mint PASS: " + ",".join(refused_upgrades))
+        return 2
     return 0
 
 

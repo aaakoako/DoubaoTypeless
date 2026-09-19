@@ -183,7 +183,7 @@ def test_desktop_hotkey_event_is_readable(tmp_path):
         port = site._server.sockets[0].getsockname()[1]
         try:
             async with ClientSession() as session:
-                creds = await _pair(session, port)
+                creds = await _pair(session, port, auth)
                 got = await session.get(
                     f"http://127.0.0.1:{port}/v3/phone/event",
                     headers={"X-DT-Session": creds["session_id"], "X-DT-Token": creds["token"]},

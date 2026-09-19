@@ -30,6 +30,19 @@ def test_windows_pack_ci_installs_qrcode_and_httpx():
     assert "windows-pytest" in needs
 
 
+def test_ci_installs_pillow_from_requirements_test():
+    req = Path("requirements-test.txt").read_text(encoding="utf-8")
+    assert "Pillow" in req
+    preview = Path(".github/workflows/preview-v3.yml").read_text(encoding="utf-8")
+    assert "requirements-test.txt" in preview.split("Install test dependencies", 1)[1]
+    assert "requirements-test.txt" in preview.split("Install native test dependencies", 1)[1]
+    ci = Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert "requirements-test.txt" in ci
+    fill = Path("tools/v3_fill_acceptance.py").read_text(encoding="utf-8")
+    assert "REFUSE_PASS_MINT" in fill
+    assert "refused to mint PASS" in fill
+
+
 def test_product_entry_preview_uses_run_v3_and_src_path():
     text = Path("docs/v3-product/START_HERE.md").read_text(encoding="utf-8")
     assert "python tools/run_v3.py" in text
@@ -55,8 +68,8 @@ def test_legacy_asset_post_binds_owner(tmp_path):
         port = site._server.sockets[0].getsockname()[1]
         try:
             async with ClientSession() as session:
-                owner = await _pair(session, port)
-                other = await _pair(session, port)
+                owner = await _pair(session, port, auth)
+                other = await _pair(session, port, auth)
                 posted = await session.post(
                     f"http://127.0.0.1:{port}/v3/assets?w=1&h=1",
                     data=PNG,

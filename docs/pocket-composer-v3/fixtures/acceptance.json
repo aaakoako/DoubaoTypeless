@@ -249,7 +249,7 @@
       "docs/evidence/v3-review/counterexamples.json",
       "docs/evidence/v3-auth/result.json"
     ],
-    "note": "旧证据仅 AuthService mismatch；本批补未鉴权 WS 改稿/资源下载与非环回挑战隔离"
+    "note": "COMPONENT：GET /v3/pair 一律 403，挑战只由电脑 AuthService 发放。不是真机扫码手感"
   },
   {
     "id": "AC3-018",
@@ -281,7 +281,7 @@
       "tests/test_v3_auth_isolation.py::test_lan_pair_post_cannot_self_grant_insert_or_capture",
       "docs/evidence/v3-review/counterexamples.json"
     ],
-    "note": "旧证据仅授权表；本批禁止非环回 POST 自授 insert/capture，默认不再 True"
+    "note": "COMPONENT：HTTP POST /v3/pair 忽略请求体 allow_*，权限只经电脑 set_grants。不是真机授权手感"
   },
   {
     "id": "AC3-020",
@@ -935,10 +935,11 @@
     "expected": "停止剩余图片和文字，不自动把新目标当原目标",
     "layer": "Windows",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_runtime.py::test_delivery_stops_remaining_when_target_changes"
-    ]
+    ],
+    "note": "旧证据只把 Composer 换成 Scintilla 分类；同类同标题不同 HWND 未测。独立复核 R05 针对 9dd3a369"
   },
   {
     "id": "AC3-064",
@@ -994,10 +995,11 @@
     "expected": "不自动重放；显示恢复选择，不自动Ctrl+A/Delete",
     "layer": "Windows",
     "severity": "P0",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_remaining.py::test_unknown_recovery_never_ctrl_a_delete"
-    ]
+    ],
+    "note": "旧证据为 policy 不发 Ctrl+A；UNKNOWN 恢复选择 UI 与 ask 不落入 full 未在原生窗口验收"
   },
   {
     "id": "AC3-068",
@@ -1095,10 +1097,11 @@
     "expected": "原文可插入；提示区别明确，无Key泄露",
     "layer": "自动",
     "severity": "P1",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_runtime.py::test_byok_skips_without_key_and_rejects_images"
-    ]
+    ],
+    "note": "旧证据为无 Key 跳过/拒图，不是 mock 401/404/429/超时/TLS 分类提示"
   },
   {
     "id": "AC3-075",
@@ -1123,10 +1126,11 @@
     "expected": "旧返回不覆盖新文字；默认不上传图与历史",
     "layer": "自动",
     "severity": "P0",
-    "status": "PASS",
+    "status": "NOT_RUN",
     "evidence": [
       "tests/test_v3_runtime.py::test_byok_stale_revision_does_not_overwrite"
-    ]
+    ],
+    "note": "旧证据在调用前传入过期 revision；未覆盖 post 期间改稿后重新读取当前版本"
   },
   {
     "id": "AC3-077",
@@ -1292,7 +1296,7 @@
       "tests/test_v3_auth_isolation.py::test_start_stops_without_writers_when_lock_held",
       "docs/evidence/v3-review/counterexamples.json"
     ],
-    "note": "旧证据仅锁文件互斥；本批补 start() 失败即停且不写 pair.txt。不是稳定版 exe 与候选 exe 同机对打"
+    "note": "COMPONENT：V3App.__init__ 先获锁再开 sqlite/history；获锁失败不写 pair.txt/v3.sqlite。不是稳定版与候选 exe 同机对打"
   },
   {
     "id": "AC3-088",

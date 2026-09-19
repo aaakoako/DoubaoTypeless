@@ -62,6 +62,8 @@ class V3App:
         self.data_dir = Path(data_dir or v3_data_dir())
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.port = pick_port(port) if port else 0
+        self._lock = None
+        self._acquire_instance_lock()
         self.auth = AuthService(store_path=self.data_dir / "trusted_devices.json")
         self.store = AssetStore(self.data_dir / "assets")
         from doubao_typeless.storage.db import V3DB

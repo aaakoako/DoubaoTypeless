@@ -116,10 +116,9 @@ def test_tail_flush_on_commit_keeps_last_character(tmp_path):
         port = site._server.sockets[0].getsockname()[1]
         try:
             async with ClientSession() as session:
-                code = (await (await session.get(f"http://127.0.0.1:{port}/v3/pair")).json())["challenge"]
-                creds = await (
-                    await session.post(f"http://127.0.0.1:{port}/v3/pair", json={"code": code, "allow_insert": True})
-                ).json()
+                from tests.v3_pairutil import desktop_issue_and_pair
+
+                creds = await desktop_issue_and_pair(session, port, auth, allow_insert=True)
                 async with session.ws_connect(f"http://127.0.0.1:{port}/ws") as ws:
                     await ws.send_json({"type": "session.hello", "session_id": creds["session_id"], "token": creds["token"]})
                     await ws.receive_json()

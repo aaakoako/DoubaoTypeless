@@ -99,17 +99,19 @@ def composer_checks(html: str) -> dict:
     }
 
 
-async def drive_phone(port: int, pngs: list[bytes], text: str, before_insert=None) -> dict:
+async def drive_phone(port: int, pngs: list[bytes], text: str, before_insert=None, *, pair_code: str, grant=None) -> dict:
     async with ClientSession() as session:
         page = await session.get(f"http://127.0.0.1:{port}/")
         html = await page.text()
-        challenge = await (await session.get(f"http://127.0.0.1:{port}/v3/pair")).json()
         creds = await (
             await session.post(
                 f"http://127.0.0.1:{port}/v3/pair",
-                json={"code": challenge["challenge"], "allow_insert": True, "allow_capture": False},
+                json={"code": pair_code},
             )
         ).json()
+        if grant:
+            grant(creds["session_id"])
+            creds["allow_insert"] = True
         headers = {"X-DT-Session": creds["session_id"], "X-DT-Token": creds["token"]}
         assets = []
         for blob in pngs:
@@ -227,7 +229,23 @@ def main() -> int:
         events.append(f"bridge_port={app.port}")
 
         focus_hwnd(hwnd)
-        drive = asyncio.run(drive_phone(app.port, [png_a, png_b], SAMPLE, before_insert=lambda: focus_hwnd(hwnd)))
+        pair_code = app.auth.current_pairing_challenge()
+        if not pair_code:
+            raise RuntimeError("desktop did not issue pairing challenge")
+
+        def grant(session_id: str) -> None:
+            app.auth.set_grants(session_id, allow_insert=True, allow_capture=False)
+
+        drive = asyncio.run(
+            drive_phone(
+                app.port,
+                [png_a, png_b],
+                SAMPLE,
+                before_insert=lambda: focus_hwnd(hwnd),
+                pair_code=pair_code,
+                grant=grant,
+            )
+        )
         if app.hud._app is not None:
             app.hud._app.processEvents()
         events.append(f"attempt={drive['attempt']}")

@@ -38,15 +38,15 @@ def test_bridge_protocol(tmp_path):
         try:
             async with ClientSession() as session:
                 first = await session.get(f"http://127.0.0.1:{port}/v3/pair")
-                code_a = (await first.json())["challenge"]
-                second = await session.get(f"http://127.0.0.1:{port}/v3/pair")
-                code_b = (await second.json())["challenge"]
+                first_body = await first.json()
+                assert first.status == 403
+                assert "challenge" not in first_body
+                code_a = auth.new_pairing_challenge()
+                code_b = auth.current_pairing_challenge()
                 assert code_a == code_b
-                paired = await session.post(
-                    f"http://127.0.0.1:{port}/v3/pair",
-                    json={"code": code_a, "allow_insert": True},
-                )
-                creds = await paired.json()
+                from tests.v3_pairutil import desktop_issue_and_pair
+
+                creds = await desktop_issue_and_pair(session, port, auth, allow_insert=True)
                 html = await session.get(f"http://127.0.0.1:{port}/")
                 body = await html.text()
                 assert "白板" in body

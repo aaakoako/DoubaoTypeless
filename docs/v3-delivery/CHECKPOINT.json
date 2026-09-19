@@ -2,30 +2,31 @@
   "schema_version": 1,
   "product_goal": "完整 V3 可发布候选。规范入口 docs/v3-product/MASTER_PLAN.md。",
   "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
-  "review_sha": "c3333a55a516022397772eea932c8a21c7a26cd0",
-  "product_source_at_review": "69eb4f875be0fea1ab12cce7b1e0d36f40d81b34",
-  "current_head": "3c5dd8ec1aa19b0e3429b33f559aac9fbc6e745c",
-  "working_tree": "clean after CHECKPOINT bind",
-  "last_completed_slice": "REVIEW_C3333A5_R01_R08",
-  "active_slice": "A18_DEVICE_AND_INDEPENDENT_SIGN",
-  "next_action": "真机 Android+豆包 与真实 Cursor 仍只 BLOCKED_NATIVE。独立复核再看本轮源码与新窗口包哈希。不要自签 RELEASE_READY。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
+  "review_sha": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
+  "product_source_at_review": "70aa6b92d13f7c8a69b024c94674835083cffa37",
+  "current_head": "70aa6b92d13f7c8a69b024c94674835083cffa37",
+  "working_tree": "R0+R1 dirty pending commit",
+  "last_completed_slice": "REVIEW_9DD3A369_R0_R1",
+  "active_slice": "REVIEW_9DD3A369_R2",
+  "next_action": "停止。下一可执行项是 R2：asset_refs 冻结、鉴权读图、1MiB chunk、HTTP 安全上下文。不要自签 RELEASE_READY。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
   "accepted_requirements": [
     "MASTER_PLAN 为唯一产品/执行规范",
-    "插入并复制是主动作",
-    "独立复核 REQUEST_CHANGES 必须重开对应 A 项",
-    "开发缺陷不能全部记成真机或人类签署阻塞",
+    "独立复核 REQUEST_CHANGES 不是仅剩真机",
+    "R0+R1 只校正验收/CI 与授权隔离",
     "不自动 merge/tag/Release",
-    "本轮已修好的 CI/HUD滚动/逐图队列/具体安全修复不得回退"
+    "不改测试期望、不删用例、不改审计包旧源码"
   ],
   "open_defects": [
+    "F03–F06 图像闭环与 1MiB/安全上下文（R2）",
+    "F07–F10 HUD 线程、目标身份、恢复、NO_STEPS（R3）",
+    "F11/F12 undo/scene/durable ACK/BYOK（R4）",
     "A18 真机 Android+豆包 与真实 Cursor 仍缺设备",
-    "独立视觉/包哈希人类签署仍未做",
-    "本机正在运行的控制台预览未替换为新窗口包"
+    "本 SHA 的 GitHub Actions 尚未跑绿"
   ],
-  "reopened_this_round": ["A02", "A04", "A05", "A06", "A07", "A09", "A10", "A12", "A14", "A17"],
-  "closed_this_round": ["R01", "R02", "R03", "R04", "R05", "R06", "R07", "R08-code"],
+  "reopened_this_round": ["F01", "F02", "F13", "F14"],
+  "closed_this_round": ["R0-evidence", "R0-ci-pillow", "R1-F01", "R1-F02", "R1-F14"],
   "kept_from_c3333a5": ["CI libEGL/windows-pytest", "HUD scroll+reserved bar", "image queue", "HTTP origin/host gates", "credential memory fallback"],
-  "remediated_findings": ["R01", "R02", "R03", "R04", "R05", "R06", "R07", "R08"],
+  "remediated_findings": ["F13-pass-corrections", "CI-Pillow", "F01-public-challenge", "F01-self-grant", "F02-unauth-ws", "F14-lock-before-writers"],
   "environment_blockers": [
     {
       "missing": "真实 Android + 豆包输入法 + 同网手机浏览器",
@@ -39,9 +40,8 @@
     }
   ],
   "last_commands": [
-    {"cmd": "python -m pytest -q", "exit_code": 0, "output": "191 passed"},
-    {"cmd": "npm run typecheck && npm run build", "exit_code": 0, "output": "web built index-Bv1K626-.js"},
-    {"cmd": "PyInstaller packaging/v3_preview_windowed.spec", "exit_code": 0, "output": "windowed onedir isolated"}
+    {"cmd": "python tools/v3_fill_acceptance.py", "exit_code": 0, "output": "PASS 24 / BLOCKED_NATIVE 28 / NOT_RUN 44"},
+    {"cmd": "python -m pytest -q --tb=short", "exit_code": 0, "output": "198 passed in 8.28s"}
   ],
   "candidate_artifact": {
     "source_sha": "3c5dd8ec1aa19b0e3429b33f559aac9fbc6e745c",
@@ -50,11 +50,13 @@
     "windowed_zip_sha256": "6fdc6137d0ef0e5c84ce09db0b02f7d46dd26b9c43bca5f3a047a8facce5e9cd",
     "previous_windowed_exe_sha256": "4bae6609e4b5af5e6c8508b774bb7b023b4c0462dd43625e95f96ee9617ae00f",
     "pack_path": "G:\\AgentStorage\\Deliveries\\v3-s5-windowed-c3333a5\\DoubaoTypelessV3PreviewUI\\DoubaoTypelessV3PreviewUI.exe",
-    "note": "本轮按当前源码重打无控制台候选，旧 4bae6609 不得沿用。不是 RELEASE_READY。"
+    "note": "窗口包仍绑定上一轮源码。本批未重打包装。不是 RELEASE_READY。"
   },
   "independent_review": {
     "status": "REQUEST_CHANGES",
-    "packet": "DoubaoTypeless_V3_Review_c3333a5",
+    "packet": "DoubaoTypeless_V3_Independent_Review_9dd3a369",
+    "review_sha": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
+    "batch": "R0+R1",
     "release_ready": false
   },
   "published": false,

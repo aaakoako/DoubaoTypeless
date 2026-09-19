@@ -1,0 +1,5 @@
+pytest
+httpx
+aiohttp
+Pillow
+qrcode

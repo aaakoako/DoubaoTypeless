@@ -14,14 +14,10 @@ from doubao_typeless.storage.credentials import AuthService
 from doubao_typeless.storage.db import V3DB
 
 
-async def _pair(session, port):
-    code = (await (await session.get(f"http://127.0.0.1:{port}/v3/pair")).json())["challenge"]
-    return await (
-        await session.post(
-            f"http://127.0.0.1:{port}/v3/pair",
-            json={"code": code, "allow_insert": True, "allow_capture": True},
-        )
-    ).json()
+async def _pair(session, port, auth):
+    from tests.v3_pairutil import desktop_issue_and_pair
+
+    return await desktop_issue_and_pair(session, port, auth, allow_insert=True, allow_capture=True)
 
 
 def test_phone_ws_does_not_write_shared_draft_while_pc_edits(tmp_path):
@@ -34,7 +30,7 @@ def test_phone_ws_does_not_write_shared_draft_while_pc_edits(tmp_path):
 
         async def run():
             async with ClientSession() as session:
-                creds = await _pair(session, app.port)
+                creds = await _pair(session, app.port, app.auth)
                 async with session.ws_connect(f"http://127.0.0.1:{app.port}/ws") as ws:
                     await ws.send_json(
                         {
@@ -83,7 +79,7 @@ def test_revoke_closes_authed_websocket(tmp_path):
         port = site._server.sockets[0].getsockname()[1]
         try:
             async with ClientSession() as session:
-                creds = await _pair(session, port)
+                creds = await _pair(session, port, auth)
                 async with session.ws_connect(f"http://127.0.0.1:{port}/ws") as ws:
                     await ws.send_json(
                         {
@@ -134,8 +130,8 @@ def test_asset_get_rejects_other_session(tmp_path):
         try:
             meta = store.put_png(b"\x89PNG\r\n\x1a\n" + b"\x00" * 16, width=1, height=1, role="photo")
             async with ClientSession() as session:
-                owner = await _pair(session, port)
-                other = await _pair(session, port)
+                owner = await _pair(session, port, auth)
+                other = await _pair(session, port, auth)
                 db.upsert_asset(meta["asset_id"], meta["sha256"], meta["bytes"], owner_session_id=owner["session_id"])
                 denied = await session.get(
                     f"http://127.0.0.1:{port}/v3/assets/{meta['asset_id']}",

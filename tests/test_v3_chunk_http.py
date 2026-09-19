@@ -41,13 +41,9 @@ def test_http_chunked_upload_resume(tmp_path):
         digest = hashlib.sha256(payload).hexdigest()
         try:
             async with ClientSession() as session:
-                code = (await (await session.get(f"http://127.0.0.1:{port}/v3/pair")).json())["challenge"]
-                creds = await (
-                    await session.post(
-                        f"http://127.0.0.1:{port}/v3/pair",
-                        json={"code": code, "allow_insert": True},
-                    )
-                ).json()
+                from tests.v3_pairutil import desktop_issue_and_pair
+
+                creds = await desktop_issue_and_pair(session, port, auth, allow_insert=True)
                 headers = {"X-DT-Session": creds["session_id"], "X-DT-Token": creds["token"]}
                 chunk = math.ceil(len(payload) / 2)
                 init = await (

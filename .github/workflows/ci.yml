@@ -17,7 +17,7 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest httpx aiohttp
+          python -m pip install -r requirements-test.txt
       - name: Unit tests
         run: python -m pytest -q
       - name: Syntax check

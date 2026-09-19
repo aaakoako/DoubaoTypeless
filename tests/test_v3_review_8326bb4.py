@@ -210,7 +210,7 @@ def test_phone_insert_rotates_matching_draft_and_keeps_later_b(tmp_path):
 
         async def run():
             async with ClientSession() as session:
-                creds = await _pair(session, app.port)
+                creds = await _pair(session, app.port, app.auth)
                 async with session.ws_connect(f"http://127.0.0.1:{app.port}/ws") as ws:
                     await ws.send_json(
                         {

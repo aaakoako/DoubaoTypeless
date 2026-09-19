@@ -134,8 +134,9 @@ def test_pc_can_grant_after_phone_pairs_without_self_grant(tmp_path):
         auth, _bridge, runner, port = await _serve(tmp_path, byok=ByokService())
         try:
             async with ClientSession() as session:
-                code = (await (await session.get(f"http://127.0.0.1:{port}/v3/pair")).json())["challenge"]
-                creds = await (await session.post(f"http://127.0.0.1:{port}/v3/pair", json={"code": code})).json()
+                from tests.v3_pairutil import desktop_issue_and_pair
+
+                creds = await desktop_issue_and_pair(session, port, auth)
                 assert creds["allow_insert"] is False
                 listed = await (await session.get(f"http://127.0.0.1:{port}/v3/sessions")).json()
                 assert listed["items"][0]["session_id"] == creds["session_id"]
@@ -225,8 +226,9 @@ def test_phone_cannot_set_byok_over_websocket(tmp_path):
         auth, _bridge, runner, port = await _serve(tmp_path, byok=ByokService())
         try:
             async with ClientSession() as session:
-                code = (await (await session.get(f"http://127.0.0.1:{port}/v3/pair")).json())["challenge"]
-                creds = await (await session.post(f"http://127.0.0.1:{port}/v3/pair", json={"code": code})).json()
+                from tests.v3_pairutil import desktop_issue_and_pair
+
+                creds = await desktop_issue_and_pair(session, port, auth)
                 async with session.ws_connect(f"http://127.0.0.1:{port}/ws") as ws:
                     await ws.send_json({"type": "session.hello", "session_id": creds["session_id"], "token": creds["token"]})
                     await ws.receive_json()

@@ -59,10 +59,9 @@ def test_ws_asset_refs_use_store_not_client_assets(tmp_path):
         digest = hashlib.sha256(payload).hexdigest()
         try:
             async with ClientSession() as session:
-                code = (await (await session.get(f"http://127.0.0.1:{port}/v3/pair")).json())["challenge"]
-                creds = await (
-                    await session.post(f"http://127.0.0.1:{port}/v3/pair", json={"code": code})
-                ).json()
+                from tests.v3_pairutil import desktop_issue_and_pair
+
+                creds = await desktop_issue_and_pair(session, port, auth)
                 headers = {"X-DT-Session": creds["session_id"], "X-DT-Token": creds["token"]}
                 init = await (
                     await session.post(

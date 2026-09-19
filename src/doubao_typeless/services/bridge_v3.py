@@ -406,24 +406,15 @@ class V3Bridge:
         return web.json_response({"hints": hints(str(request.query.get("q") or "")), "auto_replace": False})
 
     async def _pair_get(self, request: web.Request) -> web.Response:
-        if not is_loopback_host(peer_host(request)):
-            return web.json_response({"pairing": True}, status=403)
-        return web.json_response({"challenge": self.auth.new_pairing_challenge()})
+        return web.json_response({"pairing": True, "error": "challenge is desktop-only"}, status=403)
 
     async def _pair_post(self, request: web.Request) -> web.Response:
         body = await request.json()
-        loopback = is_loopback_host(peer_host(request))
-        allow_insert = bool(body.get("allow_insert", False)) if loopback else False
-        allow_capture = bool(body.get("allow_capture", False)) if loopback else False
         try:
             if body.get("device_id") and body.get("device_secret"):
                 session = self.auth.resume_trusted(str(body.get("device_id") or ""), str(body.get("device_secret") or ""))
             else:
-                session = self.auth.complete_pairing(
-                    str(body.get("code") or ""),
-                    allow_insert=allow_insert,
-                    allow_capture=allow_capture,
-                )
+                session = self.auth.complete_pairing(str(body.get("code") or ""))
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
         return web.json_response(

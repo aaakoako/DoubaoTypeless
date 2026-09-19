@@ -56,6 +56,45 @@ def test_lan_pair_get_does_not_mint_or_return_challenge(tmp_path, monkeypatch):
     asyncio.run(run())
 
 
+def test_loopback_pair_get_also_hides_challenge(tmp_path):
+    async def run():
+        auth, _bridge, runner, port = await _serve(tmp_path)
+        try:
+            async with ClientSession() as session:
+                response = await session.get(f"http://127.0.0.1:{port}/v3/pair")
+                body = await response.json()
+                assert response.status == 403
+                assert "challenge" not in body
+                assert auth.current_pairing_challenge() is None
+        finally:
+            await runner.cleanup()
+
+    asyncio.run(run())
+
+
+def test_loopback_pair_post_cannot_self_grant_insert_or_capture(tmp_path):
+    async def run():
+        auth, _bridge, runner, port = await _serve(tmp_path)
+        try:
+            code = auth.new_pairing_challenge()
+            async with ClientSession() as session:
+                response = await session.post(
+                    f"http://127.0.0.1:{port}/v3/pair",
+                    json={"code": code, "allow_insert": True, "allow_capture": True},
+                )
+                body = await response.json()
+                assert response.status == 200
+                assert body["allow_insert"] is False
+                assert body["allow_capture"] is False
+            session_obj = auth.sessions[body["session_id"]]
+            assert session_obj.allow_insert is False
+            assert session_obj.allow_capture is False
+        finally:
+            await runner.cleanup()
+
+    asyncio.run(run())
+
+
 def test_lan_pair_post_cannot_self_grant_insert_or_capture(tmp_path, monkeypatch):
     async def run():
         auth, _bridge, runner, port = await _serve(tmp_path)
@@ -131,14 +170,12 @@ def test_unauthenticated_asset_get_is_rejected(tmp_path):
 def test_start_stops_without_writers_when_lock_held(tmp_path):
     held = InstanceLock(tmp_path / "instance.lock")
     assert held.acquire() is True
-    app = V3App(data_dir=tmp_path, port=0)
     pair_note = tmp_path / "pair.txt"
-    if pair_note.exists():
-        pair_note.unlink()
+    sqlite = tmp_path / "v3.sqlite"
     with pytest.raises(RuntimeError, match="instance lock held"):
-        asyncio.run(app.start())
-    assert app.bridge._runner is None
+        V3App(data_dir=tmp_path, port=0)
     assert not pair_note.exists()
+    assert not sqlite.exists()
     held.release()
 
 
@@ -228,10 +265,9 @@ def test_nonce_without_insert_grant_is_forbidden(tmp_path):
         auth, _bridge, runner, port = await _serve(tmp_path)
         try:
             async with ClientSession() as session:
-                code = (await (await session.get(f"http://127.0.0.1:{port}/v3/pair")).json())["challenge"]
-                creds = await (
-                    await session.post(f"http://127.0.0.1:{port}/v3/pair", json={"code": code})
-                ).json()
+                from tests.v3_pairutil import desktop_issue_and_pair
+
+                creds = await desktop_issue_and_pair(session, port, auth)
                 assert creds["allow_insert"] is False
                 response = await session.post(f"http://127.0.0.1:{port}/v3/nonce", json=creds)
                 body = await response.json()

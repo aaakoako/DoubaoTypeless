@@ -66,9 +66,8 @@ def test_two_preview_dirs_start_same_dir_does_not_kill(tmp_path):
         assert first.bridge.port != second.bridge.port
         held = InstanceLock(a_dir / "instance.lock")
         assert held.acquire() is False
-        clash = V3App(data_dir=a_dir, port=0)
         with pytest.raises(RuntimeError, match="instance lock held"):
-            asyncio.run(clash.start())
+            V3App(data_dir=a_dir, port=0)
         assert first.bridge._runner is not None
 
         async def ping():
@@ -125,8 +124,9 @@ def test_reconnect_does_not_auto_insert(tmp_path):
         port = site._server.sockets[0].getsockname()[1]
         try:
             async with ClientSession() as session:
-                code = (await (await session.get(f"http://127.0.0.1:{port}/v3/pair")).json())["challenge"]
-                creds = await (await session.post(f"http://127.0.0.1:{port}/v3/pair", json={"code": code})).json()
+                from tests.v3_pairutil import desktop_issue_and_pair
+
+                creds = await desktop_issue_and_pair(session, port, auth)
                 async with session.ws_connect(f"http://127.0.0.1:{port}/ws") as ws:
                     await ws.send_json({"type": "session.hello", "session_id": creds["session_id"], "token": creds["token"]})
                     await ws.receive_json()
