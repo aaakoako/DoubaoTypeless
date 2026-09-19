@@ -120,6 +120,7 @@ class V3Bridge:
         self._clients: set[web.WebSocketResponse] = set()
         self._ws_auth: dict[int, Any] = {}
         self._ws_rate: dict[int, list[float]] = {}
+        self.last_phone_event: dict[str, Any] | None = None
 
     @web.middleware
     async def _origin_host_gate(self, request: web.Request, handler):
@@ -132,7 +133,7 @@ class V3Bridge:
             parsed = urlparse(origin)
             if parsed.scheme not in {"http", "https"} or not is_trusted_hostname(parsed.hostname):
                 return web.json_response({"error": "bad origin"}, status=403)
-        elif api and not is_loopback_host(peer_host(request)):
+        elif api and request.method not in {"GET", "HEAD"} and not is_loopback_host(peer_host(request)):
             return web.json_response({"error": "origin required"}, status=403)
         return await handler(request)
 
@@ -567,17 +568,26 @@ class V3Bridge:
         return len(bucket) <= WS_RATE_LIMIT
 
     def _apply_draft_fields(self, data: dict[str, Any]) -> None:
+        if data.get("assets") is not None:
+            raise ValueError("client assets rejected")
+        if data.get("epoch") and str(data["epoch"]) != self.draft.epoch:
+            raise ValueError("stale epoch")
+        if data.get("draft_id") and str(data["draft_id"]) != self.draft.draft_id:
+            raise ValueError("stale draft")
         refs = data.get("asset_refs")
         if refs is not None:
             assets = resolve_asset_refs(self.store, refs)
         else:
             assets = self.draft.assets
             refs = [a["asset_id"] for a in assets]
+        revision = data.get("revision")
+        if revision is None:
+            raise ValueError("invalid revision")
         apply_draft_update(
             self.draft,
             {
                 "text": data.get("text", self.draft.text),
-                "revision": int(data.get("revision") or self.draft.revision + 1),
+                "revision": int(revision),
                 "asset_refs": refs,
                 "assets": assets,
             },
@@ -678,6 +688,9 @@ class V3Bridge:
                 if self._on_intent:
                     status = self._on_intent(data, frozen) or status
                 await ws.send_json({"type": "attempt.status", **status})
+                event = status.get("phone_event") or self.last_phone_event
+                if event:
+                    await ws.send_json(event)
                 return True
             if kind == "capture.request":
                 try:

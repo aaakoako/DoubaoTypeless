@@ -4,8 +4,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from doubao_typeless.storage.secret_store import get_secret, put_secret
+
+
+def endpoint_authority(url: str) -> tuple[str, str, int | None]:
+    parsed = urlparse((url or "").strip())
+    return ((parsed.scheme or "").lower(), (parsed.hostname or "").lower(), parsed.port)
 
 
 def settings_path(data_dir: Path) -> Path:
@@ -99,7 +105,13 @@ ALLOWED = {
 def save_settings(data_dir: Path, payload: dict[str, Any]) -> None:
     path = settings_path(data_dir)
     current = load_settings(data_dir)
+    previous_endpoint = str(current.get("byok_endpoint") or "")
+    previous_key = str(current.get("byok_api_key") or "")
     current.update({k: payload[k] for k in payload if k in ALLOWED})
+    new_endpoint = str(current.get("byok_endpoint") or "")
+    new_key = str(current.get("byok_api_key") or "")
+    if endpoint_authority(previous_endpoint) != endpoint_authority(new_endpoint) and new_key == previous_key:
+        current["byok_api_key"] = ""
     put_secret(data_dir, "byok_api_key", str(current.get("byok_api_key") or ""))
     on_disk = dict(current)
     on_disk["byok_api_key"] = ""

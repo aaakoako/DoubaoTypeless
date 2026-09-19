@@ -18,10 +18,10 @@ export async function uploadPng(
   role = "photo"
 ): Promise<AssetMeta> {
   const buf = new Uint8Array(await blob.arrayBuffer());
-  if (!globalThis.crypto || !globalThis.crypto.subtle) {
-    throw new Error("需要可信 HTTPS 才能校验图片");
+  let digest = "pending";
+  if (globalThis.crypto?.subtle) {
+    digest = hexSha256(await crypto.subtle.digest("SHA-256", buf));
   }
-  const digest = hexSha256(await crypto.subtle.digest("SHA-256", buf));
   const initRes = await fetch("/v3/assets/init", {
     method: "POST",
     headers: { ...headers, "Content-Type": "application/json" },

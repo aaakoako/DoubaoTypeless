@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 SERVICE = "DoubaoTypelessV3Preview"
+_MEMORY: dict[str, str] = {}
 
 
 def _target(data_dir: Path, name: str) -> str:
@@ -40,13 +41,23 @@ def put_secret(data_dir: Path, name: str, value: str) -> str:
             path = _file_path(data_dir, name)
             if path.is_file():
                 path.unlink()
+            _MEMORY.pop(_target(data_dir, name), None)
             return "os"
         except Exception:
-            pass
-    path = _file_path(data_dir, name)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(value, encoding="utf-8")
-    return "file"
+            if os.environ.get("DT_V3_SECRET_FILE") == "1":
+                path = _file_path(data_dir, name)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(value, encoding="utf-8")
+                return "file"
+            _MEMORY[_target(data_dir, name)] = value
+            return "memory"
+    if os.environ.get("DT_V3_SECRET_FILE") == "1":
+        path = _file_path(data_dir, name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(value, encoding="utf-8")
+        return "file"
+    _MEMORY[_target(data_dir, name)] = value
+    return "memory"
 
 
 def get_secret(data_dir: Path, name: str) -> str:
@@ -60,11 +71,14 @@ def get_secret(data_dir: Path, name: str) -> str:
                 return raw.decode("utf-8", errors="replace").strip()
             return str(raw).strip()
         except Exception:
-            pass
-    path = _file_path(data_dir, name)
-    if path.is_file():
-        return path.read_text(encoding="utf-8").strip()
-    return ""
+            mem = _MEMORY.get(_target(data_dir, name), "")
+            if mem:
+                return mem
+    if os.environ.get("DT_V3_SECRET_FILE") == "1":
+        path = _file_path(data_dir, name)
+        if path.is_file():
+            return path.read_text(encoding="utf-8").strip()
+    return _MEMORY.get(_target(data_dir, name), "")
 
 
 def delete_secret(data_dir: Path, name: str) -> None:
@@ -78,3 +92,4 @@ def delete_secret(data_dir: Path, name: str) -> None:
     path = _file_path(data_dir, name)
     if path.is_file():
         path.unlink()
+    _MEMORY.pop(_target(data_dir, name), None)

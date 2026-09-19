@@ -83,6 +83,8 @@ export function boot(root: HTMLElement): void {
   const state = {
     text: "",
     revision: 0,
+    draft_id: "",
+    epoch: "",
     assets: [] as Asset[],
     session: null as Session | null,
     online: false,
@@ -174,8 +176,27 @@ export function boot(root: HTMLElement): void {
     ws.onmessage = (ev) => {
       const msg = JSON.parse(ev.data);
       if (looksLikeKeyScript(msg)) return;
+      if (msg.type === "session.ready") {
+        state.draft_id = String(msg.draft_id || state.draft_id);
+        state.epoch = String(msg.epoch || state.epoch);
+        if (typeof msg.revision === "number") state.revision = msg.revision;
+      }
       if (msg.type === "draft.ack") toast("电脑已收到 · 不自动发送");
       if (msg.type === "attempt.status") toast(`电脑：${msg.result} · 未发送Enter`);
+      if (msg.type === "draft.rotated") {
+        const archivedText = String(msg.archived?.text || "");
+        const same = state.text === archivedText;
+        if (same || (!state.text && !state.assets.length)) {
+          state.text = "";
+          state.assets = [];
+          ($("text") as HTMLTextAreaElement).value = "";
+        }
+        state.draft_id = String(msg.draft_id || state.draft_id);
+        state.epoch = String(msg.epoch || state.epoch);
+        if (typeof msg.revision === "number") state.revision = msg.revision;
+        toast(same ? "已开始下一段" : "电脑已收窗，当前未发出的稿还在");
+        update();
+      }
       if (msg.type === "recall.ready") toast(msg.text_unchanged ? "已召回上次待插入，当前草稿未改" : "召回异常");
       if (msg.type === "error") {
         const err = String(msg.error || "");
@@ -227,6 +248,8 @@ export function boot(root: HTMLElement): void {
         type: "draft.update",
         text: state.text,
         revision: ++state.revision,
+        draft_id: state.draft_id,
+        epoch: state.epoch,
         asset_refs: refs,
       })
     );
@@ -361,6 +384,7 @@ export function boot(root: HTMLElement): void {
     const item = state.assets.find((a) => a.id === currentId);
     if (item) {
       item.preview = preview;
+      item.asset_id = undefined;
       if (state.session) {
         state.uploading = true;
         update();
@@ -373,7 +397,15 @@ export function boot(root: HTMLElement): void {
           const meta = await uploadPng(blob, headers(), item.w || 1, item.h || 1, item.kind === "白板" ? "whiteboard" : "markup");
           item.asset_id = meta.asset_id;
         } catch {
-          toast("图片未同步");
+          toast("图片未同步，不会沿用原图");
+          item.asset_id = undefined;
+          state.uploading = false;
+          $("editor").classList.remove("show");
+          $("composer").style.display = "flex";
+          $("mobileHead").style.display = "flex";
+          editor = null;
+          update();
+          return;
         }
         state.uploading = false;
       }

@@ -304,13 +304,30 @@ class ReviewPanel:
         dlg.exec()
 
     def suggest_rewrite(self) -> None:
-        self.app.draft.text = self.editor.toPlainText()
-        out = self.app.suggest_text(self.editor.toPlainText())
-        if out.get("suggested") and out["suggested"] != out.get("original"):
-            self.banner.setText("有一处建议，可采用或不用。插入不会被模型挡住。")
-        else:
-            self.banner.setText(out.get("message") or "没有可用的改写建议")
+        import threading
+
+        text = self.editor.toPlainText()
+        self.app.draft.text = text
+        self.banner.setText("正在请求建议，仍可改字或插入")
         self.banner.show()
+
+        def work() -> None:
+            out = self.app.suggest_text(text)
+            def apply() -> None:
+                suggested = out.get("suggested") or ""
+                if suggested and suggested != out.get("original"):
+                    self.banner.setText(f"建议：{suggested}")
+                else:
+                    self.banner.setText(out.get("message") or "没有可用的改写建议")
+                self.banner.show()
+            try:
+                from PySide6.QtCore import QTimer
+
+                QTimer.singleShot(0, apply)
+            except Exception:
+                apply()
+
+        threading.Thread(target=work, daemon=True).start()
 
     def apply_rewrite(self) -> None:
         self.app.draft.text = self.editor.toPlainText()
@@ -347,6 +364,8 @@ class ReviewPanel:
         self.app.review_editing = False
         self.app._save_draft()
         self.app.insert_current()
+        self._editing = False
+        self.app.review_editing = False
         self.widget.hide()
 
     def show(self) -> None:
@@ -830,6 +849,13 @@ class ClientWindow:
         if not endpoint or not key:
             self.byok_status.setText(ERROR_LABELS["no_key"])
             return
+        from doubao_typeless.storage.settings_store import endpoint_authority, load_settings
+
+        stored = load_settings(self.app.data_dir)
+        if endpoint_authority(stored.get("byok_endpoint") or "") != endpoint_authority(endpoint):
+            if key == (stored.get("byok_api_key") or ""):
+                self.byok_status.setText("换了服务地址，请重新填写并批准密钥后再测试")
+                return
         from doubao_typeless.app import _httpx_json_post
 
         svc = ByokService(endpoint=endpoint, api_key=key, model=model, post=_httpx_json_post)
@@ -867,7 +893,6 @@ class ClientWindow:
         if bundle is None:
             return
         self.app.bridge.last_bundle = self.app.history.replay_bundle(bundle)
-        self.app._last_attempt = None
         self.app.insert_last()
 
     def export_diagnostics(self) -> None:

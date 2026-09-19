@@ -40,7 +40,15 @@ class HudController:
     def start(self) -> None:
         try:
             from PySide6.QtCore import Qt, QTimer
-            from PySide6.QtWidgets import QApplication, QLabel, QWidget, QHBoxLayout, QVBoxLayout, QPushButton
+            from PySide6.QtWidgets import (
+                QApplication,
+                QHBoxLayout,
+                QLabel,
+                QPushButton,
+                QTextEdit,
+                QVBoxLayout,
+                QWidget,
+            )
         except ImportError:
             return
         self._app = QApplication.instance() or QApplication([])
@@ -61,8 +69,16 @@ class HudController:
         layout = QVBoxLayout(w)
         self._status = QLabel("手机输入中")
         self._status.setStyleSheet(f"color:{TOKENS['muted']}; font-size:11px;")
-        self._body = QLabel("")
-        self._body.setWordWrap(True)
+        self._body = QTextEdit()
+        self._body.setReadOnly(True)
+        self._body.setFrameShape(self._body.NoFrame if hasattr(self._body, "NoFrame") else self._body.frameShape())
+        try:
+            from PySide6.QtWidgets import QFrame
+
+            self._body.setFrameShape(QFrame.NoFrame)
+        except Exception:
+            pass
+        self._body.setStyleSheet("border:0; background:transparent;")
         row = QHBoxLayout()
         expand = QPushButton("展开")
         expand.setStyleSheet("background:#E7EEEC; color:#1D2826; border:0; border-radius:9px; padding:6px 10px;")
@@ -76,11 +92,11 @@ class HudController:
         btn.setStyleSheet(f"background:{TOKENS['accent']}; color:white; border:0; border-radius:9px; padding:6px 10px;")
         btn.clicked.connect(lambda: self._on_insert and self._on_insert())
         self._insert = btn
-        row.addWidget(self._body, 1)
         row.addWidget(expand, 0)
         row.addWidget(copy, 0)
         row.addWidget(btn, 0)
         layout.addWidget(self._status)
+        layout.addWidget(self._body, 1)
         layout.addLayout(row)
         w.hide()
         self._widget = w
@@ -120,8 +136,7 @@ class HudController:
         if self._widget is None:
             return
         body = self.text if self.text else (f"{self.image_count} 图" if self.image_count else "")
-        self._body.setText(body)
-        self._body.setWordWrap(True)
+        self._body.setPlainText(body)
         hint = self._body.sizeHint().height()
         min_h = TOKENS["min_image_h"] if self.image_count else TOKENS["min_text_h"]
         height = max(min_h, min(self._max_height(), hint + 64))
@@ -132,5 +147,14 @@ class HudController:
 
     def hide(self) -> None:
         self.visible = False
-        if self._widget is not None:
-            self._widget.hide()
+        if self._widget is None:
+            return
+        try:
+            from PySide6.QtCore import QThread, QTimer
+
+            if QThread.currentThread() != self._widget.thread():
+                QTimer.singleShot(0, self._widget, self._widget.hide)
+                return
+        except Exception:
+            pass
+        self._widget.hide()

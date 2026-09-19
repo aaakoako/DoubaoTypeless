@@ -109,6 +109,17 @@ def test_ws_asset_refs_use_store_not_client_assets(tmp_path):
                             "assets": [{"asset_id": "forged", "bytes": 999, "sha256": "deadbeef"}],
                         }
                     )
+                    rejected = await ws.receive_json()
+                    assert rejected["type"] == "error"
+                    assert "assets" in rejected.get("error", "")
+                    await ws.send_json(
+                        {
+                            "type": "draft.update",
+                            "text": "caption",
+                            "revision": 1,
+                            "asset_refs": [meta["asset_id"]],
+                        }
+                    )
                     ack = await ws.receive_json()
                     assert ack["type"] == "draft.ack"
                     await ws.send_json(

@@ -24,10 +24,10 @@ from doubao_typeless.adapters.observable_target import from_env as observer_from
 from doubao_typeless.ui.hud import HudController
 
 
-def _httpx_json_post(url: str, body: dict, headers: dict) -> dict:
+def _httpx_json_post(url: str, body: dict, headers: dict, timeout: float = 8.0) -> dict:
     import httpx
 
-    response = httpx.post(url, json=body, headers=headers, timeout=8.0)
+    response = httpx.post(url, json=body, headers=headers, timeout=timeout)
     response.raise_for_status()
     data = response.json()
     if not isinstance(data, dict):
@@ -119,7 +119,7 @@ class V3App:
             store=self.store,
             draft=self.draft,
             on_activity=self._on_activity,
-            on_intent=self._on_intent,
+            on_intent=self.deliver_and_finish,
             on_capture=self._on_capture,
             on_recall=self.recall_last,
             on_phone_draft=self.apply_phone_update,
@@ -175,7 +175,7 @@ class V3App:
                 current = self._saved_target
         return current
 
-    def apply_phone_update(self, data: dict) -> dict:
+    def apply_phone_update(self, data: dict, *, allow_server_assets: bool = False) -> dict:
         if self.review_editing:
             self.phone_pending = dict(data)
             self._notify_ui("phone_pending")
@@ -185,27 +185,57 @@ class V3App:
                 "durable": False,
                 "hash": self.draft.acked_hash,
             }
+        if data.get("assets") is not None and not allow_server_assets:
+            raise ValueError("client assets rejected")
+        if data.get("epoch") and str(data["epoch"]) != self.draft.epoch:
+            return {
+                "revision": self.draft.revision,
+                "parked": False,
+                "durable": False,
+                "hash": self.draft.acked_hash,
+                "error": "stale epoch",
+            }
+        if data.get("draft_id") and str(data["draft_id"]) != self.draft.draft_id:
+            return {
+                "revision": self.draft.revision,
+                "parked": False,
+                "durable": False,
+                "hash": self.draft.acked_hash,
+                "error": "stale draft",
+            }
         from doubao_typeless.core.bundle import apply_draft_update
         from doubao_typeless.services.assets import resolve_asset_refs
 
         refs = data.get("asset_refs")
-        assets = data.get("assets")
-        if refs is not None and assets is None:
+        assets = None
+        if refs is not None:
             assets = resolve_asset_refs(self.store, refs)
+        elif allow_server_assets and data.get("assets") is not None:
+            assets = data.get("assets")
+        try:
+            revision = int(data["revision"])
+        except (KeyError, TypeError, ValueError):
+            if allow_server_assets:
+                revision = self.draft.revision + 1
+            else:
+                raise ValueError("invalid revision") from None
+        before = (self.draft.text, self.draft.revision)
         update = {
             "text": data.get("text", self.draft.text),
-            "revision": max(int(data.get("revision") or 0), self.draft.revision + 1),
+            "revision": revision,
             "asset_refs": refs if refs is not None else [a.get("asset_id") for a in self.draft.assets],
         }
         if assets is not None:
             update["assets"] = assets
         apply_draft_update(self.draft, update)
-        self._save_draft()
-        self._on_activity(self.draft.text, len(self.draft.assets))
+        changed = (self.draft.text, self.draft.revision) != before
+        if changed:
+            self._save_draft()
+            self._on_activity(self.draft.text, len(self.draft.assets))
         return {
             "revision": self.draft.revision,
             "parked": False,
-            "durable": True,
+            "durable": changed,
             "hash": self.draft.acked_hash,
         }
 
@@ -214,7 +244,7 @@ class V3App:
         self.review_editing = False
         self.phone_pending = None
         if pending:
-            self.apply_phone_update(pending)
+            self.apply_phone_update(pending, allow_server_assets=True)
 
     def keep_pc_edit(self) -> None:
         self.review_editing = True
@@ -356,7 +386,9 @@ class V3App:
             intent["nonce"] = self.auth.issue_nonce(sessions[-1])
         return intent
 
-    def _keep_inserted_copy(self, bundle: dict) -> None:
+    def _keep_inserted_copy(self, bundle: dict, payload: dict | None = None) -> None:
+        if payload and payload.get("error_code") == "CLIPBOARD_INTERFERENCE":
+            return
         text = str(bundle.get("text") or "")
         self._copied_text = text
         if not text:
@@ -365,15 +397,20 @@ class V3App:
             self._set_text(text)
         except Exception:
             _log("[v3.copy] 插入后保留剪贴板失败，稿未丢")
+            self._notify_ui("copy_failed")
 
-    def _maybe_start_next_draft(self, bundle: dict, payload: dict) -> None:
+    def _maybe_start_next_draft(self, bundle: dict, payload: dict) -> bool:
         result = payload.get("result")
         steps = payload.get("steps") or []
-        text_done = any(step.get("kind") == "text" for step in steps)
+        text_done = any(
+            (step.get("kind") if isinstance(step, dict) else getattr(step, "kind", None)) == "text"
+            for step in steps
+        )
         images = bundle.get("assets") or []
         if result == "CONFIRMED":
-            return
+            return False
         if result in {"UNKNOWN", "PARTIAL"} and not images and text_done:
+            before = self.draft.epoch
             archive_if_match(
                 self.draft,
                 {
@@ -386,13 +423,41 @@ class V3App:
             )
             self._save_draft()
             self._notify_ui("new_draft")
+            return self.draft.epoch != before
+        return False
+
+    def _phone_rotate_event(self, bundle: dict, rotated: bool) -> dict:
+        return {
+            "type": "draft.rotated",
+            "archived": {
+                "draft_id": bundle.get("draft_id"),
+                "epoch": bundle.get("epoch"),
+                "revision": bundle.get("revision"),
+                "hash": bundle.get("manifest_hash"),
+                "text": bundle.get("text") or "",
+                "asset_refs": [a.get("asset_id") for a in (bundle.get("assets") or [])],
+            } if rotated else None,
+            "draft_id": self.draft.draft_id,
+            "epoch": self.draft.epoch,
+            "revision": self.draft.revision,
+            "text": self.draft.text,
+            "asset_refs": [a.get("asset_id") for a in self.draft.assets],
+        }
 
     def _after_insert(self, bundle: dict, payload: dict) -> dict:
-        self.hud.hide()
-        self._keep_inserted_copy(bundle)
-        self._maybe_start_next_draft(bundle, payload)
+        self._keep_inserted_copy(bundle, payload)
+        rotated = self._maybe_start_next_draft(bundle, payload)
+        event = self._phone_rotate_event(bundle, rotated)
+        self.bridge.last_phone_event = event
+        payload = dict(payload)
+        payload["phone_event"] = event
         self._notify_ui("hide_after_insert")
         return payload
+
+    def deliver_and_finish(self, intent: dict, bundle: dict) -> dict:
+        self.hud.hide()
+        payload = self._on_intent(intent, bundle)
+        return self._after_insert(bundle, payload)
 
     def _on_intent(self, intent: dict, bundle: dict) -> dict:
         intent_id = str(intent.get("intent_id") or "")
@@ -455,8 +520,7 @@ class V3App:
         bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
         self.bridge.last_bundle = bundle
         intent = self._session_intent("insert_current")
-        payload = self._on_intent(intent, bundle)
-        return self._after_insert(bundle, payload)
+        return self.deliver_and_finish(intent, bundle)
 
     def draft_image_previews(self) -> list[dict]:
         out: list[dict] = []
@@ -492,19 +556,34 @@ class V3App:
             current_revision=self.draft.revision,
         )
         suggested = out.get("text") if out.get("status") == "ok" else None
-        self._last_suggestion = {"original": text, "suggested": suggested, **out}
+        self._last_suggestion = {
+            "original": text,
+            "suggested": suggested,
+            "draft_id": self.draft.draft_id,
+            "epoch": self.draft.epoch,
+            "revision": self.draft.revision,
+            **out,
+        }
         return self._last_suggestion
 
     def apply_suggestion(self) -> bool:
         last = self._last_suggestion or {}
-        if not last.get("suggested") or self.draft.text != last.get("original"):
+        if not last.get("suggested"):
             return False
+        if last.get("draft_id") != self.draft.draft_id or last.get("epoch") != self.draft.epoch:
+            return False
+        last["before_apply"] = self.draft.text
         self.draft.text = str(last["suggested"])
         self.draft.revision += 1
         self._save_draft()
         return True
 
     def reject_suggestion(self) -> None:
+        last = self._last_suggestion or {}
+        if last.get("before_apply") is not None and last.get("draft_id") == self.draft.draft_id:
+            self.draft.text = str(last["before_apply"])
+            self.draft.revision += 1
+            self._save_draft()
         self._last_suggestion = None
 
     def copy_text(self) -> str:
@@ -567,7 +646,7 @@ class V3App:
             if plan["mode"] in {"text_only", "remaining_verified", "full"}:
                 intent["recovery_mode"] = plan["mode"]
         self._recovery_needed = False
-        return self._on_intent(intent, bundle)
+        return self.deliver_and_finish(intent, bundle)
 
     def confirm_recovery(self, mode: str) -> dict | None:
         return self.insert_last(user_mode=mode)
@@ -596,6 +675,11 @@ class V3App:
         if self.draft.text != kept_text or [a.get("asset_id") for a in self.draft.assets] != kept_assets:
             raise RuntimeError("recall must not swallow current draft")
         self._save_draft()
+        if plan["mode"] == "ask" or (self._last_attempt and self._last_attempt.result in {"UNKNOWN", "PARTIAL"}):
+            self._recovery_needed = True
+            self._notify_ui("recovery_ask")
+            return
+        self.insert_last()
 
     def capture_region(self) -> None:
         from doubao_typeless.ui.region import select_region
@@ -606,11 +690,12 @@ class V3App:
             _log("[v3.capture] region cancelled; no new image")
             return
         x, y, w, h = box
-        sessions = list(self.auth.sessions.values())
-        if not sessions or not sessions[-1].allow_capture:
+        granted = [item for item in self.auth.sessions.values() if item.allow_capture]
+        if not granted:
             _log("[v3.capture] region needs capture grant")
             return
-        meta = self._on_capture(f"region:{x},{y},{w},{h}", str(uuid.uuid4()))
+        session = granted[-1]
+        meta = self._on_capture(f"region:{x},{y},{w},{h}", str(uuid.uuid4()), session)
         _log(f"[v3.capture] region {meta.get('width')}x{meta.get('height')}")
 
     def _acquire_instance_lock(self) -> None:

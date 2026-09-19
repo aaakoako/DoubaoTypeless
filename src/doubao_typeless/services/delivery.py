@@ -84,8 +84,13 @@ class DeliveryService:
                 return attempt
             self._set_image(asset["bytes_data"] if "bytes_data" in asset else b"")
             if not self._wait_modifiers():
-                attempt.result = "NO_STEPS"
+                attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "MODIFIERS_HELD"
+                return attempt
+            current = self._read_focus()
+            if current != focus:
+                attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
+                attempt.error_code = "TARGET_CHANGED"
                 return attempt
             self._paste()
             evidence = "os_input_count"
@@ -118,8 +123,12 @@ class DeliveryService:
                 attempt.error_code = "CLIPBOARD_INTERFERENCE"
                 return attempt
             if not self._wait_modifiers():
-                attempt.result = "NO_STEPS"
+                attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "MODIFIERS_HELD"
+                return attempt
+            if self._read_focus() != focus:
+                attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
+                attempt.error_code = "TARGET_CHANGED"
                 return attempt
             self._paste()
             if self._observe_text:

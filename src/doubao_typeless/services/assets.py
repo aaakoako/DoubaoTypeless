@@ -137,7 +137,8 @@ class UploadService:
             self._purge(session)
             raise ValueError("size mismatch")
         digest = hashlib.sha256(payload).hexdigest()
-        if digest != session["sha256"]:
+        expected = str(session.get("sha256") or "")
+        if expected not in {"", "pending"} and digest != expected:
             self._purge(session)
             raise ValueError("hash mismatch")
         if not (payload.startswith(PNG_MAGIC) or payload.startswith(JPEG_MAGIC)):

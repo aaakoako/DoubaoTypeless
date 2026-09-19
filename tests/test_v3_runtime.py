@@ -137,6 +137,7 @@ def test_delivery_stops_remaining_when_target_changes():
         [
             ("ComposerPane", "chatinput"),
             ("ComposerPane", "chatinput"),
+            ("ComposerPane", "chatinput"),
             ("Scintilla", "code"),
         ]
     )

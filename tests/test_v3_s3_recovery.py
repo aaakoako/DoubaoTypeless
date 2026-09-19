@@ -86,7 +86,14 @@ def test_unknown_result_does_not_auto_replay(tmp_path):
 
 
 def test_target_change_stops_remaining_images():
-    focuses = iter([("ComposerPane", "chatinput"), ("ComposerPane", "chatinput"), ("Notepad", "other")])
+    focuses = iter(
+        [
+            ("ComposerPane", "chatinput"),
+            ("ComposerPane", "chatinput"),
+            ("ComposerPane", "chatinput"),
+            ("Notepad", "other"),
+        ]
+    )
     pasted = []
     svc = DeliveryService(
         paste=lambda: pasted.append("paste"),
@@ -114,6 +121,7 @@ def test_target_change_stops_remaining_images():
 
 def test_two_unknown_windows_count_as_target_change():
     focuses = iter([
+        ("DT-S2-PasteTarget", "notes-a"),
         ("DT-S2-PasteTarget", "notes-a"),
         ("DT-S2-PasteTarget", "notes-a"),
         ("DT-S2-PasteTarget", "notes-b"),

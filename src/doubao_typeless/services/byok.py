@@ -4,6 +4,11 @@ from __future__ import annotations
 from typing import Any, Callable
 from urllib.parse import urlparse
 
+DEFAULT_POLISH_PROMPT = (
+    "请在保留原意、专名和用户用词的前提下，整理这段口误或语音识别文字。"
+    "不要扩写，不要编造没说过的内容。只返回改写后的正文。"
+)
+
 
 def chat_url(endpoint: str) -> str:
     url = (endpoint or "").rstrip("/")
@@ -75,9 +80,7 @@ class ByokService:
         if self._post is None:
             return {"status": "skipped", "reason": "no_transport", "message": ERROR_LABELS["no_transport"], "text": text}
         try:
-            messages = []
-            if self.extra_prompt:
-                messages.append({"role": "system", "content": self.extra_prompt})
+            messages = [{"role": "system", "content": self.extra_prompt or DEFAULT_POLISH_PROMPT}]
             messages.append({"role": "user", "content": text})
             payload: dict[str, Any] = {
                 "model": self.model,
