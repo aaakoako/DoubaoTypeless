@@ -5,7 +5,11 @@
   "published": false,
   "self_signed": false,
   "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
-  "product_sha_at_review": "b54327d95febf1c62221249d2b8e55e489a376d8",
+  "product_sha_at_review": "de7c1d2d86ee0f961cadee7053c6b986df0ac389",
+  "pack_hashes_after_rebuild": {
+    "console_exe_sha256": "fa81ac2c0a379b8feed3b7d967e2449b23757f3aaea8f91c3b11c0eae7e6c946",
+    "windowed_exe_sha256": "46d67d702f08dba074a5237a45ba9867fa57ac409bd634e5c851efd65ef544fa"
+  },
   "reviewers": [
     {
       "id": "security-review",
@@ -20,7 +24,7 @@
         "own-window never paste target"
       ],
       "residual_optional": [
-        "legacy POST /v3/assets owner bind — remediating in this slice",
+        "legacy POST /v3/assets owner bind — remediating in de7c1d2",
         "cleartext LAN accepted by product"
       ]
     },

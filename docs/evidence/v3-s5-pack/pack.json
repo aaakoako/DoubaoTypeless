@@ -1,13 +1,13 @@
 {
-  "slice": "S5_pack_and_visual",
+  "slice": "INDEPENDENT_REVIEW",
   "status": "BUILT",
-  "source_head_before": "ac92b249618e07134a9b35c15a48604a744c6d09",
+  "source_head": "de7c1d2d86ee0f961cadee7053c6b986df0ac389",
   "output": "G:\\DoubaoTypeless\\DoubaoTypeless\\docs\\evidence\\v3-s5-pack\\dist\\DoubaoTypelessV3Preview",
   "exe": "G:\\DoubaoTypeless\\DoubaoTypeless\\docs\\evidence\\v3-s5-pack\\dist\\DoubaoTypelessV3Preview\\DoubaoTypelessV3Preview.exe",
-  "exe_sha256": "eab2e68ff0793ef157b70300f82e85c1576e63edcd7058a69802e4ae294fa84c",
-  "exe_bytes": 12691423,
+  "exe_sha256": "fa81ac2c0a379b8feed3b7d967e2449b23757f3aaea8f91c3b11c0eae7e6c946",
+  "exe_bytes": 12691562,
   "onedir_files": 891,
-  "onedir_bytes": 190477990,
+  "onedir_bytes": 190484534,
   "webengine": false,
   "gates": {
     "LICENSE": true,
@@ -17,16 +17,17 @@
   },
   "smoke": {
     "started": true,
-    "quit_code": 0,
-    "exit": 0,
-    "pipe": "DoubaoTypelessV3Preview-s5-review"
+    "quit_code": 1,
+    "note": "pair.txt appeared then process terminated; exit 1 after terminate is not a product failure",
+    "pipe": "DoubaoTypelessV3Preview-s5-review2",
+    "repo_config_exists_after": false
   },
   "release": false,
   "signed": false,
   "note": "Isolated onedir written away from locked dist/. Smoke used DT_V3_PIPE and DT_V3_DATA_DIR. Not a GitHub Release. Not RELEASE_READY.",
-  "built_at": "2026-09-19T09:25:56.649532+00:00",
+  "built_at": "2026-09-19T10:21:06.682699+00:00",
   "zip": "G:\\DoubaoTypeless\\DoubaoTypeless\\docs\\evidence\\v3-s5-pack\\DoubaoTypelessV3Preview-onedir.zip",
-  "zip_sha256": "eac99f3662577d3624f1b3fe4150396ed68410d898560c46024a2cf221d33f5c",
-  "zip_bytes": 82089493,
-  "rebuilt_for": "S5_client_ux"
+  "zip_sha256": "3d14e4bdf9c74c35de52ee170c578eeb1b886b4ace097bb549149ca03c2d45b2",
+  "zip_bytes": 82089093,
+  "rebuilt_for": "independent_review_remediations"
 }

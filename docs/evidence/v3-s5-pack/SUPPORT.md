@@ -6,8 +6,8 @@
 
 | 包 | 控制台 | EXE SHA256 | ZIP SHA256 |
 |---|---|---|---|
-| DoubaoTypelessV3Preview | 有 | `eab2e68ff0793ef157b70300f82e85c1576e63edcd7058a69802e4ae294fa84c` | `eac99f3662577d3624f1b3fe4150396ed68410d898560c46024a2cf221d33f5c` |
-| DoubaoTypelessV3PreviewUI | 无 | `ec137b462b43de7ccca095ee975c9065f936c45936c99fb5ec13471e04e4a7fe` | `c5539fc1d82dd0b1bf1b1bd5306f002e4c6e565823e6791131d33a047479f5a7` |
+| DoubaoTypelessV3Preview | 有 | `fa81ac2c0a379b8feed3b7d967e2449b23757f3aaea8f91c3b11c0eae7e6c946` | `3d14e4bdf9c74c35de52ee170c578eeb1b886b4ace097bb549149ca03c2d45b2` |
+| DoubaoTypelessV3PreviewUI | 无 | `46d67d702f08dba074a5237a45ba9867fa57ac409bd634e5c851efd65ef544fa` | `fd40c37ca59b58a32836914c17b4efae364cf1bc0efe86ae73c9d8ee32e91b18` |
 
 两份包都未签名，不是 GitHub Release，源码 SHA 不等于包哈希。
 
