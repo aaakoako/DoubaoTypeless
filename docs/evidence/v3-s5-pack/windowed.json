@@ -1,0 +1,24 @@
+{
+  "name": "DoubaoTypelessV3PreviewUI",
+  "console": false,
+  "exe": "G:\\DoubaoTypeless\\DoubaoTypeless\\docs\\evidence\\v3-s5-pack\\dist\\DoubaoTypelessV3PreviewUI\\DoubaoTypelessV3PreviewUI.exe",
+  "exe_sha256": "f9d1fae52516368183cd451c05ebc9fec357131a78eac0b171401cbf2057b976",
+  "exe_bytes": 12673979,
+  "onedir_files": 891,
+  "onedir_bytes": 190466843,
+  "zip_sha256": "710714ef365e5ad6229faefadf3737886a3071a193a22ba6164f3b0d5d91b3de",
+  "zip_bytes": 82078697,
+  "webengine": false,
+  "console_pack_still_present": true,
+  "smoke": {
+    "exe_started": true,
+    "quit_code": 0,
+    "process_exit": 0,
+    "pipe": "DoubaoTypelessV3Preview-s5-ui",
+    "port": "8767",
+    "repo_config_exists_after": false
+  },
+  "release": false,
+  "signed": false,
+  "built_at": "2026-09-19T08:55:16.440743+00:00"
+}

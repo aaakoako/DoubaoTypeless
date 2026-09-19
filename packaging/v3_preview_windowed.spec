@@ -1,6 +1,6 @@
-# V3 console preview onedir — does NOT publish a GitHub Release.
-# Windowed pack is packaging/v3_preview_windowed.spec (DoubaoTypelessV3PreviewUI).
-# python -m PyInstaller --noconfirm packaging/v3_preview.spec
+# V3 windowed preview onedir — separately named from the console pack.
+# python -m PyInstaller --noconfirm packaging/v3_preview_windowed.spec
+# Does NOT publish a GitHub Release.
 # -*- mode: python ; coding: utf-8 -*-
 
 from pathlib import Path
@@ -55,12 +55,12 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="DoubaoTypelessV3Preview",
+    name="DoubaoTypelessV3PreviewUI",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=True,
+    console=False,
     disable_windowed_traceback=False,
     icon=icon_arg,
 )
@@ -72,5 +72,5 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=False,
-    name="DoubaoTypelessV3Preview",
+    name="DoubaoTypelessV3PreviewUI",
 )
