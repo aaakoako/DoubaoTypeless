@@ -32,6 +32,8 @@ a = Analysis(
         "aiohttp",
         "PIL",
         "PySide6",
+        "qrcode",
+        "qrcode.image.pil",
         "pynput.keyboard._win32",
         "pynput.mouse._win32",
     ],

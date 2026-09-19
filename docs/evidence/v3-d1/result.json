@@ -1,0 +1,20 @@
+{
+  "captured_at": "2026-09-18T16:42:07.241959+00:00",
+  "port": 50519,
+  "url": "http://192.168.8.105:50519/",
+  "pairing_code_shown": true,
+  "qr_non_null": true,
+  "status_protocol": 3,
+  "closed_to_tray": true,
+  "shots": {
+    "welcome": "docs/evidence/v3-d1/01-welcome.png",
+    "settings": "docs/evidence/v3-d1/02-settings.png",
+    "recent": "docs/evidence/v3-d1/03-recent.png",
+    "review": "docs/evidence/v3-d1/04-review.png",
+    "recovery": "docs/evidence/v3-d1/05-recovery.png"
+  },
+  "console_false_only": false,
+  "uses_pc_html": false,
+  "engineering_preview": true,
+  "desktop_complete": false
+}

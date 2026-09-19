@@ -37,6 +37,15 @@ class AuthService:
             return None
         return code
 
+    def pairing_remaining_s(self) -> float:
+        if not self._challenge:
+            return 0.0
+        remaining = self._challenge[1] - time.monotonic()
+        if remaining <= 0:
+            self._challenge = None
+            return 0.0
+        return remaining
+
     def new_pairing_challenge(self) -> str:
         existing = self.current_pairing_challenge()
         if existing:
@@ -44,6 +53,10 @@ class AuthService:
         code = secrets.token_urlsafe(8)
         self._challenge = (code, time.monotonic() + self.pairing_ttl_s)
         return code
+
+    def rotate_pairing_challenge(self) -> str:
+        self._challenge = None
+        return self.new_pairing_challenge()
 
     def complete_pairing(self, code: str, *, allow_insert: bool = False, allow_capture: bool = False) -> Session:
         if not self._challenge:

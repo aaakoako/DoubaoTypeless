@@ -111,6 +111,7 @@ class V3Bridge:
         self.byok = byok
         self.data_dir = Path(data_dir) if data_dir else None
         self._log = logger or (lambda _m: None)
+        self.paused = False
         self._runner: Optional[web.AppRunner] = None
         self._clients: set[web.WebSocketResponse] = set()
         self._ws_auth: dict[int, Any] = {}
@@ -566,6 +567,15 @@ class V3Bridge:
         if not authorized:
             await ws.send_json({"type": "error", "error": "unauthorized"})
             return False
+        if self.paused and kind in {
+            "draft.update",
+            "editor.activity",
+            "bundle.commit",
+            "insert.intent",
+            "capture.request",
+        }:
+            await ws.send_json({"type": "error", "error": "paused"})
+            return True
         try:
             if kind == "draft.update":
                 self._apply_draft_fields(data)

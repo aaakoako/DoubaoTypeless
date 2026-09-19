@@ -23,8 +23,16 @@ from doubao_typeless.adapters.observable_target import from_env as observer_from
 from doubao_typeless.ui.hud import HudController
 
 
+_log_impl = print
+
+
 def _log(message: str) -> None:
-    print(message, flush=True)
+    _log_impl(str(message))
+
+
+def set_log(fn) -> None:
+    global _log_impl
+    _log_impl = fn
 
 
 class V3App:
@@ -54,10 +62,13 @@ class V3App:
 
         stored = load_settings(self.data_dir)
         self.byok = ByokService(endpoint=stored.get("byok_endpoint") or "", api_key=stored.get("byok_api_key") or "")
-        self.hud = HudController(on_insert=self.insert_last)
+        self.hud = HudController(on_insert=self.insert_last, on_expand=lambda: self._notify_ui("expand"))
         self._observer = observer_from_env()
         self._last_attempt: Attempt | None = None
         self._recovery_needed = False
+        self.review_editing = False
+        self.phone_pending = None
+        self.ui_hook = None
         from doubao_typeless.storage.draft_snapshot import load_draft, save_draft
 
         restored, missing = load_draft(self.data_dir, self.store)
@@ -95,10 +106,20 @@ class V3App:
             read_clipboard_text=self._read_clipboard_text,
         )
 
+    def _notify_ui(self, event: str, **kwargs) -> None:
+        hook = getattr(self, "ui_hook", None)
+        if hook:
+            hook(event, **kwargs)
+
     def _on_activity(self, text: str, image_count: int) -> None:
+        if self.review_editing:
+            self.phone_pending = {"text": text, "image_count": image_count}
+            self._notify_ui("phone_pending")
+            return
         self._save_draft()
         if text or image_count:
             self.hud.show_receiving(text, image_count)
+        self._notify_ui("activity")
 
     def _history_public(self) -> list:
         return [
@@ -282,6 +303,7 @@ class V3App:
                 self._recovery_needed = True
                 self.hud.show_receiving("上次结果未知，请选择恢复方式", len(bundle.get("assets") or []))
                 _log("[v3.recovery] ask; 不自动重放、不Ctrl+A")
+                self._notify_ui("recovery_ask")
                 return
             if plan["mode"] == "cancel":
                 return
@@ -373,6 +395,7 @@ class V3App:
         thread = threading.Thread(target=loop.run_forever, daemon=True)
         thread.start()
         asyncio.run_coroutine_threadsafe(self.start(), loop).result(15)
+        self._loop = loop
         return loop
 
     async def stop(self) -> None:
@@ -383,47 +406,9 @@ class V3App:
 
 
 def main() -> None:
-    from doubao_typeless.runtime_lock import InstanceLock
+    from doubao_typeless.ui.desktop import run_desktop
 
-    data_dir = v3_data_dir()
-    lock = InstanceLock(Path(data_dir) / "instance.lock")
-    if not lock.acquire():
-        _log("[v3] 另一个预览实例已在运行，不强杀、不抢锁")
-        raise SystemExit(1)
-    app = V3App(data_dir=data_dir)
-    app._lock = lock
-    app.hud.start()
-    try:
-        from doubao_typeless.platform.windows.hotkeys import start_hotkeys
-        from doubao_typeless.storage.settings_store import load_settings
-
-        stored = load_settings(app.data_dir)
-        start = start_hotkeys(
-            on_insert=app.insert_last,
-            on_recall=app.recall_last,
-            on_region=app.capture_region,
-            insert_combo=str(stored.get("hotkey_insert") or "<alt>+i"),
-            recall_combo=str(stored.get("hotkey_recall") or "<alt>+<shift>+i"),
-        )
-        if start.get("failures"):
-            _log(f"[v3] 热键注册失败，不会把语法合法当成成功: {start['failures']}")
-        if start.get("esc_bound"):
-            _log("[v3] HUD 不应绑定 Esc")
-    except Exception as exc:
-        _log(f"[v3] 热键未启动: {exc}")
-
-    loop = asyncio.new_event_loop()
-    thread = threading.Thread(target=loop.run_forever, daemon=True)
-    thread.start()
-    asyncio.run_coroutine_threadsafe(app.start(), loop)
-    try:
-        if app.hud._app is not None:
-            app.hud._app.exec()
-        else:
-            while True:
-                time.sleep(1)
-    except KeyboardInterrupt:
-        asyncio.run_coroutine_threadsafe(app.stop(), loop).result(5)
+    raise SystemExit(run_desktop())
 
 
 if __name__ == "__main__":

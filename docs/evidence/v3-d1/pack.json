@@ -1,0 +1,17 @@
+{
+  "captured_at": "2026-09-18T16:45:00+00:00",
+  "exe": "dist/DoubaoTypelessV3Preview/DoubaoTypelessV3Preview.exe",
+  "sha256": "4f0361219e51d531f04617fbfaa7e1ec87ba76b5e580fcd9750cbdc870e2aa43",
+  "source_head": "55d03cc965652c3a8e019174d9d8463575446acc",
+  "source_note": "pack includes uncommitted D1 desktop entry; not a tagged release",
+  "protocol": 3,
+  "first_served": true,
+  "second_instance_exit": 0,
+  "second_instance_wake_not_abort": true,
+  "first_still_serving_after_second": true,
+  "file_log": true,
+  "daily_config_unchanged": true,
+  "console_false": false,
+  "killed_with_taskkill_not_tray_quit": true,
+  "engineering_preview": true
+}

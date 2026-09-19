@@ -15,14 +15,16 @@ TOKENS = {
 
 
 class HudController:
-    def __init__(self, *, on_insert: Callable[[], None] | None = None):
+    def __init__(self, *, on_insert: Callable[[], None] | None = None, on_expand: Callable[[], None] | None = None):
         self._on_insert = on_insert
+        self._on_expand = on_expand
         self.visible = False
         self.text = ""
         self.image_count = 0
         self._timer = None
         self._widget = None
         self._app = None
+        self._expand = None
 
     def start(self) -> None:
         try:
@@ -51,10 +53,15 @@ class HudController:
         self._body = QLabel("")
         self._body.setWordWrap(True)
         row = QHBoxLayout()
+        expand = QPushButton("展开")
+        expand.setStyleSheet("background:#E7EEEC; color:#1D2826; border:0; border-radius:9px; padding:6px 10px;")
+        expand.clicked.connect(lambda: self._on_expand and self._on_expand())
+        self._expand = expand
         btn = QPushButton("插入 Alt+I")
         btn.setStyleSheet(f"background:{TOKENS['accent']}; color:white; border:0; border-radius:9px; padding:6px 10px;")
         btn.clicked.connect(lambda: self._on_insert and self._on_insert())
         row.addWidget(self._body, 1)
+        row.addWidget(expand, 0)
         row.addWidget(btn, 0)
         layout.addWidget(self._status)
         layout.addLayout(row)
