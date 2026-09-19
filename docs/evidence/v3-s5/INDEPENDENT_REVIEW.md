@@ -36,4 +36,4 @@
 
 ## 当前结论
 
-`WAITING` — 实现者未签署。未得到独立复核前，不得把状态写成 RELEASE_READY 或 PUBLISHED。
+`RECORDED` — Security Review PASS；Bugbot REQUEST_CHANGES 后已返修。视觉/包哈希/真机未签署。实现者未自签 RELEASE_READY 或 PUBLISHED。详见 `docs/evidence/v3-s5-pack/INDEPENDENT_REVIEW.md`。

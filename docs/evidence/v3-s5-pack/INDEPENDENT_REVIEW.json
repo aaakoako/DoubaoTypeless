@@ -1,0 +1,52 @@
+{
+  "slice": "INDEPENDENT_REVIEW",
+  "status": "RECORDED",
+  "release_ready": false,
+  "published": false,
+  "self_signed": false,
+  "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
+  "product_sha_at_review": "b54327d95febf1c62221249d2b8e55e489a376d8",
+  "reviewers": [
+    {
+      "id": "security-review",
+      "agent": "63a48a14-f786-41eb-8406-03ae50188fb9",
+      "verdict": "PASS",
+      "scope": [
+        "pairing/revoke/WS",
+        "asset GET owner",
+        "BYOK secrets",
+        "daily-use isolation",
+        "observer gate",
+        "own-window never paste target"
+      ],
+      "residual_optional": [
+        "legacy POST /v3/assets owner bind — remediating in this slice",
+        "cleartext LAN accepted by product"
+      ]
+    },
+    {
+      "id": "bugbot",
+      "agent": "44caa116-934d-4037-8305-de2dfe9ccffc",
+      "verdict": "REQUEST_CHANGES",
+      "findings": [
+        {
+          "severity": "high",
+          "item": "windows-min-pack missing qrcode/httpx",
+          "resolution": "FIXED in .github/workflows/preview-v3.yml; asserted by test_windows_pack_ci_installs_qrcode_and_httpx"
+        },
+        {
+          "severity": "medium",
+          "item": "AGENTS.md python -m doubao_typeless is broken",
+          "resolution": "NOT rewritten: AGENTS.md is AC3-004 freeze-locked. Working command recorded in docs/v3-product/START_HERE.md and asserted by test_product_entry_preview_uses_run_v3_and_src_path"
+        }
+      ]
+    }
+  ],
+  "not_signed": [
+    "visual native vs UI_BOARD",
+    "human pack-hash attestation",
+    "real Android + 豆包 IME",
+    "real Cursor Composer"
+  ],
+  "note": "Implementing agent recorded independent subagent verdicts. This is not RELEASE_READY, not PUBLISHED, not a GitHub Release."
+}

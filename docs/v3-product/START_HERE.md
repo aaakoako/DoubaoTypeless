@@ -12,6 +12,14 @@ S0→S5是内部顺序；切片完成后继续下个可执行项，不等用户�
 
 会话结束前更新现有CHECKPOINT并记录下一条具体开发动作；下一轮一句“继续V3”即可续跑。缺设备只阻塞对应设备验证；界面、协议、CI、可安装开发依赖和适配器实现不能一并扔给设备持有者。
 
+隔离预览（不要用 `python -m doubao_typeless`，该入口在当前包布局下不可运行；`AGENTS.md` 受 AC3-004 冻结，正确命令写在这里）：
+
+```bash
+$env:DT_V3_DATA_DIR="$env:LOCALAPPDATA\DoubaoTypeless\preview-v3"
+$env:PYTHONPATH="src"
+python tools/run_v3.py
+```
+
 ## 必须记住
 
 主路径：手机说一段 → 看清/电脑可改字 → **插入并复制** → 收起浮窗 → 手机空白新稿 → 上次仍可恢复。

@@ -28,7 +28,8 @@
 
 - 真实 Android + 豆包输入法扫码/相册/白板
 - 真实 Cursor Composer 图文投递（PasteTarget 不能代替）
-- 独立复核签署
+- 独立视觉 / 包哈希人类签署
+- 独立复核已记录 ≠ RELEASE_READY
 - merge / tag / Release
 
 独立审阅者请从固定源码 SHA 与上表包哈希开始，不要用本文件当 PASSED。

@@ -4,9 +4,12 @@
 
 | 动作 | 对象 | 状态 |
 |---|---|---|
-| 功能 / 安全 / 视觉 / 包哈希独立复核 | 独立审阅者 | WAITING |
+| 安全独立复核 | Security Review `63a48a14` | PASS（见 INDEPENDENT_REVIEW.md） |
+| Bugbot 独立复核 | Bugbot `44caa116` | REQUEST_CHANGES，CI/属主返修已落地；AGENTS.md 冻结未改 |
+| 视觉 / 包哈希人类签署 | 独立审阅者 | WAITING |
 | 真机 Android + 豆包输入法 | 设备持有者 | BLOCKED_NATIVE |
 | 真实 Cursor Composer 图文 | 设备持有者 | BLOCKED_NATIVE |
+| RELEASE_READY | 不得自签 | 未达（上列未签署项仍卡） |
 | merge 到 master | 仓库所有者 | 未批准 |
 | 打 v* tag | 仓库所有者 | 未批准 |
 | GitHub Release | 仓库所有者 | 未批准 |

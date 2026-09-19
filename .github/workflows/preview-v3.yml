@@ -63,7 +63,7 @@ jobs:
       - name: Install pack dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pyinstaller aiohttp Pillow PySide6 pynput pywin32
+          python -m pip install pyinstaller aiohttp Pillow PySide6 pynput pywin32 qrcode httpx
       - name: Build isolated onedir
         run: python -m PyInstaller --noconfirm packaging/v3_preview.spec
       - name: Resource check

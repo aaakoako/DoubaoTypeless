@@ -422,12 +422,21 @@ class V3Bridge:
             raise web.HTTPUnauthorized(text=str(exc)) from exc
 
     async def _asset_post(self, request: web.Request) -> web.Response:
-        self._session_from(request)
+        session = self._session_from(request)
         data = await request.read()
         width = int(request.query.get("w", "1"))
         height = int(request.query.get("h", "1"))
         role = request.query.get("role", "photo")
         meta = self.store.put_png(data, width=width, height=height, role=role)
+        db = getattr(self.uploads, "db", None)
+        if db is not None:
+            db.upsert_asset(
+                meta["asset_id"],
+                meta["sha256"],
+                meta["bytes"],
+                referenced=False,
+                owner_session_id=session.session_id,
+            )
         if self._on_activity and should_wake("draft.update"):
             self._on_activity(self.draft.text, max(1, len(self.draft.assets)))
         return web.json_response(meta)
