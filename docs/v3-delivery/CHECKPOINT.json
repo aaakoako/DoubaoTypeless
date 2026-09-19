@@ -2,16 +2,16 @@
   "schema_version": 1,
   "product_goal": "完整 V3 可发布候选。规范入口 docs/v3-product/MASTER_PLAN.md。",
   "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
-  "current_head": "831949d799460daa21370bee63d0f81494ef4a43",
-  "working_tree": "clean after S5 windowed pack commit",
-  "last_completed_slice": "S5_windowed_pack_and_review_pack",
-  "active_slice": "S5_independent_review",
-  "next_action": "把 docs/evidence/v3-s5-pack/SUPPORT.md 与两份包哈希交给独立审阅者；不要自签 RELEASE_READY。真机 Android+豆包输入法和真实 Cursor Composer 仍 BLOCKED_NATIVE，缺设备只阻塞对应验证。不要等待用户说继续开发已授权项。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
+  "current_head": "8371a10a7cf7b559a74e2f6a16d26d5dcf93facd",
+  "working_tree": "clean after S5 review-packet commit",
+  "last_completed_slice": "S5_independent_review",
+  "active_slice": "WAITING_INDEPENDENT_REVIEW",
+  "next_action": "独立审阅者按 docs/evidence/v3-s5-pack/SUPPORT.md、GETTING_STARTED.md、APPROVAL.md 与包哈希复核；不要自签 RELEASE_READY。审阅指出的可执行代码继续修。真机 Android+豆包输入法和真实 Cursor Composer 仍 BLOCKED_NATIVE。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
   "accepted_requirements": [
     "MASTER_PLAN 为唯一产品/执行规范",
     "插入并复制是主动作",
-    "控制台包与无控制台包必须分开命名",
-    "隔离 onedir 不得覆盖正在运行的 dist 预览",
+    "检查更新不得覆盖日用",
+    "DT_V3_TARGET_STATE 不能单独充当正式确认",
     "不自动 merge/tag/Release"
   ],
   "open_defects": [],
@@ -34,12 +34,12 @@
     }
   ],
   "last_commands": [
-    {"cmd": "python -m pytest -q", "exit_code": 0, "output": "141 passed"},
-    {"cmd": "python -m PyInstaller --noconfirm packaging/v3_preview_windowed.spec", "exit_code": 0, "output": "DoubaoTypelessV3PreviewUI exe f9d1fae5… zip 710714ef… smoke 8767 quit 0"}
+    {"cmd": "python -m pytest -q", "exit_code": 0, "output": "147 passed"},
+    {"cmd": "rebuild console+windowed onedir", "exit_code": 0, "output": "console fd06cfd5… windowed 42dc7492… smoke quit 0"}
   ],
   "candidate_artifact": {
-    "console_exe_sha256": "1bf29ff452495c3a1f3b0483834a3706b078e0019472ad83b522c586885a5f39",
-    "windowed_exe_sha256": "f9d1fae52516368183cd451c05ebc9fec357131a78eac0b171401cbf2057b976",
+    "console_exe_sha256": "fd06cfd510ea23ebb1a4c4f9051b87da8422252f5b3f86724d93df766c96f084",
+    "windowed_exe_sha256": "42dc749286afb551457abebe60aa2aafe20f3f3455a552393318a493d09063ba",
     "note": "隔离候选，未签名，不是 RELEASE_READY，不是 GitHub Release。"
   },
   "published": false,
