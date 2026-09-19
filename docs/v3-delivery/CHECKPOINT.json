@@ -3,8 +3,8 @@
   "product_goal": "完整 V3 可发布候选。规范入口 docs/v3-product/MASTER_PLAN.md。",
   "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
   "review_sha": "8326bb475707cc4d3f2948379b67a5397226709e",
-  "current_head": "348c22112c444bc96e189b73d79bfbcb67e3bece",
-  "working_tree": "A07/A09/A12/A13/A14/A15 implemented, uncommitted",
+  "current_head": "69eb4f875be0fea1ab12cce7b1e0d36f40d81b34",
+  "working_tree": "clean after remaining-except-A18 commit",
   "last_completed_slice": "REMAINING_EXCEPT_A18",
   "active_slice": "A18_DEVICE_ONLY",
   "next_action": "真机 Android+豆包 与真实 Cursor 仍只 BLOCKED_NATIVE。源码已变，隔离包哈希未重打。不要自签 RELEASE_READY。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
@@ -38,7 +38,7 @@
     {"cmd": "npm run typecheck && npm run build", "exit_code": 0, "output": "web built index-DjLoiJ-m.js"}
   ],
   "candidate_artifact": {
-    "source_parent": "348c22112c444bc96e189b73d79bfbcb67e3bece",
+    "source_sha": "69eb4f875be0fea1ab12cce7b1e0d36f40d81b34",
     "console_exe_sha256": "035fca0bc7945e45e2338c4ed481887e548b7aec09fbe4b3a8bd14542b1c0677",
     "windowed_exe_sha256": "4bae6609e4b5af5e6c8508b774bb7b023b4c0462dd43625e95f96ee9617ae00f",
     "note": "A03 包哈希仍绑旧窗口包。本切片改了源码和前端，未重打包。不是 RELEASE_READY。"
