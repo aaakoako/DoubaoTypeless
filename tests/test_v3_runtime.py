@@ -192,6 +192,35 @@ def test_v3_app_uses_isolated_dir(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(__import__("sys").platform != "win32", reason="native Qt HUD")
+def test_hud_long_text_keeps_insert_inside_cap():
+    hud = HudController()
+    hud.start()
+    if hud._widget is None:
+        pytest.skip("PySide6 HUD widget missing")
+    from PySide6.QtWidgets import QApplication
+
+    long = ("这是一段用来核对原生浮窗长文阅读的说明。" "主操作仍是插入并复制，不能截成二百个字。") * 16
+    hud.show_receiving(long, 0)
+    app = QApplication.instance()
+    if app is not None:
+        app.processEvents()
+    widget = hud._widget
+    insert = hud._insert
+    assert widget.width() == 400
+    assert 240 <= widget.height() <= 300
+    assert insert is not None
+    assert insert.isVisible()
+    center = insert.mapTo(widget, insert.rect().center())
+    top = insert.mapTo(widget, insert.rect().topLeft())
+    assert widget.rect().contains(center)
+    assert insert.height() >= 20
+    assert top.y() >= widget.height() - 48
+    assert hud._body.toPlainText() == long
+    assert len(hud._body.toPlainText()) > 200
+    hud.hide()
+
+
+@pytest.mark.skipif(__import__("sys").platform != "win32", reason="native Qt HUD")
 def test_hud_applies_show_from_worker_thread():
     import threading
 

@@ -52,6 +52,17 @@ docs/evidence/v3-s5-pack/dist/
 docs/evidence/v3-s5-pack/smoke-data/
 docs/evidence/v3-s5-pack/smoke-data-ui/
 docs/evidence/v3-s5-pack/smoke-data-review/
+docs/evidence/v3-native-pack/smoke-data/
+docs/evidence/v3-native-pack/*-screen.png
+docs/evidence/v3-native-pack/hud-top.png
+docs/evidence/v3-native-pack/hud-bottom.png
+docs/evidence/v3-native-pack/*-print.png
+docs/evidence/v3-native-pack/*-screen.png
+docs/evidence/v3-native-pack/hud-hwnd.png
+docs/evidence/v3-native-pack/client-hwnd.png
+docs/evidence/v3-native-pack/hud-src-grab.png
+docs/evidence/v3-native-pack/new-exe.sha256.txt
+docs/evidence/v3-native-pack/pack.log
 docs/evidence/v3-s5-pack/*.zip
 opus.dll
 *.spec.bak
