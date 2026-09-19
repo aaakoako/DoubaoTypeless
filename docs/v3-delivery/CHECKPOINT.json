@@ -2,8 +2,8 @@
   "schema_version": 1,
   "product_goal": "完整 V3 可发布候选（R01-R10）。当前任务未完成：缺真机主流程、缺 Cursor 一键图文、缺独立复核。",
   "review_base": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
-  "current_head": "13478a74c2e25ac687b3fb15ed248a9c3fb6a975",
-  "working_tree": "D2 quit/text/image verification uncommitted",
+  "current_head": "cc777d0ad9b28688f9f74e112ac99591b5221b75",
+  "working_tree": "clean after D2 commit",
   "last_completed_slice": "D2_desktop_flows_reverified",
   "active_slice": "S5_candidate_after_native_gaps",
   "next_action": "继续不受阻工作：整理候选说明与迁移回退材料；真机与 Cursor 保持 BLOCKED_NATIVE。不要等待用户说继续。不要 merge/tag/Release。任务未完成。",
@@ -55,8 +55,8 @@
     "sha256": "d5aceb632946e1c78a5de27f147610b5939be6227a16cf539c9b6b911a4b8246",
     "kind": "isolated_dev_onedir",
     "release": false,
-    "source_head": "pending_d2_commit",
-    "note": "含 --quit 正常退出。绑定将在 D2 提交后回写。不是 RELEASE_READY。"
+    "source_head": "cc777d0ad9b28688f9f74e112ac99591b5221b75",
+    "note": "隔离开发包，含 --quit。哈希对应 D2 提交前刚打的 onedir。不是 RELEASE_READY。任务未完成。"
   },
   "published": false,
   "task_complete": false
