@@ -1,4 +1,5 @@
 import { SharedEditor, type Tool } from "./editor/canvas";
+import { applyReady, applyRotated } from "./sync.js";
 import { looksLikeKeyScript, newId } from "./transport/protocol";
 import { uploadPng } from "./transport/upload";
 
@@ -130,10 +131,10 @@ export function boot(root: HTMLElement): void {
             w: a.w,
             h: a.h,
             scene: a.scene,
-            source: a.source,
             caption: a.caption,
             status: a.status,
-            preview: a.asset_id ? `/v3/assets/${a.asset_id}` : a.preview,
+            preview: a.asset_id ? `/v3/assets/${a.asset_id}` : (a.preview || "").startsWith("blob:") ? "" : a.preview,
+            source: a.source && !a.source.startsWith("blob:") ? a.source : a.asset_id ? `/v3/assets/${a.asset_id}` : "",
           })),
         })
       );
@@ -231,36 +232,40 @@ export function boot(root: HTMLElement): void {
       if (looksLikeKeyScript(msg)) return;
       if (msg.type === "session.ready") {
         void pullRememberedSecret();
-        const same =
-          state.draft_id &&
-          state.draft_id === String(msg.draft_id || "") &&
-          state.epoch === String(msg.epoch || "");
-        state.draft_id = String(msg.draft_id || state.draft_id);
-        state.epoch = String(msg.epoch || state.epoch);
-        if (typeof msg.revision === "number") state.revision = msg.revision;
-        if (!same && (state.text || state.assets.length)) {
+        const decision = applyReady(state, msg);
+        if (decision === "conflict") {
+          toast("电脑上已有另一份稿，当前未发出的稿还在，没有覆盖服务器");
+          update();
+          return;
+        }
+        if (decision === "adopt" && (state.text || state.assets.length)) {
           sendDraft();
         }
+      }
+      if (msg.type === "device.remembered") {
+        if (msg.device_id && msg.device_secret) storeDevice(String(msg.device_id), String(msg.device_secret));
+        toast("已保存这台设备，下次可直接续接");
       }
       if (msg.type === "draft.ack") toast("电脑已收到 · 不自动发送");
       if (msg.type === "attempt.status") toast(`电脑：${msg.result} · 未发送Enter`);
       if (msg.type === "draft.rotated") {
-        const archivedText = String(msg.archived?.text || "");
-        const same = state.text === archivedText;
-        if (same || (!state.text && !state.assets.length)) {
-          state.text = "";
-          state.assets = [];
-          ($("text") as HTMLTextAreaElement).value = "";
-        }
-        state.draft_id = String(msg.draft_id || state.draft_id);
-        state.epoch = String(msg.epoch || state.epoch);
-        if (typeof msg.revision === "number") state.revision = msg.revision;
-        toast(same ? "已开始下一段" : "电脑已收窗，当前未发出的稿还在");
+        const cleared = applyRotated(state, msg) === "cleared";
+        if (cleared) ($("text") as HTMLTextAreaElement).value = "";
+        toast(cleared ? "已开始下一段" : "电脑已收窗，当前未发出的稿还在");
         update();
       }
       if (msg.type === "recall.ready") toast(msg.text_unchanged ? "已召回上次待插入，当前草稿未改" : "召回异常");
       if (msg.type === "error") {
         const err = String(msg.error || "");
+        if (/session revoked|session expired/i.test(err)) {
+          sessionStorage.removeItem("dt.v3.session");
+          state.session = null;
+          ws?.close();
+          void resumeRemembered().then((ok) => {
+            if (!ok) showPair();
+          });
+          return;
+        }
         toast(err.includes("not granted") || err === "CAPTURE_DENIED" ? "这台手机还没有截图权限，文字仍可同步" : err);
         return;
       }
@@ -289,8 +294,8 @@ export function boot(root: HTMLElement): void {
   }
 
   function assetRefs(): string[] {
-    const missing = state.assets.filter((a) => !a.asset_id);
-    if (missing.length) {
+    const unfinished = state.assets.filter((a) => !a.asset_id || (a.status && a.status !== "ready"));
+    if (unfinished.length) {
       throw new Error("incomplete assets");
     }
     return state.assets.map((a) => a.asset_id as string);
@@ -314,6 +319,8 @@ export function boot(root: HTMLElement): void {
         draft_id: state.draft_id,
         epoch: state.epoch,
         asset_refs: refs,
+        captions: state.assets.map((a) => a.caption || ""),
+        asset_status: state.assets.map((a) => a.status || "ready"),
       })
     );
   }
@@ -351,6 +358,15 @@ export function boot(root: HTMLElement): void {
   };
   $("cropReset").onclick = () => editor?.resetCrop();
 
+  async function fileToDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
   $("file").addEventListener("change", async (e) => {
     const files = Array.from((e.target as HTMLInputElement).files || []);
     for (const f of files) {
@@ -360,8 +376,8 @@ export function boot(root: HTMLElement): void {
         toast("不支持的图片类型");
         continue;
       }
-      const preview = URL.createObjectURL(f);
-      const a: Asset = { id: "p-" + f.name + Date.now(), kind: "图片", preview };
+      const preview = await fileToDataUrl(f);
+      const a: Asset = { id: "p-" + f.name + Date.now(), kind: "图片", preview, source: preview };
       const image = new Image();
       image.src = preview;
       try {
@@ -406,6 +422,14 @@ export function boot(root: HTMLElement): void {
     editor = new SharedEditor(host, asset.w || 1600, asset.h || 1000);
     if (asset.scene) {
       editor.importScene(asset.scene);
+      if (asset.source || asset.preview) {
+        let src = asset.source || asset.preview;
+        if (src.startsWith("/v3/assets/") && state.session) {
+          const res = await fetch(src, { headers: headers() });
+          if (res.ok) src = URL.createObjectURL(await res.blob());
+        }
+        editor.rebindSource(src);
+      }
     } else if (title === "快速白板") {
       editor.addBlankBoard(asset.w || 1600, asset.h || 1000);
       host.dataset.ready = "1";
@@ -536,7 +560,19 @@ export function boot(root: HTMLElement): void {
       return;
     }
     sendDraft();
-    ws.send(JSON.stringify({ protocol: 3, type: "bundle.commit", text: state.text, revision: state.revision, asset_refs: refs }));
+    ws.send(
+      JSON.stringify({
+        protocol: 3,
+        type: "bundle.commit",
+        text: state.text,
+        revision: state.revision,
+        asset_refs: refs,
+        draft_id: state.draft_id,
+        epoch: state.epoch,
+        captions: state.assets.map((a) => a.caption || ""),
+        asset_status: state.assets.map((a) => a.status || "ready"),
+      })
+    );
     const nonceRes = await fetch("/v3/nonce", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(state.session) });
     if (!nonceRes.ok) {
       toast("请在电脑确认插入权限。拒绝后仍可同步文字。练习插入用电脑 Alt+I。");
@@ -555,6 +591,10 @@ export function boot(root: HTMLElement): void {
         text: state.text,
         revision: state.revision,
         asset_refs: refs,
+        draft_id: state.draft_id,
+        epoch: state.epoch,
+        captions: state.assets.map((a) => a.caption || ""),
+        asset_status: state.assets.map((a) => a.status || "ready"),
       })
     );
   };
@@ -590,6 +630,8 @@ export function boot(root: HTMLElement): void {
   }
 
   async function resumeRemembered(): Promise<boolean> {
+    sessionStorage.removeItem("dt.v3.session");
+    state.session = null;
     let stored: { device_id?: string; device_secret?: string } | null = null;
     try {
       stored = JSON.parse(localStorage.getItem(DEVICE_KEY) || "null");

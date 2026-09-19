@@ -82,6 +82,7 @@ def probe_uia() -> dict:
                 report["text_value"] = str(focused.CurrentValue or "")
             except Exception:
                 report["text_value"] = None
+            report["image_children"] = _collect_image_children(uia, focused)
         return report
     except Exception as exc:
         report["error"] = str(exc)
@@ -89,11 +90,36 @@ def probe_uia() -> dict:
         return report
 
 
+def _collect_image_children(uia, element, *, depth: int = 0, found: list | None = None) -> list:
+    found = found if found is not None else []
+    if depth > 8 or len(found) >= 8:
+        return found
+    try:
+        ctl = str(getattr(element, "CurrentControlType", "") or "")
+        name = str(getattr(element, "CurrentName", "") or "")
+        cls = str(getattr(element, "CurrentClassName", "") or "")
+        blob = f"{ctl} {name} {cls}".lower()
+        if any(token in blob for token in ("image", "picture", "bitmap", "photo", "attachment", "thumb")):
+            found.append({"name": name, "class_name": cls, "control_type": ctl})
+    except Exception:
+        pass
+    try:
+        walker = uia.ControlViewWalker
+        child = walker.GetFirstChildElement(element)
+        while child is not None and len(found) < 8:
+            _collect_image_children(uia, child, depth=depth + 1, found=found)
+            child = walker.GetNextSiblingElement(child)
+    except Exception:
+        pass
+    return found
+
+
 def observe_image() -> str:
     report = probe_uia()
     if not report.get("composer_control"):
         return "unknown"
-    # 附件树未闭合前不能把粘贴成功当接收。
+    if report.get("image_children"):
+        return "observed"
     return "unknown"
 
 
@@ -101,4 +127,6 @@ def observe_text() -> str:
     report = probe_uia()
     if not report.get("composer_control"):
         return "unknown"
+    if report.get("text_value"):
+        return "observed"
     return "unknown"

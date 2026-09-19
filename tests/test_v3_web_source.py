@@ -27,7 +27,12 @@ def test_vite_konva_sources_exist():
     assert "dt.v3.device" in app
     assert "resumeRemembered" in app
     assert "if (asset.scene)" in app
+    assert "rebindSource" in app
+    assert "applyRotated" in app
+    assert "applyReady" in app
+    assert "device.remembered" in app
     assert "recall.last" in app
+    assert "rebindSource" in canvas
     upload = (WEB / "src" / "transport" / "upload.ts").read_text(encoding="utf-8")
     assert "/v3/assets/init" in upload
     assert "chunks" in upload
@@ -35,6 +40,6 @@ def test_vite_konva_sources_exist():
 
 def test_image_queue_and_finish_policy_scripts():
     root = Path(__file__).resolve().parents[1]
-    for name in ("test_v3_image_queue.mjs", "test_v3_finish_editor.mjs"):
+    for name in ("test_v3_image_queue.mjs", "test_v3_finish_editor.mjs", "test_v3_phone_events.mjs"):
         out = subprocess.check_output(["node", str(root / "tests" / name)], text=True)
         assert "ok" in out

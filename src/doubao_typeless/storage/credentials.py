@@ -174,6 +174,11 @@ class AuthService:
         return session
 
     def remember_device(self, session: Session) -> str:
+        existing = self.trusted.get(session.device_id)
+        if existing is not None and time.time() <= existing.expires_at:
+            session.remembered = True
+            session.expires_at = existing.expires_at
+            return session.device_secret_once
         secret = secrets.token_urlsafe(24)
         session.remembered = True
         session.expires_at = time.time() + REMEMBER_TTL_S
@@ -244,6 +249,10 @@ class AuthService:
             session.allow_insert = bool(allow_insert)
         if allow_capture is not None:
             session.allow_capture = bool(allow_capture)
+        for other in self.sessions.values():
+            if other.device_id == session.device_id:
+                other.allow_insert = session.allow_insert
+                other.allow_capture = session.allow_capture
         trusted = self.trusted.get(session.device_id)
         if trusted is not None:
             trusted.allow_insert = session.allow_insert
@@ -266,12 +275,22 @@ class AuthService:
         ]
 
     def revoke(self, session_id: str) -> bool:
-        session = self.sessions.pop(session_id, None)
+        session = self.sessions.get(session_id)
         if session is None:
             return False
-        self.trusted.pop(session.device_id, None)
+        return self.forget_device(session.device_id)
+
+    def forget_device(self, device_id: str) -> bool:
+        found = False
+        for sid, item in list(self.sessions.items()):
+            if item.device_id == device_id:
+                self.sessions.pop(sid, None)
+                found = True
+        if device_id in self.trusted:
+            self.trusted.pop(device_id, None)
+            found = True
         self._save_trusted()
-        return True
+        return found
 
     def issue_nonce(self, session: Session) -> str:
         nonce = secrets.token_urlsafe(24)

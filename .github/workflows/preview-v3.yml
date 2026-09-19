@@ -62,7 +62,7 @@ jobs:
 
   windows-min-pack:
     runs-on: windows-latest
-    needs: pytest
+    needs: [pytest, windows-pytest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

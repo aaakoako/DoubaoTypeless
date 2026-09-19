@@ -156,6 +156,7 @@ class V3Bridge:
             app.router.add_static("/assets", _web_dist() / "assets")
         app.router.add_get("/v3/history", self._history)
         app.router.add_get("/v3/status", self._status)
+        app.router.add_get("/v3/phone/event", self._phone_event)
         app.router.add_get("/pc", self._pc)
         app.router.add_get("/v3/sessions", self._sessions)
         app.router.add_post("/v3/sessions/revoke", self._revoke)
@@ -239,11 +240,35 @@ class V3Bridge:
             }
         )
 
+    async def send_to_session(self, session_id: str, payload: dict[str, Any]) -> bool:
+        for ws in list(self._clients):
+            bound = self._ws_auth.get(id(ws))
+            if bound is None or bound.session_id != session_id:
+                continue
+            try:
+                await ws.send_json(payload)
+                return True
+            except Exception:
+                return False
+        return False
+
+    async def publish_phone_event(self, event: dict[str, Any]) -> None:
+        self.last_phone_event = event
+        for ws in list(self._clients):
+            if id(ws) not in self._ws_auth:
+                continue
+            try:
+                await ws.send_json(event)
+            except Exception:
+                pass
+
     async def revoke_session(self, session_id: str) -> bool:
         removed = self.auth.revoke(session_id)
         for ws in list(self._clients):
             bound = self._ws_auth.get(id(ws))
-            if bound is None or bound.session_id != session_id:
+            if bound is None:
+                continue
+            if bound.session_id in self.auth.sessions:
                 continue
             try:
                 await ws.send_json({"type": "error", "error": "session revoked"})
@@ -553,6 +578,10 @@ class V3Bridge:
         items = self._history_list() if self._history_list else []
         return web.json_response({"items": items})
 
+    async def _phone_event(self, request: web.Request) -> web.Response:
+        self._session_from(request)
+        return web.json_response(self.last_phone_event or {})
+
     async def _ws(self, request: web.Request) -> web.WebSocketResponse:
         ws = web.WebSocketResponse(max_msg_size=256 * 1024)
         await ws.prepare(request)
@@ -599,6 +628,18 @@ class V3Bridge:
         while bucket and bucket[0] < cutoff:
             bucket.pop(0)
         return len(bucket) <= WS_RATE_LIMIT
+
+    def _require_draft_identity(self, data: dict[str, Any]) -> None:
+        has_id = bool(data.get("draft_id"))
+        has_epoch = bool(data.get("epoch"))
+        if has_id != has_epoch:
+            raise ValueError("draft identity required")
+        if not has_id:
+            return
+        if str(data["draft_id"]) != self.draft.draft_id:
+            raise ValueError("stale draft")
+        if str(data["epoch"]) != self.draft.epoch:
+            raise ValueError("stale epoch")
 
     def _apply_draft_fields(self, data: dict[str, Any]) -> None:
         if data.get("assets") is not None:
@@ -649,6 +690,8 @@ class V3Bridge:
                     "draft_id": self.draft.draft_id,
                     "epoch": self.draft.epoch,
                     "revision": self.draft.revision,
+                    "text": self.draft.text,
+                    "asset_refs": [a.get("asset_id") for a in self.draft.assets],
                 }
             )
             return True
@@ -692,6 +735,10 @@ class V3Bridge:
                 )
                 return True
             if kind == "editor.activity":
+                for asset in self.draft.assets:
+                    status = str(asset.get("status") or "ready")
+                    if status == "ready":
+                        asset["status"] = "editing"
                 if self._on_activity and should_wake("editor.activity"):
                     self._on_activity(self.draft.text, len(self.draft.assets))
                 return True
@@ -699,9 +746,14 @@ class V3Bridge:
                 if self._is_pc_editing():
                     await ws.send_json({"type": "error", "error": "pc_editing", "message": "电脑正在改字"})
                     return True
+                self._require_draft_identity(data)
                 if "text" in data or "revision" in data:
                     self._apply_draft_fields(data)
-                bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
+                try:
+                    bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
+                except ValueError as exc:
+                    await ws.send_json({"type": "error", "error": str(exc)})
+                    return True
                 self.last_bundle = bundle
                 public = {k: v for k, v in bundle.items() if k != "bytes_data"}
                 await ws.send_json({"type": "bundle.ready", "bundle": public})
@@ -712,18 +764,20 @@ class V3Bridge:
                     return True
                 session = self.auth.authorize(data["session_id"], data.get("token") or "", "insert")
                 self.auth.consume_nonce(session, str(data.get("nonce") or ""))
+                self._require_draft_identity(data)
                 if "text" in data or "revision" in data:
                     self._apply_draft_fields(data)
-                if self.last_bundle is None or int(self.last_bundle.get("revision") or -1) != self.draft.revision:
-                    self.last_bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
+                try:
+                    if self.last_bundle is None or int(self.last_bundle.get("revision") or -1) != self.draft.revision:
+                        self.last_bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
+                except ValueError as exc:
+                    await ws.send_json({"type": "error", "error": str(exc)})
+                    return True
                 frozen = dict(self.last_bundle)
                 status = {"result": "RUNNING"}
                 if self._on_intent:
                     status = self._on_intent(data, frozen) or status
                 await ws.send_json({"type": "attempt.status", **status})
-                event = status.get("phone_event") or self.last_phone_event
-                if event:
-                    await ws.send_json(event)
                 return True
             if kind == "capture.request":
                 try:

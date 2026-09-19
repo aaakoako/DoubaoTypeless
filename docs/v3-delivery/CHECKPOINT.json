@@ -2,50 +2,59 @@
   "schema_version": 1,
   "product_goal": "完整 V3 可发布候选。规范入口 docs/v3-product/MASTER_PLAN.md。",
   "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
-  "review_sha": "8326bb475707cc4d3f2948379b67a5397226709e",
-  "current_head": "69eb4f875be0fea1ab12cce7b1e0d36f40d81b34",
-  "working_tree": "clean after remaining-except-A18 commit",
-  "last_completed_slice": "REMAINING_EXCEPT_A18",
-  "active_slice": "A18_DEVICE_ONLY",
-  "next_action": "真机 Android+豆包 与真实 Cursor 仍只 BLOCKED_NATIVE。源码已变，隔离包哈希未重打。不要自签 RELEASE_READY。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
+  "review_sha": "c3333a55a516022397772eea932c8a21c7a26cd0",
+  "product_source_at_review": "69eb4f875be0fea1ab12cce7b1e0d36f40d81b34",
+  "current_head": "uncommitted-c3333a5-remediation",
+  "working_tree": "c3333a5 R01-R08 remediations + rebuilt windowed pack",
+  "last_completed_slice": "REVIEW_C3333A5_R01_R08",
+  "active_slice": "A18_DEVICE_AND_INDEPENDENT_SIGN",
+  "next_action": "真机 Android+豆包 与真实 Cursor 仍只 BLOCKED_NATIVE。独立复核再看本轮源码与新窗口包哈希。不要自签 RELEASE_READY。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
   "accepted_requirements": [
     "MASTER_PLAN 为唯一产品/执行规范",
     "插入并复制是主动作",
     "独立复核 REQUEST_CHANGES 必须重开对应 A 项",
     "开发缺陷不能全部记成真机或人类签署阻塞",
-    "不自动 merge/tag/Release"
+    "不自动 merge/tag/Release",
+    "本轮已修好的 CI/HUD滚动/逐图队列/具体安全修复不得回退"
   ],
   "open_defects": [
-    "A18 真机 Android+豆包 与真实 Cursor 仍缺设备"
+    "A18 真机 Android+豆包 与真实 Cursor 仍缺设备",
+    "独立视觉/包哈希人类签署仍未做",
+    "本机正在运行的控制台预览未替换为新窗口包"
   ],
-  "reopened_this_round": ["A01", "A02", "A04", "A05", "A06", "A07", "A08", "A10", "A11", "A12", "A15", "A17"],
-  "closed_this_round": ["A03", "A07", "A09", "A12", "A13", "A14", "A15"],
-  "remediated_findings": ["F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08", "F09", "F10-partial", "F11", "F12"],
+  "reopened_this_round": ["A02", "A04", "A05", "A06", "A07", "A09", "A10", "A12", "A14", "A17"],
+  "closed_this_round": ["R01", "R02", "R03", "R04", "R05", "R06", "R07", "R08-code"],
+  "kept_from_c3333a5": ["CI libEGL/windows-pytest", "HUD scroll+reserved bar", "image queue", "HTTP origin/host gates", "credential memory fallback"],
+  "remediated_findings": ["R01", "R02", "R03", "R04", "R05", "R06", "R07", "R08"],
   "environment_blockers": [
     {
       "missing": "真实 Android + 豆包输入法 + 同网手机浏览器",
-      "blocks": ["真机扫码/相册/白板手感"],
+      "blocks": ["真机扫码/相册/白板手感", "记住设备续接手感"],
       "who": "设备持有者"
     },
     {
       "missing": "真实 Cursor Composer 目标",
-      "blocks": ["J7 真目标图文"],
+      "blocks": ["J7 真目标图文", "observe_image 实测"],
       "who": "设备持有者；PasteTarget 不能代替"
     }
   ],
   "last_commands": [
-    {"cmd": "python -m pytest -q", "exit_code": 0, "output": "177 passed"},
-    {"cmd": "npm run typecheck && npm run build", "exit_code": 0, "output": "web built index-DjLoiJ-m.js"}
+    {"cmd": "python -m pytest -q", "exit_code": 0, "output": "191 passed"},
+    {"cmd": "npm run typecheck && npm run build", "exit_code": 0, "output": "web built index-Bv1K626-.js"},
+    {"cmd": "PyInstaller packaging/v3_preview_windowed.spec", "exit_code": 0, "output": "windowed onedir isolated"}
   ],
   "candidate_artifact": {
-    "source_sha": "69eb4f875be0fea1ab12cce7b1e0d36f40d81b34",
+    "source_sha": "pending-commit",
     "console_exe_sha256": "035fca0bc7945e45e2338c4ed481887e548b7aec09fbe4b3a8bd14542b1c0677",
-    "windowed_exe_sha256": "4bae6609e4b5af5e6c8508b774bb7b023b4c0462dd43625e95f96ee9617ae00f",
-    "note": "A03 包哈希仍绑旧窗口包。本切片改了源码和前端，未重打包。不是 RELEASE_READY。"
+    "windowed_exe_sha256": "5891472bb331b2e2bf15fc1057d3d62b6fe94f6ddf0c82d0754404c8288d4538",
+    "windowed_zip_sha256": "6fdc6137d0ef0e5c84ce09db0b02f7d46dd26b9c43bca5f3a047a8facce5e9cd",
+    "previous_windowed_exe_sha256": "4bae6609e4b5af5e6c8508b774bb7b023b4c0462dd43625e95f96ee9617ae00f",
+    "pack_path": "G:\\AgentStorage\\Deliveries\\v3-s5-windowed-c3333a5\\DoubaoTypelessV3PreviewUI\\DoubaoTypelessV3PreviewUI.exe",
+    "note": "本轮按当前源码重打无控制台候选，旧 4bae6609 不得沿用。不是 RELEASE_READY。"
   },
   "independent_review": {
     "status": "REQUEST_CHANGES",
-    "packet": "DoubaoTypeless_V3_Review_8326bb4",
+    "packet": "DoubaoTypeless_V3_Review_c3333a5",
     "release_ready": false
   },
   "published": false,

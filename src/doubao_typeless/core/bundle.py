@@ -64,9 +64,21 @@ def freeze_bundle(draft: Draft, *, bundle_id: str) -> dict[str, Any]:
         raise ValueError("more than six")
     if not text.strip() and not assets:
         raise ValueError("empty bundle")
+    for asset in assets:
+        status = str(asset.get("status") or "ready")
+        if status in {"queued", "editing", "failed", "dirty"}:
+            raise ValueError("IMAGE_EDITING")
     ids = [a["asset_id"] for a in assets]
     if len(ids) != len(set(ids)):
         raise ValueError("duplicate asset id")
+    captions = []
+    for index, asset in enumerate(assets, start=1):
+        caption = str(asset.get("caption") or "").strip()
+        if caption:
+            captions.append(f"图{index}：{caption}")
+    if captions:
+        extra = "\n".join(captions)
+        text = f"{text.rstrip()}\n\n{extra}" if text.strip() else extra
     if sum(int(a.get("bytes", 0)) for a in assets) > MAX_BUNDLE_IMAGE_BYTES:
         raise ValueError("total byte limit")
     bundle = {

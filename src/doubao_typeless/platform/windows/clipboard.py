@@ -18,12 +18,17 @@ KEYEVENTF_KEYUP = 0x0002
 
 
 def read_focus() -> tuple[str, str]:
+    class_name, title, _hwnd = read_focus_fp()
+    return class_name, title
+
+
+def read_focus_fp() -> tuple[str, str, int]:
     if sys.platform != "win32":
-        return ("", "")
+        return ("", "", 0)
     hwnd = win32gui.GetForegroundWindow()
     title = win32gui.GetWindowText(hwnd)
     class_name = win32gui.GetClassName(hwnd)
-    return class_name, title
+    return class_name, title, int(hwnd or 0)
 
 
 def send_paste() -> None:

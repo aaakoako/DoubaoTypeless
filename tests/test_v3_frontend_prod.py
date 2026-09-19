@@ -74,3 +74,56 @@ def test_production_frontend_syncs_text_without_extra_fields(tmp_path):
         assert "production frontend text" in bridge.draft.text
 
     asyncio.run(run())
+
+
+def test_production_page_reconnect_keeps_local_and_does_not_overwrite(tmp_path):
+    assert DIST.is_file(), "web/dist/index.html missing; CI/local must run npm run build first"
+    playwright = pytest.importorskip("playwright.async_api")
+
+    async def run():
+        auth = AuthService()
+        draft = Draft(str(uuid.uuid4()), "E-SERVER", 3, "pc", "服务器新稿")
+        bridge = V3Bridge(port=0, auth=auth, store=AssetStore(tmp_path / "assets"), draft=draft)
+        runner = AppRunner(bridge.make_app())
+        await runner.setup()
+        site = TCPSite(runner, "127.0.0.1", 0)
+        await site.start()
+        port = site._server.sockets[0].getsockname()[1]
+        try:
+            async with playwright.async_playwright() as p:
+                browser = await p.chromium.launch()
+                page = await browser.new_page()
+                await page.goto(f"http://127.0.0.1:{port}/")
+                await page.wait_for_selector("#pairCode", state="visible")
+                code = auth.new_pairing_challenge()
+                await page.fill("#pairCode", code)
+                await page.click("#pairGo")
+                await page.wait_for_function(
+                    "() => (document.getElementById('connText')||{}).textContent && document.getElementById('connText').textContent.indexOf('已连接') >= 0"
+                )
+                await page.evaluate(
+                    """() => {
+                      sessionStorage.setItem('dt.v3.draft', JSON.stringify({
+                        text: '离线旧稿A',
+                        revision: 10,
+                        draft_id: 'D-OLD',
+                        epoch: 'E-OLD',
+                        assets: []
+                      }));
+                    }"""
+                )
+                await page.reload()
+                await page.wait_for_function(
+                    "() => (document.getElementById('connText')||{}).textContent && document.getElementById('connText').textContent.indexOf('已连接') >= 0"
+                )
+                for _ in range(20):
+                    await asyncio.sleep(0.05)
+                local = await page.locator("#text").input_value()
+                await browser.close()
+        finally:
+            await runner.cleanup()
+        assert bridge.draft.text == "服务器新稿"
+        assert bridge.draft.epoch == "E-SERVER"
+        assert local == "离线旧稿A"
+
+    asyncio.run(run())

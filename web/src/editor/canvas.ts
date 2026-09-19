@@ -37,6 +37,7 @@ export class SharedEditor {
   private pinch: { dist: number; scale: number; x: number; y: number } | null = null;
   private bg: Konva.Image | null = null;
   private source = { w: 1600, h: 1000 };
+  private sourceUrl = "";
   cropTemp: Crop | null = null;
   private moving: { node: Konva.Node; x: number; y: number; px: number; py: number } | null = null;
 
@@ -70,6 +71,7 @@ export class SharedEditor {
 
   loadImage(src: string, w: number, h: number): void {
     this.source = { w, h };
+    this.sourceUrl = src;
     this.crop = { x: 0, y: 0, w, h };
     this.cropTemp = null;
     const host = this.stage.container();
@@ -436,7 +438,7 @@ export class SharedEditor {
       crop: this.crop,
       numbers: this.numbers,
       ops: this.ops,
-      source: this.source,
+      source: { ...this.source, url: this.sourceUrl },
       image: this.imageLayer.toJSON(),
       layer: this.layer.toJSON(),
     });
@@ -447,22 +449,43 @@ export class SharedEditor {
       crop: Crop;
       numbers: number;
       ops: number;
-      source: { w: number; h: number };
+      source: { w: number; h: number; url?: string };
       image: string;
       layer: string;
     };
-    this.source = snap.source;
+    this.source = { w: snap.source.w, h: snap.source.h };
     this.crop = snap.crop;
     this.numbers = snap.numbers;
     this.ops = snap.ops;
     this.imageLayer.destroy();
     this.layer.destroy();
-    this.imageLayer = Konva.Node.create(snap.image, this.stage.container());
-    this.layer = Konva.Node.create(snap.layer, this.stage.container());
+    this.imageLayer = Konva.Node.create(snap.image);
+    this.layer = Konva.Node.create(snap.layer);
     this.stage.add(this.imageLayer);
     this.stage.add(this.layer);
+    this.rebindSource(snap.source?.url || "");
     this.fit();
     this.stage.container().dataset.ready = "1";
+  }
+
+  rebindSource(src: string): void {
+    if (!src) return;
+    const image = new window.Image();
+    image.onload = () => {
+      const nodes = this.imageLayer.find("Image");
+      if (nodes.length) {
+        nodes.forEach((node) => {
+          (node as Konva.Image).image(image);
+        });
+      } else {
+        this.bg = new Konva.Image({ image, x: 0, y: 0, width: this.source.w, height: this.source.h });
+        this.imageLayer.destroyChildren();
+        this.imageLayer.add(this.bg);
+      }
+      this.imageLayer.draw();
+      this.stage.container().dataset.ready = "1";
+    };
+    image.src = src;
   }
 
   exportBlob(): Promise<Blob> {

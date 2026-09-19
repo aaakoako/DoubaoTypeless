@@ -89,6 +89,7 @@ class V3App:
             model=stored.get("byok_model") or "",
             extra_prompt=str(stored.get("byok_prompt") or ""),
             temperature=_optional_float(stored.get("byok_temperature")),
+            timeout=_optional_float(stored.get("byok_timeout")) or 8.0,
             post=_httpx_json_post,
         )
         self._last_suggestion = None
@@ -102,6 +103,7 @@ class V3App:
         self._recovery_needed = False
         self._saved_target: tuple[str, str] | None = None
         self._copied_text = ""
+        self._last_target_fp: tuple[str, str, int] | None = None
         self.review_editing = False
         self.phone_pending = None
         self.ui_hook = None
@@ -146,11 +148,33 @@ class V3App:
 
     def remember_connected(self) -> int:
         count = 0
+        loop = getattr(self, "_loop", None)
         for session in list(self.auth.sessions.values()):
             if time.time() > session.expires_at:
                 continue
-            self.auth.remember_device(session)
+            secret = self.auth.remember_device(session)
             count += 1
+            if secret and loop is not None:
+                asyncio.run_coroutine_threadsafe(
+                    self.bridge.send_to_session(
+                        session.session_id,
+                        {
+                            "type": "device.remembered",
+                            "device_id": session.device_id,
+                            "device_secret": secret,
+                        },
+                    ),
+                    loop,
+                )
+        return count
+
+    def forget_connected(self) -> int:
+        ids = {s.device_id for s in self.auth.sessions.values()}
+        ids.update(self.auth.trusted)
+        count = 0
+        for device_id in ids:
+            if self.auth.forget_device(device_id):
+                count += 1
         return count
 
     def _notify_ui(self, event: str, **kwargs) -> None:
@@ -235,6 +259,15 @@ class V3App:
             "asset_refs": refs if refs is not None else [a.get("asset_id") for a in self.draft.assets],
         }
         if assets is not None:
+            captions = data.get("captions")
+            statuses = data.get("asset_status")
+            if isinstance(captions, list):
+                for asset, caption in zip(assets, captions):
+                    asset["caption"] = str(caption or "")
+            if isinstance(statuses, list):
+                for asset, status in zip(assets, statuses):
+                    if status:
+                        asset["status"] = str(status)
             update["assets"] = assets
         apply_draft_update(self.draft, update)
         changed = (self.draft.text, self.draft.revision) != before
@@ -304,6 +337,9 @@ class V3App:
             referenced=True,
             owner_session_id=session.session_id,
         )
+        meta = dict(meta)
+        meta["status"] = "editing"
+        meta["role"] = "source"
         if self.review_editing:
             pending = dict(self.phone_pending or {})
             pending_assets = list(pending.get("assets") or [])
@@ -408,6 +444,16 @@ class V3App:
             _log("[v3.copy] 插入后保留剪贴板失败，稿未丢")
             self._notify_ui("copy_failed")
 
+    def _delivery_blocked(self, bundle: dict | None = None) -> str:
+        assets = (bundle or {}).get("assets") if bundle else self.draft.assets
+        for asset in assets or []:
+            status = str(asset.get("status") or "ready")
+            if status in {"queued", "editing", "failed", "dirty"}:
+                return "IMAGE_EDITING"
+            if asset.get("role") == "source" and status != "ready":
+                return "SOURCE_NOT_FINISHED"
+        return ""
+
     def _maybe_start_next_draft(self, bundle: dict, payload: dict) -> bool:
         result = payload.get("result")
         steps = payload.get("steps") or []
@@ -417,8 +463,13 @@ class V3App:
         )
         images = bundle.get("assets") or []
         if result == "CONFIRMED":
+            rotated = self.draft.epoch != bundle.get("epoch") or (not self.draft.text and not self.draft.assets)
+            if rotated:
+                self._notify_ui("new_draft")
+            return rotated
+        if images:
             return False
-        if result in {"UNKNOWN", "PARTIAL"} and not images and text_done:
+        if result in {"UNKNOWN", "PARTIAL"} and text_done:
             before = self.draft.epoch
             archive_if_match(
                 self.draft,
@@ -435,17 +486,21 @@ class V3App:
             return self.draft.epoch != before
         return False
 
-    def _phone_rotate_event(self, bundle: dict, rotated: bool) -> dict:
+    def _phone_rotate_event(self, bundle: dict, rotated: bool, result: str = "") -> dict:
+        archived = {
+            "draft_id": bundle.get("draft_id"),
+            "epoch": bundle.get("epoch"),
+            "revision": bundle.get("revision"),
+            "hash": bundle.get("manifest_hash"),
+            "text": bundle.get("text") or "",
+            "asset_refs": [a.get("asset_id") for a in (bundle.get("assets") or [])],
+            "result": result,
+        }
         return {
             "type": "draft.rotated",
-            "archived": {
-                "draft_id": bundle.get("draft_id"),
-                "epoch": bundle.get("epoch"),
-                "revision": bundle.get("revision"),
-                "hash": bundle.get("manifest_hash"),
-                "text": bundle.get("text") or "",
-                "asset_refs": [a.get("asset_id") for a in (bundle.get("assets") or [])],
-            } if rotated else None,
+            "rotated": rotated,
+            "result": result,
+            "archived": archived if rotated else None,
             "draft_id": self.draft.draft_id,
             "epoch": self.draft.epoch,
             "revision": self.draft.revision,
@@ -453,11 +508,17 @@ class V3App:
             "asset_refs": [a.get("asset_id") for a in self.draft.assets],
         }
 
+    def _publish_phone_event(self, event: dict) -> None:
+        self.bridge.last_phone_event = event
+        loop = getattr(self, "_loop", None)
+        if loop is not None:
+            asyncio.run_coroutine_threadsafe(self.bridge.publish_phone_event(event), loop)
+
     def _after_insert(self, bundle: dict, payload: dict) -> dict:
         self._keep_inserted_copy(bundle, payload)
         rotated = self._maybe_start_next_draft(bundle, payload)
-        event = self._phone_rotate_event(bundle, rotated)
-        self.bridge.last_phone_event = event
+        event = self._phone_rotate_event(bundle, rotated, str(payload.get("result") or ""))
+        self._publish_phone_event(event)
         payload = dict(payload)
         payload["phone_event"] = event
         self._notify_ui("hide_after_insert")
@@ -476,6 +537,12 @@ class V3App:
         if decision == "busy":
             return {"result": "BUSY", "error_code": "BUSY"}
         class_name, control = self._restore_external_target()
+        try:
+            from doubao_typeless.platform.windows.clipboard import read_focus_fp
+
+            self._last_target_fp = read_focus_fp()
+        except Exception:
+            self._last_target_fp = (class_name, control, 0)
         if is_own_window(class_name, control):
             self.ledger.finish(intent_id, "NO_STEPS")
             return {"result": "NO_STEPS", "error_code": "OWN_WINDOW"}
@@ -526,7 +593,15 @@ class V3App:
     def insert_current(self) -> dict | None:
         if not (self.draft.text or self.draft.assets):
             return None
-        bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
+        blocked = self._delivery_blocked()
+        if blocked:
+            return {"result": "NO_STEPS", "error_code": blocked}
+        try:
+            bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
+        except ValueError as exc:
+            if str(exc) == "IMAGE_EDITING":
+                return {"result": "NO_STEPS", "error_code": "IMAGE_EDITING"}
+            raise
         self.bridge.last_bundle = bundle
         intent = self._session_intent("insert_current")
         return self.deliver_and_finish(intent, bundle)
@@ -557,39 +632,58 @@ class V3App:
         return out
 
     def suggest_text(self, text: str) -> dict:
-        out = self.byok.polish(
-            text,
-            draft_id=self.draft.draft_id,
-            revision=self.draft.revision,
-            current_draft_id=self.draft.draft_id,
-            current_revision=self.draft.revision,
-        )
-        suggested = out.get("text") if out.get("status") == "ok" else None
-        self._last_suggestion = {
+        bound = {
             "original": text,
-            "suggested": suggested,
             "draft_id": self.draft.draft_id,
             "epoch": self.draft.epoch,
             "revision": self.draft.revision,
-            **out,
         }
+        out = self.byok.polish(
+            text,
+            draft_id=bound["draft_id"],
+            revision=bound["revision"],
+            current_draft_id=bound["draft_id"],
+            current_revision=bound["revision"],
+        )
+        live_match = (
+            self.draft.draft_id == bound["draft_id"]
+            and self.draft.epoch == bound["epoch"]
+            and self.draft.revision == bound["revision"]
+            and self.draft.text == bound["original"]
+        )
+        if not live_match:
+            out = {**out, "status": "stale", "reason": "draft moved after response", "text": None}
+        suggested = out.get("text") if out.get("status") == "ok" else None
+        self._last_suggestion = {**bound, "suggested": suggested, **out}
         return self._last_suggestion
 
     def apply_suggestion(self) -> bool:
         last = self._last_suggestion or {}
         if not last.get("suggested"):
             return False
-        if last.get("draft_id") != self.draft.draft_id or last.get("epoch") != self.draft.epoch:
+        if (
+            last.get("draft_id") != self.draft.draft_id
+            or last.get("epoch") != self.draft.epoch
+            or last.get("revision") != self.draft.revision
+            or last.get("original") != self.draft.text
+        ):
             return False
         last["before_apply"] = self.draft.text
         self.draft.text = str(last["suggested"])
         self.draft.revision += 1
+        last["after_revision"] = self.draft.revision
         self._save_draft()
         return True
 
     def reject_suggestion(self) -> None:
         last = self._last_suggestion or {}
-        if last.get("before_apply") is not None and last.get("draft_id") == self.draft.draft_id:
+        if (
+            last.get("before_apply") is not None
+            and last.get("draft_id") == self.draft.draft_id
+            and last.get("epoch") == self.draft.epoch
+            and last.get("after_revision") == self.draft.revision
+            and self.draft.text == last.get("suggested")
+        ):
             self.draft.text = str(last["before_apply"])
             self.draft.revision += 1
             self._save_draft()
@@ -636,9 +730,16 @@ class V3App:
             images_total = len(bundle.get("assets") or [])
             images_obs = sum(1 for s in self._last_attempt.steps if s.kind == "image" and s.state == "observed")
             text_sent = any(s.kind == "text" for s in self._last_attempt.steps)
+            try:
+                from doubao_typeless.platform.windows.clipboard import read_focus_fp
+
+                current_fp = read_focus_fp()
+            except Exception:
+                current_fp = ("", "", 0)
+            same_target = bool(self._last_target_fp and current_fp == self._last_target_fp)
             plan = plan_retry(
                 previous_result=self._last_attempt.result,
-                same_target=True,
+                same_target=same_target,
                 images_observed=images_obs,
                 images_total=images_total,
                 text_sent=text_sent,
@@ -705,6 +806,9 @@ class V3App:
             return
         session = granted[-1]
         meta = self._on_capture(f"region:{x},{y},{w},{h}", str(uuid.uuid4()), session)
+        if isinstance(meta, dict):
+            meta["status"] = "ready"
+            meta["role"] = "screenshot"
         _log(f"[v3.capture] region {meta.get('width')}x{meta.get('height')}")
 
     def _acquire_instance_lock(self) -> None:

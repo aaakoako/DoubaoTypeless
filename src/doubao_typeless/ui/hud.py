@@ -125,6 +125,13 @@ class HudController:
         self._timer = QTimer()
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self.hide)
+        try:
+            self._body.selectionChanged.connect(self._pause_or_resume_idle)
+            bar = self._body.verticalScrollBar()
+            if bar is not None:
+                bar.valueChanged.connect(lambda _v: self._pause_or_resume_idle())
+        except Exception:
+            pass
 
     def show_receiving(self, text: str, image_count: int = 0) -> None:
         self.text = text
@@ -180,11 +187,46 @@ class HudController:
         except Exception:
             return max(40, 21 * max(1, (len(text) + 19) // 20))
 
+    def _reading(self) -> bool:
+        if self._body is None:
+            return False
+        try:
+            if self._body.textCursor().hasSelection():
+                return True
+            bar = self._body.verticalScrollBar()
+            if bar is not None and bar.maximum() > 0 and bar.value() < max(0, bar.maximum() - 4):
+                return True
+        except Exception:
+            return False
+        return False
+
+    def _pause_or_resume_idle(self) -> None:
+        if self._timer is None:
+            return
+        if self._reading():
+            self._timer.stop()
+            return
+        self._timer.start(TOKENS["idle_ms"])
+
     def _apply_show(self) -> None:
         if self._widget is None:
             return
         body = self.text if self.text else (f"{self.image_count} 图" if self.image_count else "")
+        keep_scroll = False
+        scroll_pos = 0
+        try:
+            bar = self._body.verticalScrollBar()
+            if bar is not None and bar.maximum() > 0 and bar.value() < max(0, bar.maximum() - 4):
+                keep_scroll = True
+                scroll_pos = bar.value()
+        except Exception:
+            keep_scroll = False
         self._body.setPlainText(body)
+        if keep_scroll:
+            try:
+                self._body.verticalScrollBar().setValue(scroll_pos)
+            except Exception:
+                pass
         chrome = self._chrome_height()
         max_h = self._max_height()
         doc_h = self._text_height(body)
@@ -202,7 +244,10 @@ class HudController:
             pass
         self._widget.show()
         if self._timer:
-            self._timer.start(TOKENS["idle_ms"])
+            if self._reading():
+                self._timer.stop()
+            else:
+                self._timer.start(TOKENS["idle_ms"])
 
     def hide(self) -> None:
         self.visible = False

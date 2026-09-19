@@ -49,12 +49,14 @@ class ByokService:
         model: str = "",
         extra_prompt: str = "",
         temperature: float | None = None,
-        post: Callable[[str, dict[str, Any], dict[str, str]], dict[str, Any]] | None = None,
+        timeout: float = 8.0,
+        post: Callable[..., dict[str, Any]] | None = None,
     ):
         self.endpoint = (endpoint or "").strip()
         self.api_key = (api_key or "").strip()
         self.model = (model or "").strip()
         self.temperature = temperature
+        self.timeout = float(timeout or 8.0)
         self.extra_prompt = (extra_prompt or "").strip()
         self._post = post
 
@@ -89,11 +91,16 @@ class ByokService:
             }
             if self.temperature is not None:
                 payload["temperature"] = self.temperature
-            body = self._post(
-                chat_url(self.endpoint),
-                payload,
-                {"Authorization": f"Bearer {self.api_key}"},
-            )
+            headers = {"Authorization": f"Bearer {self.api_key}"}
+            try:
+                body = self._post(
+                    chat_url(self.endpoint),
+                    payload,
+                    headers,
+                    timeout=self.timeout,
+                )
+            except TypeError:
+                body = self._post(chat_url(self.endpoint), payload, headers)
         except Exception as exc:
             reason = classify_api_error(exc, self.api_key)
             return {

@@ -7,7 +7,8 @@
 | 包 | 控制台 | EXE SHA256 | ZIP SHA256 |
 |---|---|---|---|
 | DoubaoTypelessV3Preview | 有 | `035fca0bc7945e45e2338c4ed481887e548b7aec09fbe4b3a8bd14542b1c0677` | `53bda5fb1c7a8f3a2bda3071f409e6e48d13c880d7bc0b12d2a9088ebe5db21a` |
-| DoubaoTypelessV3PreviewUI | 无 | `4bae6609e4b5af5e6c8508b774bb7b023b4c0462dd43625e95f96ee9617ae00f` | `f23be749dbc35c89e7e8f5a909c1f041ac33e0ffbd48ed691262336d853181df` |
+| DoubaoTypelessV3PreviewUI（本轮） | 无 | `5891472bb331b2e2bf15fc1057d3d62b6fe94f6ddf0c82d0754404c8288d4538` | `6fdc6137d0ef0e5c84ce09db0b02f7d46dd26b9c43bca5f3a047a8facce5e9cd` |
+| DoubaoTypelessV3PreviewUI（旧 A03，不得沿用） | 无 | `4bae6609e4b5af5e6c8508b774bb7b023b4c0462dd43625e95f96ee9617ae00f` | `f23be749dbc35c89e7e8f5a909c1f041ac33e0ffbd48ed691262336d853181df` |
 
 两份包都未签名，不是 GitHub Release，源码 SHA 不等于包哈希。
 

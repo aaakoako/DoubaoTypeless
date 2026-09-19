@@ -224,6 +224,14 @@ class ReviewPanel:
         row.addWidget(copy)
         row.addWidget(insert)
         layout.addLayout(row)
+        self.btn_use_phone = use_phone
+        self.btn_keep = keep
+        self.btn_apply = apply_s
+        self.btn_reject = reject_s
+        use_phone.hide()
+        keep.hide()
+        apply_s.hide()
+        reject_s.hide()
         self.widget = w
         from PySide6.QtCore import QEvent, QObject
 
@@ -242,6 +250,15 @@ class ReviewPanel:
         self._editing = True
         self.app.review_editing = True
 
+    def _sync_buttons(self) -> None:
+        pending = bool(self.app.phone_pending)
+        self.btn_use_phone.setVisible(pending)
+        self.btn_keep.setVisible(pending)
+        last = getattr(self.app, "_last_suggestion", None) or {}
+        has = bool(last.get("suggested"))
+        self.btn_apply.setVisible(has)
+        self.btn_reject.setVisible(has)
+
     def reload(self) -> None:
         self._editing = False
         self.app.review_editing = False
@@ -250,6 +267,7 @@ class ReviewPanel:
         self.editor.setPlainText(self.app.draft.text or "")
         self.editor.blockSignals(False)
         self._refresh_images()
+        self._sync_buttons()
 
     def note_phone_pending(self) -> None:
         if not self._editing:
@@ -257,6 +275,7 @@ class ReviewPanel:
             return
         self.banner.setText("手机有更新。采用手机版或保留电脑稿，插入时冻结当前这一版。")
         self.banner.show()
+        self._sync_buttons()
 
     def take_phone(self) -> None:
         self.app.accept_phone_pending()
@@ -349,7 +368,7 @@ class ReviewPanel:
             try:
                 from PySide6.QtCore import QTimer
 
-                QTimer.singleShot(0, apply)
+                QTimer.singleShot(0, self.widget, apply)
             except Exception:
                 apply()
 
@@ -366,11 +385,16 @@ class ReviewPanel:
         self.editor.blockSignals(False)
         self.banner.setText("已采用建议，可再点不用建议前的稿已替换")
         self.banner.show()
+        self._sync_buttons()
 
     def reject_rewrite(self) -> None:
         self.app.reject_suggestion()
+        self.editor.blockSignals(True)
+        self.editor.setPlainText(self.app.draft.text)
+        self.editor.blockSignals(False)
         self.banner.setText("已不用这次建议，原文未改")
         self.banner.show()
+        self._sync_buttons()
 
     def check_terms(self) -> None:
         from doubao_typeless.services.terms import hints
@@ -749,6 +773,8 @@ class ClientWindow:
 
     def _toggle_remember(self) -> None:
         if not self.remember_box.isChecked():
+            count = self.app.forget_connected()
+            self.device_box.setText(f"已忘记 {count} 台设备，下次需要重新配对。")
             return
         count = self.app.remember_connected()
         self.device_box.setText(
@@ -884,6 +910,7 @@ class ClientWindow:
         from doubao_typeless.app import _optional_float
 
         self.app.byok.temperature = _optional_float(stored["byok_temperature"])
+        self.app.byok.timeout = _optional_float(stored.get("byok_timeout")) or 8.0
         failures = self.app.apply_hotkeys(
             stored["hotkey_insert"],
             stored["hotkey_recall"],
@@ -917,12 +944,27 @@ class ClientWindow:
             if key == (stored.get("byok_api_key") or ""):
                 self.byok_status.setText("换了服务地址，请重新填写并批准密钥后再测试")
                 return
-        from doubao_typeless.app import _httpx_json_post
+        from doubao_typeless.app import _httpx_json_post, _optional_float
+        import threading
 
-        svc = ByokService(endpoint=endpoint, api_key=key, model=model, post=_httpx_json_post)
-        out = svc.polish("ping", draft_id="probe", revision=1, current_draft_id="probe", current_revision=1)
-        used = out.get("model") or model
-        self.byok_status.setText(f"{out.get('message') or out.get('status') or ''}  model={used}")
+        timeout = _optional_float(self.byok_timeout.text()) or 8.0
+        svc = ByokService(endpoint=endpoint, api_key=key, model=model, timeout=timeout, post=_httpx_json_post)
+        self.byok_status.setText("正在测试连接…")
+        host = self.widget
+
+        def work() -> None:
+            out = svc.polish("ping", draft_id="probe", revision=1, current_draft_id="probe", current_revision=1)
+            used = out.get("model") or model
+            def apply() -> None:
+                self.byok_status.setText(f"{out.get('message') or out.get('status') or ''}  model={used}")
+            try:
+                from PySide6.QtCore import QTimer
+
+                QTimer.singleShot(0, host, apply)
+            except Exception:
+                apply()
+
+        threading.Thread(target=work, daemon=True).start()
 
     def _selected_bundle(self):
         from PySide6.QtCore import Qt

@@ -26,6 +26,8 @@ def test_windows_pack_ci_installs_qrcode_and_httpx():
     pack_block = text.split("Install pack dependencies", 1)[1]
     assert "qrcode" in pack_block
     assert "httpx" in pack_block
+    needs = text.split("windows-min-pack:", 1)[1].split("steps:", 1)[0]
+    assert "windows-pytest" in needs
 
 
 def test_product_entry_preview_uses_run_v3_and_src_path():
