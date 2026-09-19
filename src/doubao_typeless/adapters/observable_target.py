@@ -48,6 +48,7 @@ class FileTargetObserver:
 
 def from_env() -> FileTargetObserver | None:
     raw = os.environ.get("DT_V3_TARGET_STATE", "").strip()
-    if not raw:
+    allow = os.environ.get("DT_V3_ALLOW_FILE_OBSERVER", "").strip().lower() in {"1", "true", "yes"}
+    if not raw or not allow:
         return None
     return FileTargetObserver(Path(raw))

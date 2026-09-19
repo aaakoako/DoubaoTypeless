@@ -175,6 +175,7 @@ def main() -> int:
     os.environ["PYTHONPATH"] = str(ROOT / "src")
     state_path = isolated / "target-state.json"
     os.environ["DT_V3_TARGET_STATE"] = str(state_path)
+    os.environ["DT_V3_ALLOW_FILE_OBSERVER"] = "1"
 
     events: list[str] = []
     png_a = make_png((212, 82, 67), "IMG1")

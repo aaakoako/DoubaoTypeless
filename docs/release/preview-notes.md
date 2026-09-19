@@ -1,10 +1,10 @@
 # Pocket Composer v3 工程预览说明
 
-这是隔离分支 `v3/00-baseline` 上的工程预览，**不是稳定日用替换**，**桌面产品交付尚未完成**。没有自动 merge、没有 v* tag、没有 GitHub Release。
+这是隔离分支 `v3/00-baseline` 上的 V3 预览候选，**不是稳定日用替换**。没有自动 merge、没有 v* tag、没有 GitHub Release，也不是 `RELEASE_READY`。
 
-不要把当前包描述成“只剩用户核查或独立审阅”。
+入门、迁移/回退和审批对象见仓库 `docs/evidence/v3-s5-pack/`。独立复核不能自签通过。
 
-校验值见同目录 `checksums.txt`。可执行文件哈希必须与该文件一致，才能把这次试用对应到固定源码。
+校验值见同目录 `checksums.txt` 或 `docs/evidence/v3-s5-pack/pack.json`。可执行文件哈希必须与记录一致，才能把这次试用对应到固定源码。
 
 ## 试用
 
@@ -15,7 +15,7 @@
 5. 空闲无输入浮窗。需要时点「展开」改字，或用「当前图文」。`Alt+I` 插入，`Alt+Shift+I` 召回。语法合法不等于注册成功。
 6. 关闭连接窗口会收到托盘，连接保持。托盘「退出」才结束进程。再双击 EXE 应唤起已有窗口，不启动第二套服务。
 7. 回退：继续使用原来的 `python main.py` 日用入口，不要把 preview 数据拷进日用目录。
-8. 本预览包仍带控制台，便于启动失败时对照文件日志；**只把 console 改成 False 不算修复**。日志在隔离数据目录 `logs/v3.log`。
+8. 控制台包与无控制台包分开命名（`DoubaoTypelessV3Preview` / `DoubaoTypelessV3PreviewUI`）。**只把 console 改成 False 不算修复**。日志在隔离数据目录 `logs/v3.log`。
 
 ## 需求追溯
 

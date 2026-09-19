@@ -6,8 +6,8 @@
 
 | 包 | 控制台 | EXE SHA256 | ZIP SHA256 |
 |---|---|---|---|
-| DoubaoTypelessV3Preview | 有 | `1bf29ff452495c3a1f3b0483834a3706b078e0019472ad83b522c586885a5f39` | `2a08aba77fa460966654eea52eeca9785567f060fa564adc5eccd145e45cfa6d` |
-| DoubaoTypelessV3PreviewUI | 无 | `f9d1fae52516368183cd451c05ebc9fec357131a78eac0b171401cbf2057b976` | `710714ef365e5ad6229faefadf3737886a3071a193a22ba6164f3b0d5d91b3de` |
+| DoubaoTypelessV3Preview | 有 | `fd06cfd510ea23ebb1a4c4f9051b87da8422252f5b3f86724d93df766c96f084` | `0ca992fe494c61791fa9415d9866ddd8fdb1b24076c0b2ae3cec9a9bb568a7b6` |
+| DoubaoTypelessV3PreviewUI | 无 | `42dc749286afb551457abebe60aa2aafe20f3f3455a552393318a493d09063ba` | `6e4bd1f5f41c0994d1d45ad8d768aeb727834fdeb56132234247f5ba55cfcf77` |
 
 两份包都未签名，不是 GitHub Release，源码 SHA 不等于包哈希。
 
@@ -19,7 +19,9 @@
 - 配对长码进 QR，短码备用
 - 素材所有权绑定会话
 - 预览管道/数据目录/自启动名与日用 `DoubaoTypeless` 隔离
-- pytest 140 passed（本切片）
+- 检查更新只打开公开下载页，不自动替换
+- 日用词库只读导入；`DT_V3_TARGET_STATE` 单独存在不能当正式确认
+- pytest 以 CHECKPOINT 记录为准
 
 ## 不能自称通过
 

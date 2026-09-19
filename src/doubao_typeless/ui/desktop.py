@@ -305,6 +305,11 @@ class ClientWindow:
         connect = QWidget()
         cl = QVBoxLayout(connect)
         cl.addWidget(QLabel("让手机成为更顺手的输入工具。"))
+        from doubao_typeless.services.v3_update import preview_version_label
+
+        version = QLabel(preview_version_label())
+        version.setObjectName("muted")
+        cl.addWidget(version)
         card = QFrame()
         card.setObjectName("card")
         card_l = QHBoxLayout(card)
@@ -390,6 +395,13 @@ class ClientWindow:
         sl.addRow("Base URL", self.byok_endpoint)
         sl.addRow("API Key", self.byok_key)
         sl.addRow("模型 ID", self.byok_model)
+        from doubao_typeless.services.byok import url_join_note
+
+        self.byok_url_note = QLabel(url_join_note(self.byok_endpoint.text()))
+        self.byok_url_note.setObjectName("muted")
+        self.byok_url_note.setWordWrap(True)
+        self.byok_endpoint.textChanged.connect(lambda t: self.byok_url_note.setText(url_join_note(t)))
+        sl.addRow(self.byok_url_note)
         self.byok_status = QLabel("")
         self.byok_status.setObjectName("muted")
         sl.addRow(self.byok_status)
@@ -405,11 +417,19 @@ class ClientWindow:
         export = QPushButton("导出诊断")
         export.setObjectName("ghost")
         export.clicked.connect(self.export_diagnostics)
+        import_vocab = QPushButton("导入日用词库")
+        import_vocab.setObjectName("ghost")
+        import_vocab.clicked.connect(self.import_daily_vocab)
+        update = QPushButton("检查更新")
+        update.setObjectName("ghost")
+        update.clicked.connect(self.check_update)
         save = QPushButton("保存设置")
         save.setObjectName("primary")
         save.clicked.connect(self.save_settings)
         srow.addWidget(probe)
         srow.addWidget(export)
+        srow.addWidget(import_vocab)
+        srow.addWidget(update)
         srow.addWidget(save)
         sl.addRow(srow)
         settings_scroll = QScrollArea()
@@ -473,15 +493,53 @@ class ClientWindow:
     def show_help(self) -> None:
         from PySide6.QtWidgets import QMessageBox
 
+        from doubao_typeless.services.v3_update import preview_version_label
+
         log = self.app.data_dir / "logs" / "v3.log"
         QMessageBox.information(
             self.widget,
             "帮助与诊断",
-            "1. 手机浏览器打开上面的地址或扫码。\n"
-            "2. 电脑点允许插入后，手机说话，电脑点目标再按 Alt+I 插入并复制。\n"
-            "3. 不要改 JSON、不要设环境变量、不必打开 pc.html。\n"
+            f"{preview_version_label()}\n\n"
+            "1. 手机浏览器扫码或打开窗口里的地址。\n"
+            "2. 电脑批准插入后，点外部目标，再按「插入并复制」或 Alt+I。\n"
+            "3. 不要改 JSON、不要设环境变量、不必打开 pc.html、不必读 pair.txt。\n"
+            "4. 检查更新只打开公开下载页，不会覆盖日用安装。\n"
             f"日志：{log}",
         )
+
+    def check_update(self) -> None:
+        import webbrowser
+
+        from PySide6.QtWidgets import QMessageBox
+
+        from doubao_typeless.services.v3_update import DOWNLOAD_PAGE, check_preview_update
+
+        info = check_preview_update()
+        QMessageBox.information(self.widget, "检查更新", info["message"])
+        webbrowser.open(DOWNLOAD_PAGE)
+
+    def import_daily_vocab(self) -> None:
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+
+        from doubao_typeless.storage.vocab_store import daily_vocab_candidates, import_vocab_preview, inspect_vocab_file
+
+        source = next((path for path in daily_vocab_candidates() if path.is_file()), None)
+        if source is None:
+            picked, _ok = QFileDialog.getOpenFileName(self.widget, "选择只读词库", "", "Text (*.txt);;All (*)")
+            if not picked:
+                return
+            source = Path(picked)
+        info = inspect_vocab_file(source)
+        reply = QMessageBox.question(
+            self.widget,
+            "导入日用词库",
+            f"从 {info['path']} 复制 {info['mappings']} 条到本预览词库。\n不会改源文件，也不会写日用 config.json。",
+        )
+        if reply != QMessageBox.Yes:
+            return
+        result = import_vocab_preview(self.app.data_dir, source)
+        self.vocab.setPlainText(load_vocab(self.app.data_dir))
+        self.byok_status.setText(f"已复制 {result['imported']} 条新词到预览词库")
 
     def hide_to_tray(self) -> None:
         stored = load_settings(self.app.data_dir)
@@ -604,12 +662,16 @@ class ClientWindow:
         self.app.byok.endpoint = stored["byok_endpoint"]
         self.app.byok.api_key = stored["byok_api_key"]
         self.app.byok.model = stored["byok_model"]
+        failures = self.app.apply_hotkeys(stored["hotkey_insert"], stored["hotkey_recall"])
         ok, err = apply_v3_autostart(bool(stored["autostart"]))
         if stored["autostart"] and not ok:
             self.byok_status.setText(f"设置已保存。开机自启未写入：{err}")
             self.byok_status.setObjectName("error")
+        elif failures:
+            self.byok_status.setText("已保存。热键注册失败，请改键。不会把语法合法当成成功。")
+            self.byok_status.setObjectName("error")
         else:
-            self.byok_status.setText("已保存。热键改动下次启动生效；失败请改键。")
+            self.byok_status.setText("已保存。热键已按新组合重新注册。")
             self.byok_status.setObjectName("muted")
 
     def probe_byok(self) -> None:

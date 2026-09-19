@@ -589,6 +589,20 @@ class V3App:
         self._loop = loop
         return loop
 
+    def apply_hotkeys(self, insert: str, recall: str) -> list[str]:
+        self._stop_hotkeys()
+        from doubao_typeless.platform.windows.hotkeys import start_hotkeys
+
+        start = start_hotkeys(
+            on_insert=self.insert_current,
+            on_recall=self.recall_last,
+            on_region=self.capture_region,
+            insert_combo=insert or "<alt>+i",
+            recall_combo=recall or "<alt>+<shift>+i",
+        )
+        self._hotkeys = start
+        return list(start.get("failures") or [])
+
     def _stop_hotkeys(self) -> None:
         hotkeys = getattr(self, "_hotkeys", None) or {}
         for key in ("listener", "release"):

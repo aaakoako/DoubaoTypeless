@@ -251,6 +251,7 @@ def main() -> int:
     iso.mkdir(parents=True, exist_ok=True)
     os.environ["DT_V3_DATA_DIR"] = str(iso / "data")
     os.environ["DT_V3_TARGET_STATE"] = str(iso / "target.json")
+    os.environ["DT_V3_ALLOW_FILE_OBSERVER"] = "1"
     os.environ["DT_V3_CHUNK_SIZE"] = os.environ.get("DT_V3_CHUNK_SIZE") or "4096"
     state_path = iso / "target.json"
     source = make_source(iso / "s2-source.png")

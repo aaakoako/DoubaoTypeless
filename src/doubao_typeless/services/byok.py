@@ -14,6 +14,12 @@ def chat_url(endpoint: str) -> str:
     return url + "/chat/completions"
 
 
+def url_join_note(endpoint: str) -> str:
+    if not (endpoint or "").strip():
+        return "已含 /chat/completions 的完整地址不会再拼接。"
+    return f"实际请求 {chat_url(endpoint)}"
+
+
 def extract_model_text(body: dict[str, Any], original: str) -> str:
     if not isinstance(body, dict):
         return ""

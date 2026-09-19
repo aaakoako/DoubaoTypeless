@@ -214,6 +214,7 @@ def main() -> int:
     iso.mkdir(parents=True, exist_ok=True)
     os.environ["DT_V3_DATA_DIR"] = str(iso / "data")
     os.environ["DT_V3_TARGET_STATE"] = str(iso / "target.json")
+    os.environ["DT_V3_ALLOW_FILE_OBSERVER"] = "1"
     state_path = iso / "target.json"
     target = subprocess.Popen([sys.executable, str(ROOT / "tools" / "v3_s2_paste_target.py"), str(state_path)])
     time.sleep(0.8)

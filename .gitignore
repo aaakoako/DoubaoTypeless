@@ -51,6 +51,7 @@ docs/evidence/v3-s5/data/
 docs/evidence/v3-s5-pack/dist/
 docs/evidence/v3-s5-pack/smoke-data/
 docs/evidence/v3-s5-pack/smoke-data-ui/
+docs/evidence/v3-s5-pack/smoke-data-review/
 docs/evidence/v3-s5-pack/*.zip
 opus.dll
 *.spec.bak
