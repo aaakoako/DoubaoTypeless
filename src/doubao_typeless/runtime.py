@@ -8,6 +8,15 @@ from pathlib import Path
 PREVIEW_NAME = "preview-v3"
 
 
+def daily_use_config_candidates() -> list[Path]:
+    out: list[Path] = []
+    for env in ("APPDATA", "LOCALAPPDATA"):
+        base = os.environ.get(env)
+        if base:
+            out.append(Path(base) / "DoubaoTypeless" / "config.json")
+    return out
+
+
 def v3_data_dir() -> Path:
     override = os.environ.get("DT_V3_DATA_DIR", "").strip()
     if override:
@@ -19,10 +28,10 @@ def v3_data_dir() -> Path:
 
 
 def pick_port(preferred: int = 8766) -> int:
-    for port in range(preferred, preferred + 8):
+    for port in range(preferred, preferred + 16):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            sock.bind(("127.0.0.1", port))
+            sock.bind(("0.0.0.0", port))
         except OSError:
             continue
         else:

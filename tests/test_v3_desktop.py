@@ -138,20 +138,24 @@ def test_pause_blocks_draft_without_dropping_text(tmp_path):
 
 
 @pytest.mark.skipif(not HAS_PYSIDE, reason="PySide6 not installed")
-def test_wake_pipe_is_preview_specific_and_false_without_server():
+def test_wake_pipe_is_preview_specific_and_false_without_server(monkeypatch):
     from PySide6.QtNetwork import QLocalServer, QLocalSocket
-    from doubao_typeless.ui.single_instance import PIPE, request_quit, request_show
-    from doubao_typeless.ui.v3_startup import V3_RUN_NAME
+    from doubao_typeless.ui.single_instance import PIPE, pipe_name, request_quit, request_show
+    from doubao_typeless.ui.v3_startup import DAILY_RUN_NAME, V3_RUN_NAME
 
+    monkeypatch.setenv("DT_V3_PIPE", "DoubaoTypelessV3Preview-test-wake")
+    isolated = pipe_name()
     assert PIPE == "DoubaoTypelessV3Preview"
+    assert isolated == "DoubaoTypelessV3Preview-test-wake"
+    assert isolated != PIPE
     assert V3_RUN_NAME == "DoubaoTypelessV3Preview"
-    assert V3_RUN_NAME != "DoubaoTypeless"
+    assert V3_RUN_NAME != DAILY_RUN_NAME
     _qt_app()
     probe = QLocalSocket()
-    probe.connectToServer(PIPE)
+    probe.connectToServer(isolated)
     if probe.waitForConnected(80):
         probe.disconnectFromServer()
-        pytest.skip("live preview instance owns the pipe; do not poke it")
-    QLocalServer.removeServer(PIPE)
+        pytest.skip("unexpected occupant on the isolated test pipe")
+    QLocalServer.removeServer(isolated)
     assert request_show() is False
     assert request_quit() is False

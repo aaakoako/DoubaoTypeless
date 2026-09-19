@@ -17,7 +17,7 @@ def main():
     draw.rounded_rectangle(
         [pad, pad, size - pad, size - pad],
         radius=48,
-        fill=(51, 112, 255, 255),
+        fill=(22, 125, 113, 255),
     )
     try:
         font = ImageFont.truetype("segoeui.ttf", 100)

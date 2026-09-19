@@ -1,7 +1,14 @@
 """Wake or stop the running desktop client. Same process never starts a second service."""
 from __future__ import annotations
 
+import os
+
 PIPE = "DoubaoTypelessV3Preview"
+
+
+def pipe_name() -> str:
+    override = os.environ.get("DT_V3_PIPE", "").strip()
+    return override or PIPE
 
 
 def request_command(command: str, timeout_ms: int = 800) -> bool:
@@ -10,7 +17,7 @@ def request_command(command: str, timeout_ms: int = 800) -> bool:
     except ImportError:
         return False
     sock = QLocalSocket()
-    sock.connectToServer(PIPE)
+    sock.connectToServer(pipe_name())
     if not sock.waitForConnected(timeout_ms):
         sock.close()
         return False
@@ -34,9 +41,10 @@ def listen_for_commands(on_command, parent=None):
         from PySide6.QtNetwork import QLocalServer
     except ImportError:
         return None
-    QLocalServer.removeServer(PIPE)
+    name = pipe_name()
+    QLocalServer.removeServer(name)
     server = QLocalServer(parent)
-    if not server.listen(PIPE):
+    if not server.listen(name):
         return None
 
     def _incoming():

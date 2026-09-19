@@ -160,7 +160,7 @@ def test_pick_port_skips_occupied_without_killing():
     import socket
 
     blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    blocker.bind(("127.0.0.1", 0))
+    blocker.bind(("0.0.0.0", 0))
     occupied = blocker.getsockname()[1]
     try:
         chosen = pick_port(occupied)

@@ -48,6 +48,9 @@ docs/evidence/v3-ci/junit.xml
 docs/evidence/v3-idle/data/
 docs/evidence/v3-s4/data/
 docs/evidence/v3-s5/data/
+docs/evidence/v3-s5-pack/dist/
+docs/evidence/v3-s5-pack/smoke-data/
+docs/evidence/v3-s5-pack/*.zip
 opus.dll
 *.spec.bak
 _DoubaoTypeless_update.bat

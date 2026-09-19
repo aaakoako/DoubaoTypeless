@@ -30,6 +30,21 @@ TOKENS = {
     "danger": "#B42318",
 }
 
+RESULT_LABELS = {
+    "CONFIRMED": "已插入",
+    "UNKNOWN": "上次结果未知",
+    "PARTIAL": "只完成一部分",
+    "NO_STEPS": "没有贴出",
+    "CANCELLED": "已取消",
+    "BUSY": "正忙",
+}
+
+
+def _result_label(code: object) -> str:
+    if not code:
+        return "未记录"
+    return RESULT_LABELS.get(str(code), str(code))
+
 STYLESHEET = f"""
 QWidget {{ background: {TOKENS['surface']}; color: {TOKENS['ink']}; font-size: 13px; font-family: "Microsoft YaHei UI","Microsoft YaHei","Segoe UI"; }}
 QTabWidget::pane {{ border: 0; }}
@@ -84,9 +99,13 @@ def apply_ui_font(qt=None) -> str:
 def app_icon():
     from PySide6.QtGui import QColor, QIcon, QPixmap
 
-    ico = _repo_root() / "assets" / "icon.ico"
-    if ico.is_file():
-        return QIcon(str(ico))
+    candidates = [
+        _repo_root() / "assets" / "icon.ico",
+        Path(sys.executable).parent / "assets" / "icon.ico",
+    ]
+    for ico in candidates:
+        if ico.is_file():
+            return QIcon(str(ico))
     pm = QPixmap(32, 32)
     pm.fill(QColor(TOKENS["accent"]))
     return QIcon(pm)
@@ -160,6 +179,9 @@ class ReviewPanel:
         keep = QPushButton("保留电脑稿")
         keep.setObjectName("ghost")
         keep.clicked.connect(self.keep_pc)
+        terms_btn = QPushButton("检查术语")
+        terms_btn.setObjectName("ghost")
+        terms_btn.clicked.connect(self.check_terms)
         copy = QPushButton("复制")
         copy.setObjectName("ghost")
         copy.clicked.connect(self.copy_only)
@@ -168,6 +190,7 @@ class ReviewPanel:
         insert.clicked.connect(self.insert)
         row.addWidget(use_phone)
         row.addWidget(keep)
+        row.addWidget(terms_btn)
         row.addStretch(1)
         row.addWidget(copy)
         row.addWidget(insert)
@@ -209,6 +232,18 @@ class ReviewPanel:
         self.app.review_editing = False
         self.app._save_draft()
         self.app.copy_text()
+
+    def check_terms(self) -> None:
+        from doubao_typeless.services.terms import hints
+        from doubao_typeless.storage.vocab_store import load_vocab, parse_mappings
+
+        text = self.editor.toPlainText()
+        notes = [item["hint"] for item in hints(text)]
+        vocab_hits = [src for src, _dst in parse_mappings(load_vocab(self.app.data_dir)) if src and src in text]
+        if vocab_hits:
+            notes.append("词库命中：" + "、".join(vocab_hits[:8]))
+        self.banner.setText("；".join(notes) if notes else "当前稿没有命中术语或词库")
+        self.banner.show()
 
     def insert(self) -> None:
         self.app.draft.text = self.editor.toPlainText()
@@ -260,7 +295,7 @@ class ClientWindow:
                 self._close_event(event)
 
         w = ShellWindow()
-        w.setWindowTitle("DoubaoTypeless")
+        w.setWindowTitle("DoubaoTypeless 预览")
         w.resize(560, 600)
         w.setStyleSheet(STYLESHEET)
         root = QVBoxLayout(w)
@@ -530,7 +565,8 @@ class ClientWindow:
             for item in reversed(self.app.history.items[-20:]):
                 bundle = item["bundle"]
                 preview = (bundle.get("text") or "").replace("\n", " ")[:48] or "（无文字）"
-                row = QListWidgetItem(f"{item.get('attempt_result')}  {len(bundle.get('assets') or [])}图  {preview}")
+                result = _result_label(item.get("attempt_result"))
+                row = QListWidgetItem(f"{result}  {len(bundle.get('assets') or [])}图  {preview}")
                 row.setData(Qt.UserRole, bundle)
                 self.recent_list.addItem(row)
 
@@ -661,7 +697,7 @@ class DesktopShell:
         menu.addSeparator()
         menu.addAction("退出", self.quit)
         self.tray.setContextMenu(menu)
-        self.tray.setToolTip("DoubaoTypeless")
+        self.tray.setToolTip("DoubaoTypeless 预览")
         self.tray.activated.connect(self._tray_activated)
         self.tray.show()
         self._wake = listen_for_commands(self._on_ipc)
@@ -673,7 +709,7 @@ class DesktopShell:
 
     def _explained_tray(self) -> None:
         if not load_settings(self.app.data_dir).get("tray_explained"):
-            self.tray.showMessage("DoubaoTypeless", "已在托盘运行。点图标可再打开窗口。")
+            self.tray.showMessage("DoubaoTypeless 预览", "已在托盘运行。点图标可再打开窗口。")
             save_settings(self.app.data_dir, {"tray_explained": True})
 
     def _on_ipc(self, command: str) -> None:

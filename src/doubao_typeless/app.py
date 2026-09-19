@@ -79,7 +79,11 @@ class V3App:
             model=stored.get("byok_model") or "",
             post=_httpx_json_post,
         )
-        self.hud = HudController(on_insert=self.insert_current, on_expand=lambda: self._notify_ui("expand"))
+        self.hud = HudController(
+            on_insert=self.insert_current,
+            on_copy=self.copy_text,
+            on_expand=lambda: self._notify_ui("expand"),
+        )
         self._observer = observer_from_env()
         self._last_attempt: Attempt | None = None
         self._recovery_needed = False

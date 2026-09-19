@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 V3_RUN_NAME = "DoubaoTypelessV3Preview"
+DAILY_RUN_NAME = "DoubaoTypeless"
 
 
 def startup_command() -> str:
@@ -26,6 +27,8 @@ def apply_v3_autostart(enabled: bool) -> tuple[bool, str]:
         import winreg
     except ImportError:
         return False, "无法加载 winreg"
+    if V3_RUN_NAME == DAILY_RUN_NAME:
+        return False, "拒绝写入日用自启动项"
     key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
     try:
         key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE)

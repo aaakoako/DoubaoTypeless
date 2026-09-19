@@ -19,9 +19,16 @@ TOKENS = {
 
 
 class HudController:
-    def __init__(self, *, on_insert: Callable[[], None] | None = None, on_expand: Callable[[], None] | None = None):
+    def __init__(
+        self,
+        *,
+        on_insert: Callable[[], None] | None = None,
+        on_expand: Callable[[], None] | None = None,
+        on_copy: Callable[[], None] | None = None,
+    ):
         self._on_insert = on_insert
         self._on_expand = on_expand
+        self._on_copy = on_copy
         self.visible = False
         self.text = ""
         self.image_count = 0
@@ -61,12 +68,17 @@ class HudController:
         expand.setStyleSheet("background:#E7EEEC; color:#1D2826; border:0; border-radius:9px; padding:6px 10px;")
         expand.clicked.connect(lambda: self._on_expand and self._on_expand())
         self._expand = expand
+        copy = QPushButton("复制")
+        copy.setStyleSheet("background:#E7EEEC; color:#1D2826; border:0; border-radius:9px; padding:6px 10px;")
+        copy.clicked.connect(lambda: self._on_copy and self._on_copy())
+        self._copy = copy
         btn = QPushButton("插入并复制")
         btn.setStyleSheet(f"background:{TOKENS['accent']}; color:white; border:0; border-radius:9px; padding:6px 10px;")
         btn.clicked.connect(lambda: self._on_insert and self._on_insert())
         self._insert = btn
         row.addWidget(self._body, 1)
         row.addWidget(expand, 0)
+        row.addWidget(copy, 0)
         row.addWidget(btn, 0)
         layout.addWidget(self._status)
         layout.addLayout(row)
