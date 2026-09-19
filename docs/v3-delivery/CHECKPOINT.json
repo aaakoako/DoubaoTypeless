@@ -2,16 +2,16 @@
   "schema_version": 1,
   "product_goal": "完整 V3 可发布候选。规范入口 docs/v3-product/MASTER_PLAN.md。",
   "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
-  "current_head": "8371a10a7cf7b559a74e2f6a16d26d5dcf93facd",
-  "working_tree": "clean after S5 review-packet commit",
-  "last_completed_slice": "S5_independent_review",
+  "current_head": "b54327d95febf1c62221249d2b8e55e489a376d8",
+  "working_tree": "clean after S5 client UX commit",
+  "last_completed_slice": "S5_client_ux",
   "active_slice": "WAITING_INDEPENDENT_REVIEW",
-  "next_action": "独立审阅者按 docs/evidence/v3-s5-pack/SUPPORT.md、GETTING_STARTED.md、APPROVAL.md 与包哈希复核；不要自签 RELEASE_READY。审阅指出的可执行代码继续修。真机 Android+豆包输入法和真实 Cursor Composer 仍 BLOCKED_NATIVE。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
+  "next_action": "独立审阅者按 docs/evidence/v3-s5-pack/SUPPORT.md 与新包哈希复核；不要自签 RELEASE_READY。审阅指出的代码继续修。真机 Android+豆包输入法和真实 Cursor Composer 仍 BLOCKED_NATIVE。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
   "accepted_requirements": [
     "MASTER_PLAN 为唯一产品/执行规范",
     "插入并复制是主动作",
-    "检查更新不得覆盖日用",
-    "DT_V3_TARGET_STATE 不能单独充当正式确认",
+    "模型建议不得自动改稿",
+    "当前图文必须能看见图序",
     "不自动 merge/tag/Release"
   ],
   "open_defects": [],
@@ -34,12 +34,12 @@
     }
   ],
   "last_commands": [
-    {"cmd": "python -m pytest -q", "exit_code": 0, "output": "147 passed"},
-    {"cmd": "rebuild console+windowed onedir", "exit_code": 0, "output": "console fd06cfd5… windowed 42dc7492… smoke quit 0"}
+    {"cmd": "python -m pytest -q", "exit_code": 0, "output": "152 passed"},
+    {"cmd": "rebuild console+windowed onedir", "exit_code": 0, "output": "console eab2e68f… windowed ec137b46…"}
   ],
   "candidate_artifact": {
-    "console_exe_sha256": "fd06cfd510ea23ebb1a4c4f9051b87da8422252f5b3f86724d93df766c96f084",
-    "windowed_exe_sha256": "42dc749286afb551457abebe60aa2aafe20f3f3455a552393318a493d09063ba",
+    "console_exe_sha256": "eab2e68ff0793ef157b70300f82e85c1576e63edcd7058a69802e4ae294fa84c",
+    "windowed_exe_sha256": "ec137b462b43de7ccca095ee975c9065f936c45936c99fb5ec13471e04e4a7fe",
     "note": "隔离候选，未签名，不是 RELEASE_READY，不是 GitHub Release。"
   },
   "published": false,
