@@ -12,12 +12,20 @@ jobs:
   source:
     if: github.ref == 'refs/heads/v3/assistant-runtime-safety'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       source_sha: ${{ steps.source.outputs.source_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Import exact source-only delta when present
+        run: |
+          if test -f tools/import_unified_delta.py; then python tools/import_unified_delta.py; fi
       - name: Bind immutable source commit
         id: source
         run: |
@@ -52,6 +60,7 @@ jobs:
           sudo apt-get install -y libegl1 libgl1
           python -m pip install -r requirements-test.txt PySide6 playwright
           python -m playwright install --with-deps chromium
+          python tools/export_ui_theme.py --check
           python tools/export_v3_icon.py
           cd web && npm ci && npm run typecheck && npm run build
       - name: Evidence checker self-test
@@ -59,6 +68,7 @@ jobs:
       - name: Full tests without exclusions
         env:
           QT_QPA_PLATFORM: offscreen
+          DT_UI_EVIDENCE_DIR: ui-evidence/linux
         run: python -m pytest -q --tb=short --junitxml=test-results.xml
       - name: Confirm isolated data
         run: test ! -f config.json
@@ -66,7 +76,9 @@ jobs:
         if: always()
         with:
           name: assistant-tests-${{ needs.source.outputs.source_sha }}
-          path: test-results.xml
+          path: |
+            test-results.xml
+            ui-evidence/
   windowed:
     needs: [source, validate]
     runs-on: windows-latest
@@ -85,6 +97,7 @@ jobs:
         run: |
           python -m pip install -r requirements-test.txt PySide6 pywin32 pynput pyinstaller playwright comtypes
           python -m playwright install chromium
+          python tools/export_ui_theme.py --check
           python tools/export_v3_icon.py
           cd web
           npm ci
@@ -93,6 +106,7 @@ jobs:
       - name: Windows full tests
         env:
           QT_QPA_PLATFORM: offscreen
+          DT_UI_EVIDENCE_DIR: ui-evidence/windows
         run: python -m pytest -q --tb=short --junitxml=windows-tests.xml
       - name: Generate UIA wrappers and bind actual source version
         env:
@@ -112,7 +126,7 @@ jobs:
         run: python tools/verify_candidate_text.py dist/DoubaoTypelessV3PreviewUI/DoubaoTypelessV3PreviewUI.exe --report candidate-text.json
       - name: Phone-owned latest draft with real frozen hotkey and clipboard
         run: python tools/verify_candidate_text.py dist/DoubaoTypelessV3PreviewUI/DoubaoTypelessV3PreviewUI.exe --phone-primary --report candidate-phone-primary.json
-      - name: Frozen production phone, native HUD and real browser failure recovery
+      - name: Frozen production phone, native HUD and mixed image-text recovery
         timeout-minutes: 5
         run: python tools/verify_candidate_browser.py dist/DoubaoTypelessV3PreviewUI/DoubaoTypelessV3PreviewUI.exe --report candidate-browser.json
       - name: Full folder inventory and candidate archive
@@ -141,5 +155,6 @@ jobs:
             candidate-browser.png
             candidate-browser-logs/
             windows-tests.xml
+            ui-evidence/
           if-no-files-found: warn
           retention-days: 14
