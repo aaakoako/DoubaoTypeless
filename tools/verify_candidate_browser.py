@@ -105,6 +105,66 @@ def clipboard_text():
     raise RuntimeError('cannot read clipboard')
 
 
+CLIPBOARD_HOLDER = r"""
+import json,sys,time,win32clipboard,win32gui
+from pathlib import Path
+# A message-only window identifies the lease owner; no UI or keyboard hook.
+w=win32gui.CreateWindowEx(0,'STATIC','DT Clipboard Lease',0,0,0,0,0,-3,0,0,None)
+try:
+    for attempt in range(40):
+        try:
+            win32clipboard.OpenClipboard(w)
+            break
+        except Exception:
+            if attempt==39:raise
+            time.sleep(.05)
+    note=Path(sys.argv[1]); tmp=note.with_suffix('.tmp')
+    tmp.write_text(json.dumps({'pid':__import__('os').getpid(),'hwnd':w}),encoding='utf-8')
+    tmp.replace(note)
+    sys.stdin.readline()
+    if win32clipboard.GetOpenClipboardWindow()!=w:
+        raise RuntimeError('clipboard lease lost before explicit release')
+    win32clipboard.CloseClipboard()
+finally:
+    win32gui.DestroyWindow(w)
+"""
+
+
+class ClipboardLease:
+    """A separate test-owned PID holds the real clipboard, not the COM test thread."""
+    def __init__(self, folder):
+        self.path=folder/'clipboard-owner.json'
+        self.log=(folder/'clipboard-holder.log').open('wb')
+        self.process=subprocess.Popen([sys.executable,'-u','-c',CLIPBOARD_HOLDER,str(self.path)],
+            stdin=subprocess.PIPE,stdout=self.log,stderr=subprocess.STDOUT)
+        self.owner=None
+
+    async def ready(self):
+        import win32clipboard
+        await until(lambda:self.path.is_file() or self.process.poll() is not None,
+                    message='clipboard holder not ready')
+        if self.process.poll() is not None:
+            raise RuntimeError('clipboard holder failed before acquiring lease')
+        self.owner=json.loads(self.path.read_text(encoding='utf-8'))
+        if win32clipboard.GetOpenClipboardWindow()!=self.owner['hwnd']:
+            raise RuntimeError('clipboard is not actually held by test child')
+        return self.owner
+
+    def release(self):
+        if self.process.poll() is None:
+            self.process.stdin.write(b'\n');self.process.stdin.flush()
+        try:
+            code=self.process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.process.terminate();self.process.wait(5)
+            raise RuntimeError('test clipboard holder did not release normally')
+        finally:
+            self.log.close()
+            if self.process.stdin:self.process.stdin.close()
+        if code:
+            raise RuntimeError('test clipboard holder failed while holding lease')
+
+
 async def exercise(child,data,result,report):
     from aiohttp import ClientSession,web
     from playwright.async_api import async_playwright
@@ -207,15 +267,16 @@ const raw=WebSocket.prototype.send;WebSocket.prototype.send=function(data){
                 await target.locator('#prompt-textarea').fill('')
                 text='剪贴板异常后仍可继续'
                 await ready(text)
-                win32clipboard.OpenClipboard()
+                lease=ClipboardLease(data.parent)
                 try:
+                    result['clipboard_fixture']=await lease.ready()
                     hotkey()
                     await until(lambda:'保留' in hud_text() and '插入未完成' in hud_text(),timeout=12,
                                 message='clipboard failure missing visible recovery')
                     assert await phone.locator('#text').input_value()==text
                     assert await target.locator('#prompt-textarea').input_value()==''
                     assert child.poll() is None
-                finally:win32clipboard.CloseClipboard()
+                finally:lease.release()
                 await target.locator('#prompt-textarea').click();hotkey();await completed(text)
                 cases.append({'name':'real_clipboard_lock_then_retry_succeeds','passed':True})
 
@@ -293,6 +354,8 @@ def verify(exe,report):
                     child.terminate();child.wait(5);result['test_owned_forced_cleanup']=True
             logs=report.parent/(report.stem+'-logs');logs.mkdir(exist_ok=True)
             for p in (data/'logs').glob('*.log'):shutil.copyfile(p,logs/p.name)
+            fixture_log=Path(temp)/'clipboard-holder.log'
+            if fixture_log.is_file():shutil.copyfile(fixture_log,logs/fixture_log.name)
             report.write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     return 0 if result['passed'] else 1
 
