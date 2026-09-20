@@ -150,7 +150,7 @@ def test_production_page_reconnect_uses_phone_master_and_preserves_old_pc_draft(
         assert bridge.draft.text == "离线新稿B"
         assert bridge.draft.epoch == before["epoch"]
         assert local == "离线新稿B"
-        recovered=[json.loads(p.read_text()) for p in (tmp_path/"recovery").glob("*.json")]
+        recovered=[json.loads(p.read_text(encoding='utf-8')) for p in (tmp_path/"recovery").glob("*.json")]
         assert any(item["text"]=="服务器新稿" for item in recovered)
         assert not any(f.get("type")=="insert.intent" for f in frames)
     asyncio.run(run())

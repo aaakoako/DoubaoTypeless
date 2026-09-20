@@ -215,7 +215,7 @@ def test_explicit_takeover_requires_exact_mirror_and_preserves_previous(app):
     with pytest.raises(ValueError,match='OTHER_PHONE_OWNER'):app.apply_phone_update(bad)
     app.apply_phone_update(request)
     assert app.draft.text=='当前手机' and app.draft.editor_device_id=='other'
-    assert any(json.loads(p.read_text())['text']=='前一台' for p in (app.data_dir/'recovery').glob('*.json'))
+    assert any(json.loads(p.read_text(encoding='utf-8'))['text']=='前一台' for p in (app.data_dir/'recovery').glob('*.json'))
 
 
 def test_same_owner_explicit_new_generation_recovers_without_automatic_rebase(app):
