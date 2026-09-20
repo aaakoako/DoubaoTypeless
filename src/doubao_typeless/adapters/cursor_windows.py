@@ -94,7 +94,11 @@ def _probe_uia_direct(anchor=None) -> dict:
                                     {"composer","message composer","chat composer","消息编辑器","对话输入区"})
                     if semantic_group or any(k in identity for k in ("composer","chatinput","chat-input","promptinput","prompt-form")):
                         container=node;break
-                # 未暴露可绑定的Composer容器，保守保留未知，不拿整页历史图片当附件。
+                # 有些聊天应用没有命名容器；只在最近完整、唯一输入区按结构建立锚点。
+                # 后续采样必须仍在这个确切容器内，不能临时换成别的聊天框。
+                if container is None:
+                    from doubao_typeless.adapters.composer_scope import find_structural_scope
+                    container = find_structural_scope(uia, chain)
                 if container is None:return report
                 scope_id=runtime_id(container)
                 if not scope_id:return report
@@ -123,7 +127,9 @@ def _collect_image_children(uia, element, *, depth=0, found=None, budget=None):
         name=str(getattr(element,"CurrentName","") or "")
         cls=str(getattr(element,"CurrentClassName","") or "")
         blob=f"{name} {cls}".lower()
-        if ctl=="50006":
+        from doubao_typeless.adapters.composer_scope import attachment_remove
+        identity=str(getattr(element,"CurrentAutomationId","") or "")
+        if ctl=="50006" or (ctl=="50000" and attachment_remove(name, identity)):
             try:rid=list(element.GetRuntimeId())
             except Exception:rid=[]
             found.append({"control_type":ctl,"runtime_id":rid,
@@ -164,9 +170,9 @@ def observe_image(baseline=None, *, timeout_s=5.0, cancelled=None) -> str:
         report=capture_image_baseline(baseline) if baseline.get("scope") else capture_image_baseline()
         if not same_composer_scope(baseline,report):return "unknown"
         candidates={tuple(n["runtime_id"]) for n in report.get("image_children") or []
-                    if n.get("runtime_id") and n.get("control_type")=="50006" and not n.get("pending")}
+                    if n.get("runtime_id") and n.get("control_type") in {"50006", "50000"} and not n.get("pending")}
         added=candidates-previous
-        if added and added==stable:return "observed"
+        if added and added==stable and len(candidates)>len(previous):return "observed"
         stable=added
         if time.monotonic()>=deadline:return "unknown"
         time.sleep(.1)

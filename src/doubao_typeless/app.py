@@ -105,6 +105,13 @@ class V3App:
             "draft_id": self.draft.draft_id,
             "revision": self.draft.revision,
         }
+        from doubao_typeless.services.phone_send import PhoneSendService
+        from doubao_typeless.platform.windows.native_input import send_submit
+        self.phone_send = PhoneSendService(data_dir=self.data_dir,
+            options=lambda: load_settings(self.data_dir), read_focus=lambda: self._read_focus(),
+            wait_modifiers=lambda: self._wait_modifiers(), emit=send_submit,
+            authorize=self.auth.authorize, current_draft=lambda: self.draft,
+            is_locked=lambda: self._session_locked(), is_elevated=lambda: self._target_elevated())
         self._last_suggestion = None
         self.hud = HudController(
             on_insert=self.request_insert,
@@ -153,6 +160,8 @@ class V3App:
             logger=_log,
             byok=self.byok,
             data_dir=self.data_dir,
+            phone_send=self.phone_send,
+            on_send=lambda session, body: self._commands.submit(self.phone_send.commit, session, body),
         )
         self.capture = CaptureService(grab=self._grab, hide_surfaces=self.hud.hide)
         self.delivery = DeliveryService(
@@ -323,7 +332,7 @@ class V3App:
             # Tk/native editors may expose no UIA editable pattern. Keep their text
             # path, but require a located composer for images or our own window.
             # DeliveryService rechecks the final bundle and target after prepare.
-            if (kind == "unknown" and bool(self.draft.assets)) or is_own_window(*focus[:2]):
+            if (kind in {"unknown", "edit"} and bool(self.draft.assets)) or is_own_window(*focus[:2]):
                 located = self._locate_composer()
                 if located.get("status") != "located": raise ValueError("COMPOSER_NOT_FOUND")
                 focus = self._read_focus()
@@ -405,6 +414,15 @@ class V3App:
             hud = getattr(self, "hud", None)
             if hud is not None:
                 hud.operation_event(event, **kwargs)
+        if event == "delivery_progress":
+            device = getattr(self, "_active_delivery_device", None)
+            loop = getattr(self, "_loop", None)
+            if device and loop and loop.is_running():
+                progress = {"type":"delivery.progress", "stage":kwargs.get("stage"),
+                            "index":kwargs.get("index"), "total":kwargs.get("total")}
+                for session in list(self.auth.sessions.values()):
+                    if session.device_id == device:
+                        asyncio.run_coroutine_threadsafe(self.bridge.send_to_session(session.session_id, progress), loop)
         hook = getattr(self, "ui_hook", None)
         if hook:
             hook(event, **kwargs)
@@ -825,6 +843,7 @@ class V3App:
         rotated = self._maybe_start_next_draft(bundle, payload)
         event = self._phone_rotate_event(bundle, rotated, str(payload.get("result") or ""))
         event["progress"] = payload["progress"]
+        self.phone_send.record_delivery(bundle, payload, self._last_target_fp)
         if payload.get("error_code"): event["error_code"] = payload["error_code"]
         self.bridge.last_phone_event = event
         if publish:
@@ -866,6 +885,7 @@ class V3App:
         attempt = Attempt(attempt_id=str(uuid.uuid4()), intent_id=intent_id,
                           bundle_id=bundle.get("bundle_id", ""), adapter_id="generic_text")
         phase = "prepare"
+        self._active_delivery_device = bundle.get("device_id")
         try:
             # 保存完整副本后才允许触碰剪贴板。未准备成功不执行任何按键。
             self.history.record(bundle, attempt_result="RUNNING")
@@ -920,6 +940,7 @@ class V3App:
                 pass  # 投递前成功写下的 RUNNING 副本仍然用于恢复。
         finally:
             self.ledger.finish(intent_id, attempt.result)
+            self._active_delivery_device = None
         self._last_attempt = attempt
         self._last_attempt_bundle_id = bundle.get("bundle_id")
         _log(f"[v3.delivery] result={attempt.result} phase={phase} steps={len(attempt.steps)}")

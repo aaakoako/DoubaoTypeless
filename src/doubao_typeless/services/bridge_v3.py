@@ -101,6 +101,8 @@ class V3Bridge:
         logger: Callable[[str], None] | None = None,
         byok: Any | None = None,
         data_dir: Path | None = None,
+        phone_send=None,
+        on_send=None,
     ):
         self.port = port
         self.auth = auth
@@ -108,6 +110,7 @@ class V3Bridge:
         self.draft = draft
         self.last_bundle: dict[str, Any] | None = None
         self._on_activity = on_activity
+        self.phone_send, self._on_send = phone_send, on_send
         self._on_intent = on_intent
         self._on_capture = on_capture
         self._on_recall = on_recall
@@ -162,6 +165,9 @@ class V3Bridge:
         app.router.add_get("/v3/history", self._history)
         app.router.add_get("/v3/status", self._status)
         app.router.add_get("/v3/phone/event", self._phone_event)
+        app.router.add_get("/v3/send/status", self._send_status)
+        app.router.add_post("/v3/send/prepare", self._send_prepare)
+        app.router.add_post("/v3/send/commit", self._send_commit)
         app.router.add_get("/pc", self._pc)
         app.router.add_get("/v3/sessions", self._sessions)
         app.router.add_post("/v3/sessions/revoke", self._revoke)
@@ -198,6 +204,41 @@ class V3Bridge:
         if not path.is_file():
             raise web.HTTPNotFound()
         return web.FileResponse(path)
+
+    async def _send_status(self, request: web.Request) -> web.Response:
+        session = self._session_from(request)
+        if not self.phone_send:
+            return web.json_response({"available": False, "error_code": "PHONE_SEND_DISABLED"})
+        try:
+            return web.json_response(await asyncio.to_thread(self.phone_send.status, session))
+        except ValueError:
+            return web.json_response({"available":False,"error_code":"SEND_PERMISSION_DENIED"},status=403)
+
+    async def _send_prepare(self, request: web.Request) -> web.Response:
+        session = self._session_from(request)
+        if not self.phone_send:
+            return web.json_response({"error_code": "PHONE_SEND_DISABLED"}, status=403)
+        try:
+            # 焦点检查不阻塞WebSocket心跳与手机稿同步。
+            result = await asyncio.to_thread(self.phone_send.prepare, session)
+        except ValueError:
+            return web.json_response({"error_code": "SEND_PERMISSION_DENIED"}, status=403)
+        except Exception:
+            return web.json_response({"error_code":"SEND_TARGET_UNAVAILABLE"},status=503)
+        return web.json_response(result)
+
+    async def _send_commit(self, request: web.Request) -> web.Response:
+        session = self._session_from(request)
+        if not self.phone_send or not self._on_send:
+            return web.json_response({"error_code": "PHONE_SEND_DISABLED"}, status=403)
+        body = await request.json()
+        if not isinstance(body, dict) or set(body) - {"ticket", "delivery_id", "confirmed"}:
+            return web.json_response({"error_code": "SEND_INVALID_REQUEST"}, status=400)
+        try:
+            result = await self._call_result(self._on_send, session, body)
+        except ValueError:
+            return web.json_response({"error_code": "SEND_PERMISSION_DENIED"}, status=403)
+        return web.json_response(result or {"result": "UNKNOWN"})
 
     async def _status(self, request: web.Request) -> web.Response:
         return web.json_response(
@@ -889,6 +930,7 @@ class V3Bridge:
                     await self.publish_phone_event(status["phone_event"])
                 return True
             if kind == "capture.request":
+                request_id = str(data.get("request_id") or "")[:128]
                 try:
                     if data.get("session_id") != live.session_id:
                         raise ValueError("session mismatch")
@@ -896,14 +938,14 @@ class V3Bridge:
                 except ValueError:
                     await ws.send_json(
                         {
-                            "type": "capture.result",
+                            "type": "capture.result", "request_id": request_id,
                             "error": "CAPTURE_DENIED",
                             "message": "这台手机还没有截图权限，文字仍可同步",
                         }
                     )
                     return True
                 if not self._on_capture:
-                    await ws.send_json({"type": "capture.result", "error": "unavailable"})
+                    await ws.send_json({"type": "capture.result", "request_id": request_id, "error": "unavailable"})
                     return True
                 try:
                     meta = self._on_capture(
@@ -912,9 +954,9 @@ class V3Bridge:
                         session,
                     )
                 except ValueError as exc:
-                    await ws.send_json({"type": "capture.result", "error": str(exc)})
+                    await ws.send_json({"type": "capture.result", "request_id": request_id, "error": str(exc)})
                     return True
-                await ws.send_json({"type": "capture.result", "asset": meta})
+                await ws.send_json({"type": "capture.result", "request_id": request_id, "asset": meta})
                 return True
             if kind == "recall.last":
                 before = (self.draft.text, [a.get("asset_id") for a in self.draft.assets])

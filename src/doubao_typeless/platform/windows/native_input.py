@@ -85,3 +85,41 @@ def send_paste() -> int:
     send.restype = ctypes.c_uint32
     ctypes.set_last_error(0)
     return inject_paste(send, ctypes.get_last_error)
+
+
+def inject_submit(mode: str, send: Callable, get_error: Callable[[], int] = lambda: 0) -> int:
+    """独立的明确发送动作。仅支持白名单两种组合，不接受客户端按键脚本。"""
+    if mode not in {"enter", "ctrl_enter"}:
+        raise ValueError("INVALID_SEND_MODE")
+    vk = 0x0D
+    events = ([_key(vk), _key(vk, True)] if mode == "enter" else
+              [_key(VK_CONTROL), _key(vk), _key(vk, True), _key(VK_CONTROL, True)])
+    size = len(events)
+    accepted = int(send(size, (INPUT * size)(*events), ctypes.sizeof(INPUT)))
+    if accepted == size:
+        return accepted
+    error = int(get_error())
+    releases = []
+    if mode == "enter" and accepted == 1:
+        releases = [_key(vk, True)]
+    elif mode == "ctrl_enter" and 0 < accepted < size:
+        if accepted == 2:
+            releases.append(_key(vk, True))
+        releases.append(_key(VK_CONTROL, True))
+    if releases:
+        try:
+            send(len(releases), (INPUT * len(releases))(*releases), ctypes.sizeof(INPUT))
+        except Exception:
+            pass
+    raise InputInjectionError(accepted, size, error)
+
+
+def send_submit(mode: str) -> int:
+    if sys.platform != "win32":
+        raise OSError("WINDOWS_INPUT_UNAVAILABLE")
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    send = user32.SendInput
+    send.argtypes = [ctypes.c_uint32, ctypes.POINTER(INPUT), ctypes.c_int]
+    send.restype = ctypes.c_uint32
+    ctypes.set_last_error(0)
+    return inject_submit(mode, send, ctypes.get_last_error)

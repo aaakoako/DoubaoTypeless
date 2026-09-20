@@ -72,6 +72,9 @@ def classify_element(descriptors: list[dict]) -> str:
                             and item.get("readonly") is False)
     if not editable or not item.get("enabled", True) or item.get("offscreen"):
         return "unknown"
+    from doubao_typeless.platform.windows.composer_locator import composer_candidate
+    if composer_candidate(descriptors):
+        return "composer"
     if any(k in context for k in ("composer", "chatinput", "promptinput", "prompt-textarea",
                                   "ask anything", "send a message", "message", "prompt", "发送消息", "输入消息", "询问任何")):
         return "composer"

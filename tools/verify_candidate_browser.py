@@ -24,14 +24,14 @@ TARGET_HTML = '''<!doctype html><meta charset="utf-8"><title>DT Browser Contract
 <h1>Disposable native input target</h1>
 <div id="composer" role="group" aria-label="Composer"><textarea id="prompt-textarea" aria-label="Message input"></textarea>
 <div id="editable" contenteditable="true" role="textbox" aria-label="Chat input"></div>
-<div id="attachments"></div><button id="attachment-action" aria-label="Attachment details">附件详情</button></div><textarea id="other" aria-label="Other input"></textarea>
+<div id="attachments"></div><button aria-label="Add photos and files">+</button><button aria-label="Send">Send</button><button id="attachment-action" aria-label="Attachment details">附件详情</button></div><textarea id="other" aria-label="Other input"></textarea>
 <script>
-window.enterEvents=0;document.addEventListener('keydown',e=>{if(e.key==='Enter')window.enterEvents++});
-window.pasteCount=0; window.pasteRecords=[]; window.imageRecords=[]; window.attachDelay=0; window.shiftImageFocus=false;window.hideImageAccessibility=false;
+window.enterEvents=0;window.submitKeys=[];document.addEventListener('keydown',e=>{if(e.key==='Enter'){window.enterEvents++;window.submitKeys.push({ctrl:e.ctrlKey,target:e.target.id})}});
+window.pasteCount=0; window.pasteRecords=[]; window.imageRecords=[]; window.attachDelay=0; window.shiftImageFocus=false;window.hideImageAccessibility=false;window.removeOnly=false;
 window.pixelFingerprint=async function(im){const cv=document.createElement('canvas');cv.width=im.naturalWidth;cv.height=im.naturalHeight;cv.getContext('2d').drawImage(im,0,0);const rgba=cv.getContext('2d').getImageData(0,0,cv.width,cv.height).data;const rgb=new Uint8Array(cv.width*cv.height*3);for(let i=0,j=0;i<rgba.length;i+=4){rgb[j++]=rgba[i];rgb[j++]=rgba[i+1];rgb[j++]=rgba[i+2]}const digest=await crypto.subtle.digest('SHA-256',rgb);return {w:cv.width,h:cv.height,sha256:[...new Uint8Array(digest)].map(v=>v.toString(16).padStart(2,'0')).join('')}}; document.addEventListener('paste',e=>{window.pasteCount++;
  window.pasteRecords.push({target:e.target.id, text:e.clipboardData.getData('text/plain')});
  const files=[...e.clipboardData.files];
- if(files.length){e.preventDefault();for(const file of files){const im=new Image();im.alt='Uploading attachment';im.width=48;im.height=48;if(window.hideImageAccessibility)im.setAttribute('aria-hidden','true');im.onload=()=>{setTimeout(async()=>{im.alt='Attachment ready';window.imageRecords.push(await window.pixelFingerprint(im));if(window.shiftImageFocus)document.getElementById('attachment-action').focus()},window.attachDelay)};im.src=URL.createObjectURL(file);document.getElementById('attachments').append(im)}}});
+ if(files.length){e.preventDefault();for(const file of files){const im=new Image();im.alt='Uploading attachment';im.width=48;im.height=48;if(window.hideImageAccessibility||window.removeOnly)im.setAttribute('aria-hidden','true');im.onload=()=>{setTimeout(async()=>{im.alt='Attachment ready';if(window.removeOnly){const b=document.createElement('button');b.setAttribute('aria-label','Remove image attachment');b.textContent='Remove image';document.getElementById('attachments').append(b)}window.imageRecords.push(await window.pixelFingerprint(im));if(window.shiftImageFocus)document.getElementById('attachment-action').focus()},window.attachDelay)};im.src=URL.createObjectURL(file);document.getElementById('attachments').append(im)}}});
 window.dynamicTitle=null;
 </script>'''
 
@@ -310,6 +310,7 @@ const raw=WebSocket.prototype.send;WebSocket.prototype.send=function(data){
                 async def add_photo(path,caption):
                     await phone.set_input_files('#file',str(path))
                     await phone.wait_for_function("document.querySelector('#editor').classList.contains('show') && document.querySelector('#stage').dataset.ready==='1'")
+                    await phone.click('#captionToggle')
                     await phone.fill('#captionInput',caption)
                     # 真正经过Canvas落笔、成品导出、上传，不能只构造asset_refs。
                     box=await phone.locator('#stage').bounding_box()
@@ -335,6 +336,52 @@ const raw=WebSocket.prototype.send;WebSocket.prototype.send=function(data){
                 assert [v['target'] for v in records]==['prompt-textarea']*3,records
                 assert await phone.locator('.attach-card').count()==0
                 cases.append({'name':'two_rendered_images_then_text_after_attachment_focus','passed':True,'image_pixels':expected_images})
+
+                # 用户的真实顺序：相册/截图成品加白板，将白板移到最前，一次点电脑按钮。
+                result['stage']='three_reordered_images_one_desktop_click'
+                await target.locator('#prompt-textarea').fill('')
+                await target.evaluate("window.imageRecords=[];window.pasteRecords=[];document.querySelector('#attachments').replaceChildren()")
+                await add_photo(fixtures[0],'相册标注')
+                await add_photo(fixtures[1],'截图标注')
+                await phone.click('#boardBtn')
+                await phone.wait_for_function("document.querySelector('#stage').dataset.ready==='1' && !document.querySelector('#done').disabled")
+                box=await phone.locator('#stage').bounding_box()
+                await phone.mouse.move(box['x']+box['width']*.25,box['y']+box['height']*.3)
+                await phone.mouse.down();await phone.mouse.move(box['x']+box['width']*.65,box['y']+box['height']*.65,steps=8);await phone.mouse.up()
+                await phone.click('#captionToggle');await phone.fill('#captionInput','白板先插入')
+                await phone.click('#done');await phone.wait_for_selector('#editor.show',state='hidden')
+                await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本') && [...document.querySelectorAll('.attach-card label')].every(e=>e.textContent.includes('电脑已收到'))")
+                await phone.locator('.attach-card').nth(2).locator('.left').click()
+                await phone.locator('.attach-card').nth(1).locator('.left').click()
+                assert '白板' in await phone.locator('.attach-card').first.locator('label').inner_text()
+                text='一次操作三张图  不漏正文\n完整换行'
+                await phone.fill('#text',text)
+                await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
+                expected=text+'\n\n图1：白板先插入\n图2：相册标注\n图3：截图标注'
+                expected_three=await phone.evaluate("""async()=>{const out=[];for(const im of document.querySelectorAll('.attach-card img')){await im.decode();const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;c.getContext('2d').drawImage(im,0,0);const a=c.getContext('2d').getImageData(0,0,c.width,c.height).data,r=new Uint8Array(c.width*c.height*3);for(let i=0,j=0;i<a.length;i+=4){r[j++]=a[i];r[j++]=a[i+1];r[j++]=a[i+2]}const d=await crypto.subtle.digest('SHA-256',r);out.push({w:c.width,h:c.height,sha256:[...new Uint8Array(d)].map(v=>v.toString(16).padStart(2,'0')).join('')})}return out}""")
+                await target.bring_to_front();await target.locator('#prompt-textarea').click()
+                await until(lambda:'3 张图片已更新' in hud_text())
+                assert inspector.click(hud(),'插入并复制')
+                await completed(expected)
+                assert await target.evaluate('window.imageRecords')==expected_three
+                records=await target.evaluate('window.pasteRecords')
+                assert [x['text'] for x in records]==['','','',expected],records
+                assert not own_window(child.pid,'上次结果未知') or not win32gui.IsWindowVisible(own_window(child.pid,'上次结果未知'))
+                cases.append({'name':'three_reordered_renders_one_native_click_no_per_image_confirmation','passed':True,'image_pixels':expected_three})
+
+                # 无语义名称的窄 Composer 容器 + 仅移除附件按钮（真实 UIA，不替换观察器）。
+                result['stage']='structural_scope_remove_buttons'
+                await target.locator('#prompt-textarea').fill('')
+                await target.evaluate("window.imageRecords=[];window.pasteRecords=[];document.querySelector('#attachments').replaceChildren();document.querySelector('#composer').removeAttribute('id');document.querySelector('[aria-label=Composer]').removeAttribute('aria-label');document.querySelector('#editable').style.display='none';window.removeOnly=true;window.shiftImageFocus=false")
+                await add_photo(fixtures[0],'附件按钮识别')
+                text='图片无需逐张确认'
+                await phone.fill('#text',text);await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
+                await target.bring_to_front();await target.locator('#prompt-textarea').click()
+                await phone.click('#sendBtn');await completed(text+'\n\n图1：附件按钮识别')
+                assert len(await target.evaluate('window.imageRecords'))==1
+                assert len(await target.evaluate('window.pasteRecords'))==2
+                cases.append({'name':'unnamed_composer_remove_attachment_controls_auto_continue','passed':True})
+                await target.evaluate("document.querySelector('[role=group]').id='composer';document.querySelector('#composer').setAttribute('aria-label','Composer');window.removeOnly=false;document.querySelector('#attachments').replaceChildren()")
 
                 # 不暴露附件接收证据的目标：明确询问，点击继续文字不重新贴图。
                 result['stage']='unknown_image_explicit_continue_text'
@@ -378,7 +425,40 @@ const raw=WebSocket.prototype.send;WebSocket.prototype.send=function(data){
 
                 assert await target.evaluate('window.enterEvents')==0
                 assert not errors,errors
-                result['enter_events']=0
+                result['insertion_enter_events']=0
+                # 确认发送与插入分离。测试设置仅写本脚本创建的隔离目录。
+                result['stage']='phone_explicit_send'
+                await phone.wait_for_selector('#submitPanel',state='visible')
+                before_paste=await target.evaluate('window.pasteCount')
+                before_clipboard=clipboard_text()
+                await phone.click('#submitMessage');await phone.wait_for_selector('#confirmSend')
+                await phone.click('#cancelSend')
+                assert await target.evaluate('window.enterEvents')==0
+                await phone.click('#submitMessage');await phone.click('#confirmSend')
+                await until(lambda:target.evaluate('window.enterEvents===1'),message='confirmed phone Enter missing')
+                assert await target.evaluate('window.submitKeys')==[{'ctrl':False,'target':'prompt-textarea'}]
+                assert await target.evaluate('window.pasteCount')==before_paste
+                assert clipboard_text()==before_clipboard
+                await phone.reload();await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
+                assert await target.evaluate('window.enterEvents')==1,'reconnect must never repeat sending'
+                cases.append({'name':'phone_cancel_then_explicit_enter_once_without_repasting','passed':True})
+                settings_path=data/'settings.json';settings=json.loads(settings_path.read_text(encoding='utf-8'))
+                settings['phone_send_mode']='ctrl_enter'
+                settings_path.write_text(json.dumps(settings),encoding='utf-8')
+                await target.locator('#prompt-textarea').fill('')
+                text='第二份用Ctrl+Enter发送'
+                await ready(text);await phone.click('#sendBtn');await completed(text)
+                assert await target.evaluate('window.enterEvents')==1,'insertion must not submit'
+                await phone.wait_for_selector('#submitPanel',state='visible')
+                before_paste=await target.evaluate('window.pasteCount')
+                await phone.click('#submitMessage')
+                assert 'Ctrl+Enter' in await phone.locator('#submitShortcut').inner_text()
+                await phone.click('#confirmSend')
+                await until(lambda:target.evaluate('window.enterEvents===2'),message='confirmed Ctrl+Enter missing')
+                assert await target.evaluate('window.submitKeys')==[{'ctrl':False,'target':'prompt-textarea'},{'ctrl':True,'target':'prompt-textarea'}]
+                assert await target.evaluate('window.pasteCount')==before_paste
+                cases.append({'name':'phone_explicit_ctrl_enter_only_after_second_insertion','passed':True})
+                result['explicit_send_enter_events']=2
                 result['page_errors']=errors
                 result['real_browser']=True
                 await target.screenshot(path=str(report.with_suffix('.png')))
@@ -422,7 +502,8 @@ def verify(exe,report):
     result={'passed':False,'test':'frozen-production-phone-browser-stability','cursor_tested':False,
             'android_ime_tested':False,'exe_sha256':hashlib.sha256(exe.read_bytes()).hexdigest()}
     with tempfile.TemporaryDirectory(prefix='dt-browser-stability-') as temp:
-        data=Path(temp)/'data'
+        data=Path(temp)/'data';data.mkdir()
+        (data/'settings.json').write_text(json.dumps({'phone_send_enabled':True,'phone_send_mode':'enter'}),encoding='utf-8')
         env={**os.environ,'DT_V3_DATA_DIR':str(data),'DT_V3_PIPE':'DT-stable-'+uuid.uuid4().hex,'PYTHONUTF8':'1'}
         env.pop('QT_QPA_PLATFORM',None)
         child=subprocess.Popen([str(exe),'--minimized'],env=env)

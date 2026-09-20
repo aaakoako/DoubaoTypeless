@@ -27,6 +27,10 @@ type Asset = {
   pending_png?: Blob;
   upload_ticket?: UploadTicket;
   progress?: number;
+  // Saved before editing; unsaved scratch never replaces the committed image.
+  edit_original?: Asset | null;
+  edit_scene?: string;
+  edit_caption?: string;
 };
 
 export function boot(root: HTMLElement): void {
@@ -54,17 +58,21 @@ export function boot(root: HTMLElement): void {
           <button id="boardBtn">白板</button>
         </div>
         <button class="primary" id="sendBtn" disabled>插入电脑</button>
+        <section id="submitPanel" class="submit-panel" hidden>
+          <p>上一份已放入电脑输入框。请看电脑确认图文完整。</p>
+          <button id="submitMessage">确认后发送上一份</button>
+        </section>
         <p id="deliveryStatus" class="progress-detail" role="status" aria-live="polite" hidden></p><p id="transferStatus" role="status" aria-live="polite">手机主稿 · 等待同步</p><p id="sync">图在前，文字在后 · 不自动发送</p><p id="localSave" role="status" aria-live="polite"></p>
       </section>
       <section class="editor" id="editor">
         <div class="head">
-          <button id="back" aria-label="返回并保留编辑">←</button>
+          <button id="back" aria-label="取消编辑">取消</button>
           <b id="editTitle">图片标注</b>
-          <button id="undoBtn" aria-label="撤销">撤</button>
-          <button id="redoBtn" aria-label="重做">重</button>
-          <button class="primary" id="done">完成</button>
+          <button id="undoBtn" aria-label="撤销">撤销</button>
+          <button id="redoBtn" aria-label="重做">重做</button>
+          <button class="primary" id="done">保存图片</button>
         </div>
-        <div id="stage"></div>
+        <p id="editorStatus" role="status" aria-live="polite" hidden></p><div id="stage"></div>
         <div class="crop-actions" id="cropActions">
           <button id="cropReset">全图</button>
           <button id="cropApply">应用裁剪</button>
@@ -95,7 +103,8 @@ export function boot(root: HTMLElement): void {
           <button data-tool="select">选择</button>
           <button id="wire">线框按钮</button>
         </div>
-        <div class="caption-drawer" id="captionDrawer">
+        <button id="captionToggle" aria-expanded="false">图注 · 补充说明</button>
+        <div class="caption-drawer" id="captionDrawer" hidden>
           <textarea id="captionInput" placeholder="给这张图补一句说明，不发Enter"></textarea>
         </div>
       </section>
@@ -128,6 +137,14 @@ export function boot(root: HTMLElement): void {
   let closingForAuth = false;
   let sheetRevision = 0;
   let sessionReady = false;
+  let editorStartScene = "";
+  let editorLoading = false;
+  let editorSequence = 0;
+  let editorAbort: AbortController | null = null;
+  let submitBusy = false;
+  let submitAvailable = false;
+  let pendingCapture = "";
+  const receivedCaptures = new Set<string>();
 
   function rememberBlob(url: string): string {
     if (url.startsWith("blob:")) blobUrls.push(url);
@@ -147,6 +164,7 @@ export function boot(root: HTMLElement): void {
 
   function toast(t: string) {
     $("sync").textContent = t;
+    if($("editor").classList.contains("show")){$("editorStatus").hidden=false;$("editorStatus").textContent=t;}
   }
 
   const DRAFT_KEY = "dt.v3.draft";
@@ -201,7 +219,7 @@ export function boot(root: HTMLElement): void {
     if (state.sending) return "正在确认当前图文…";
     if (state.assets.some(a => !a.asset_id || a.status !== "ready")) return "请先完成图片";
     if (!state.text.trim() && !state.assets.length) return "插入电脑";
-    return state.assets.length ? `插入 ${state.assets.length} 张图和文字` : "插入并复制";
+    return state.assets.length ? `插入 ${state.assets.length} 张图${state.text.trim() ? "和文字" : ""}` : "插入并复制";
   }
 
   let attachmentsSignature = "";
@@ -296,6 +314,7 @@ export function boot(root: HTMLElement): void {
       if (ws !== socket) return;
       state.online = false;
       state.sending = false;
+      submitAvailable = false; $("submitPanel").hidden = true;
       sessionReady = false;
       outbox.disconnect();
       for (const controller of uploadControllers.values()) controller.abort();
@@ -331,6 +350,12 @@ export function boot(root: HTMLElement): void {
         if (msg.error) outbox.reject(msg);
         else outbox.acknowledge(msg);
       }
+      if (msg.type === "delivery.progress") {
+        state.sending = true;
+        const detail = msg.stage === "text" ? "图片已处理，正在插入文字…" :
+          `正在${msg.stage === "image_wait" ? "确认" : "插入"}第 ${msg.index} / ${msg.total} 张图片…`;
+        $("deliveryStatus").textContent = detail; $("deliveryStatus").hidden = false; update();
+      }
       if (msg.type === "attempt.status") {
         state.sending = false;
         const labels: Record<string, string> = {CONFIRMED:"已放入输入框",UNKNOWN:"已尝试插入，可召回重试",NO_STEPS:"未插入，请先选中电脑输入框",PARTIAL:"只完成一部分，请查看恢复选项",BUSY:"正在处理上一份内容"};
@@ -340,6 +365,7 @@ export function boot(root: HTMLElement): void {
         update();
       }
       if (msg.type === "draft.rotated") {
+        state.sending = false; update();
         if(msg.progress?.message){$("deliveryStatus").textContent=msg.progress.message;$("deliveryStatus").hidden=false;}
         void handleReceipt(msg);
       }
@@ -374,12 +400,17 @@ export function boot(root: HTMLElement): void {
         return;
       }
       if (msg.type === "capture.result") {
+        // 过期请求不能冒充后来一次截图，也不能重新打开已经取消的编辑流程。
+        if (msg.request_id && msg.request_id !== pendingCapture) return;
+        pendingCapture = ""; ($("captureBtn") as HTMLButtonElement).disabled = false;
         if (msg.error) {
           toast(String(msg.message || msg.error).includes("CAPTURE") || String(msg.error).includes("not granted")
             ? "这台手机还没有截图权限，文字仍可同步"
             : String(msg.message || msg.error));
           return;
         }
+        if (!msg.asset?.asset_id || state.assets.length >= 6 || receivedCaptures.has(msg.asset.asset_id)) return;
+        receivedCaptures.add(msg.asset.asset_id);
         const a: Asset = {
           id: msg.asset.asset_id,
           asset_id: msg.asset.asset_id,
@@ -441,6 +472,8 @@ export function boot(root: HTMLElement): void {
     outbox.offer(currentMessage());
   }
   function sendDraft() {
+    // New authoring cancels an old send affordance; rotation fetches a fresh status afterwards.
+    submitAvailable = false; $("submitPanel").hidden = true;
     latestMessage = buildPrimaryUpdate(state, newId());
     persistDraft();
     if (restored) publishCurrent();
@@ -458,6 +491,7 @@ export function boot(root: HTMLElement): void {
     state.sending = false; latestMessage = null;
     outbox.disconnect(); if (sessionReady) outbox.connect();
     sendDraft(); update(); toast("已开始下一段，上次图文可召回");
+    void refreshSubmit();
   }
   function handleReceipt(msg: any): Promise<void> {
     receiptChain = receiptChain.then(() => handleReceiptNow(msg)).catch(() => {toast("上次回执待确认，当前稿保留");});
@@ -467,6 +501,7 @@ export function boot(root: HTMLElement): void {
     try {
       const res = await fetch("/v3/phone/event", {headers:headers(), signal:AbortSignal.timeout(2500)});
       if (res.ok) await handleReceipt(await res.json());
+      await refreshSubmit();
     } catch { /* 仅取数据，不重放插入动作。 */ }
   }
   async function prepareForDesktop(requestId: string) {
@@ -510,7 +545,7 @@ export function boot(root: HTMLElement): void {
   }
   $("boardBtn").onclick = () => {
     if (state.assets.length >= 6) {toast("一份图文最多六张图片");return;}
-    const a: Asset = { id: "board-" + Date.now(), kind: "白板", preview: "", w: 1600, h: 1000, status: "queued" };
+    const a: Asset = { id: "board-" + newId(), kind: "白板", preview: "", w: 1600, h: 1000, status: "queued" };
     state.assets.push(a);
     sendDraft();
     update();
@@ -520,7 +555,11 @@ export function boot(root: HTMLElement): void {
   $("captureBtn").onclick = () => {
     if (state.assets.length >= 6) {toast("一份图文最多六张图片");return;}
     if (!state.session || !ws || !state.online || ws.readyState !== 1) {toast("截图需要电脑在线；相册和白板仍可使用");return;}
-    ws.send(JSON.stringify({ protocol: 3, type: "capture.request", session_id: state.session.session_id, token: state.session.token, scope: "primary" }));
+    if (pendingCapture) return;
+    pendingCapture = newId(); const requestId = pendingCapture;
+    ($("captureBtn") as HTMLButtonElement).disabled = true;
+    ws.send(JSON.stringify({ protocol: 3, type: "capture.request", session_id: state.session.session_id, token: state.session.token, scope: "primary", request_id:requestId }));
+    window.setTimeout(() => {if(pendingCapture===requestId){pendingCapture="";($("captureBtn") as HTMLButtonElement).disabled=false;toast("截图未确认；不会自动重复截图，可重新操作");}}, 10000);
   };
   $("cropApply").onclick = () => {
     if (!editor?.applyCrop()) toast("请拖出至少64×64像素的选区");
@@ -557,6 +596,7 @@ export function boot(root: HTMLElement): void {
         continue;
       }
       if (image.naturalWidth*image.naturalHeight > 48_000_000) {toast("图片像素过大，请先缩小");continue;}
+      if (state.assets.length >= 6) break;
       a.w = image.naturalWidth || 1;
       a.h = image.naturalHeight || 1;
       a.status = "queued";
@@ -583,9 +623,18 @@ export function boot(root: HTMLElement): void {
   }
 
   async function openEditor(title: string, asset: Asset) {
+    if (editorOpen() || finishingEditor) return;
     uploadControllers.get(asset.id)?.abort();
+    if (!("edit_original" in asset)) {
+      asset.edit_original = (asset.status === "ready" || asset.pending_png) ? structuredClone(asset) : null;
+    }
     asset.pending_png = undefined; asset.upload_ticket = undefined;
     currentId = asset.id;
+    const thisEditor = ++editorSequence;
+    editorAbort?.abort(); editorAbort = new AbortController();
+    const editorSignal = editorAbort.signal;
+    editorLoading = true;
+    ($("done") as HTMLButtonElement).disabled = true;
     asset.status = "editing";
     asset.render_revision = (asset.render_revision || 1) + 1;
     sendDraft();
@@ -594,19 +643,28 @@ export function boot(root: HTMLElement): void {
     $("mobileHead").style.display = "none";
     $("editor").classList.add("show");
     $("editTitle").textContent = title;
-    ($("captionInput") as HTMLTextAreaElement).value = asset.caption || "";
+    $("editorStatus").hidden=true; $("stage").dataset.ready="0";
+    ($("captionInput") as HTMLTextAreaElement).value = asset.edit_caption ?? asset.caption ?? "";
+    $("extra").classList.remove("show"); $("cropActions").classList.remove("show");
+    $("captionDrawer").hidden = true; $("captionToggle").setAttribute("aria-expanded", "false");
     const host = $("stage") as HTMLDivElement;
     editor?.destroy();
     host.replaceChildren();
     editor = new SharedEditor(host, asset.w || 1600, asset.h || 1000);
-    if (asset.scene) {
-      editor.importScene(asset.scene);
+    const view = editor;
+    document.querySelectorAll("[data-tool]").forEach(b => b.classList.toggle("selected", (b as HTMLElement).dataset.tool === view.tool));
+    document.querySelectorAll("[data-color]").forEach(b => b.classList.toggle("selected", (b as HTMLElement).dataset.color === view.color));
+    $("widthBtn").textContent = "中 · 5";
+    try {
+    if (asset.edit_scene || asset.scene) {
+      editor.importScene(asset.edit_scene || asset.scene!);
       if (asset.source || asset.preview) {
         let src = asset.source || asset.preview;
         if (src.startsWith("/v3/assets/") && state.session) {
-          const res = await fetch(src, { headers: headers() });
+          const res = await fetch(src, { headers: headers(), signal:editorSignal });
           if (!res.ok) throw new Error("SOURCE_READ_FAILED");
           src = await fileToDataUrl(await res.blob());
+          if (thisEditor !== editorSequence) return;
           asset.source = src;
         }
         await editor.rebindSource(src);
@@ -617,17 +675,22 @@ export function boot(root: HTMLElement): void {
     } else if (asset.source || asset.preview) {
       let src = asset.source || asset.preview;
       if (src.startsWith("/v3/assets/") && state.session) {
-        const res = await fetch(src, { headers: headers() });
+        const res = await fetch(src, { headers: headers(), signal:editorSignal });
         if (!res.ok) {
-          toast("图片需要登录后才能看");
-          asset.status = "failed";
-          return;
+          throw new Error("SOURCE_READ_FAILED");
         }
         src = await fileToDataUrl(await res.blob());
+        if (thisEditor !== editorSequence) return;
         asset.source = src;
       }
       await editor.loadImage(src, asset.w || 1600, asset.h || 1000);
     }
+    } catch (error) {if(thisEditor !== editorSequence || editorSignal.aborted)return; throw error;}
+    if (thisEditor !== editorSequence || editor !== view) return;
+    editorLoading = false;
+    ($("done") as HTMLButtonElement).disabled = false;
+    host.dataset.ready="1";
+    editorStartScene = editor.exportScene();
     requestAnimationFrame(() => editor?.resize());
     update();
     if (ws?.readyState === 1) ws.send(JSON.stringify({ protocol: 3, type: "editor.activity", kind: "edit" }));
@@ -655,7 +718,12 @@ export function boot(root: HTMLElement): void {
     editor.width = vals[i];
     $("widthBtn").textContent = ["细 · 2", "中 · 5", "粗 · 10"][i];
   };
-  $("moreBtn").onclick = () => $("extra").classList.toggle("show");
+  $("moreBtn").onclick = () => { $("extra").classList.toggle("show"); requestAnimationFrame(()=>editor?.resize()); };
+  $("captionToggle").onclick = () => {
+    $("captionDrawer").hidden = !$("captionDrawer").hidden;
+    $("captionToggle").setAttribute("aria-expanded", String(!$("captionDrawer").hidden));
+    requestAnimationFrame(()=>editor?.resize());
+  };
   $("wire").onclick = () => editor?.addWireframe();
   $("undoBtn").onclick = () => editor?.undo();
   $("redoBtn").onclick = () => editor?.redo();
@@ -699,35 +767,53 @@ export function boot(root: HTMLElement): void {
     }
   }
   async function finishEditor() {
-    if (!editor || finishingEditor) return;
+    if (!editor || finishingEditor || editorLoading) return;
     if (state.editorKind === "快速白板" && editor.ops === 0) {toast("先画一点内容，再加入本次图文");return;}
     finishingEditor = true;
+    window.clearTimeout(persistTimer);
+    ($("done") as HTMLButtonElement).disabled = true;
+    ($("back") as HTMLButtonElement).disabled = true;
     const item = state.assets.find(a=>a.id===currentId);
+    let committed = false;
     try {
-      const blob = await editor.exportBlob();
       if (!item) return;
-      item.caption=($("captionInput") as HTMLTextAreaElement).value.trim();
-      const sceneData=JSON.parse(editor.exportScene());
+      const blob = await editor.exportBlob();
+      const sceneData = JSON.parse(editor.exportScene());
       if(sceneData.source) sceneData.source.url=item.source||"";
-      item.scene=JSON.stringify(sceneData); item.preview=await fileToDataUrl(blob);
-      const bmp=await createImageBitmap(blob);item.w=bmp.width;item.h=bmp.height;bmp.close();
-      item.pending_png=blob; item.asset_id=undefined; item.upload_ticket=undefined;item.progress=0;item.status="queued";
-      sendDraft(); repository.save(draftSnapshot()); await repository.flush();
+      const preview = await fileToDataUrl(blob);
+      const bmp = await createImageBitmap(blob);
+      const next: Asset = {...item, caption: ($("captionInput") as HTMLTextAreaElement).value.trim(),
+        scene:JSON.stringify(sceneData), preview, w:bmp.width, h:bmp.height, pending_png:blob,
+        asset_id:undefined, upload_ticket:undefined, progress:0, status:"queued"};
+      bmp.close();
+      delete next.edit_original; delete next.edit_scene; delete next.edit_caption;
+      const index=state.assets.indexOf(item);
+      if(index<0) return;
+      // Persist a separate committed candidate before publishing ready/uploadable state.
+      // A failed transaction retains both the live canvas and prior saved rendition.
+      const snapshot=draftSnapshot(); snapshot.assets[index]={...next};
+      try {repository.save(snapshot);await repository.flush();}
+      catch {repository.save(draftSnapshot());toast("保存失败，画布和原图都保留；请重试保存或取消");return;}
+      state.assets[index]=next; committed=true;
+      sendDraft();
       $("editor").classList.remove("show");$("composer").style.display="flex";$("mobileHead").style.display="flex";
-      editor.destroy();editor=null;
-      update(); void uploadPending(); void openNextQueued();
-    } finally {finishingEditor=false;}
+      editor.destroy();editor=null;editorLoading=false;
+      update();
+    } finally {
+      finishingEditor=false;($("done") as HTMLButtonElement).disabled=editorLoading;($("back") as HTMLButtonElement).disabled=false;
+    }
+    if(committed){void uploadPending();void openNextQueued();}
   }
 
   function saveOpenEditor() {
-    if (!editor || !editorOpen()) return;
+    if (!editor || !editorOpen() || finishingEditor) return;
     const item = state.assets.find(a => a.id === currentId);
     if (!item) return;
     try {
       const scene = JSON.parse(editor.exportScene());
       if (scene.source) scene.source.url = item.source || "";
-      item.scene = JSON.stringify(scene);
-      item.caption = ($("captionInput") as HTMLTextAreaElement).value;
+      item.edit_scene = JSON.stringify(scene);
+      item.edit_caption = ($("captionInput") as HTMLTextAreaElement).value;
       repository.save(draftSnapshot());
     } catch { $("localSave").textContent = "当前编辑尚未保存，请保留页面"; }
   }
@@ -744,10 +830,11 @@ export function boot(root: HTMLElement): void {
   });
 
   function editorFailure() {
-    state.uploading = false;
+    state.uploading = false; editorLoading = false;
+    ($("done") as HTMLButtonElement).disabled = false;
     const item = state.assets.find(a => a.id === currentId);
     if (item) {
-      try { if (editor) item.scene = editor.exportScene(); } catch {}
+      try { if (editor) item.edit_scene = editor.exportScene(); } catch {}
       item.status = "failed";
       sendDraft();
     }
@@ -758,21 +845,37 @@ export function boot(root: HTMLElement): void {
   $("done").onclick = () => {
     void finishEditor().catch(editorFailure);
   };
-  $("back").onclick = () => {
-    if (state.editorKind === "快速白板" && editor && editor.ops === 0) {
-      state.assets = state.assets.filter((a) => a.id !== currentId);
-      $("editor").classList.remove("show");
-      $("composer").style.display = "flex";
-      $("mobileHead").style.display = "flex";
-      editor?.destroy();
-      editor = null;
-      sendDraft();
-      update();
-      void openNextQueued();
-      return;
+  function discardEditor() {
+    if (finishingEditor) return;
+    const index = state.assets.findIndex(a => a.id === currentId);
+    if (index >= 0) {
+      const original = state.assets[index].edit_original;
+      if (original) state.assets[index] = structuredClone(original);
+      else state.assets.splice(index, 1);
     }
-    void finishEditor().catch(editorFailure);
-  };
+    ++editorSequence; editorAbort?.abort();
+    editor?.destroy(); editor = null; editorLoading = false;
+    $("editor").classList.remove("show"); $("composer").style.display="flex"; $("mobileHead").style.display="flex";
+    $("sheet").classList.remove("show");
+    sendDraft(); update(); void uploadPending();
+    toast("已放弃未保存的编辑，没有加入新图片");
+  }
+  function cancelEditor() {
+    if (finishingEditor || !editorOpen()) return;
+    const item=state.assets.find(a=>a.id===currentId);
+    const changed = !editorLoading && editor && (editor.exportScene() !== editorStartScene ||
+      ($("captionInput") as HTMLTextAreaElement).value !== (item?.edit_original?.caption || ""));
+    if (!changed) {discardEditor(); return;}
+    ++sheetRevision;
+    $("sheetCard").innerHTML='<h3>放弃未保存的编辑？</h3><p>已保存的图片不会改变。新建但未保存的白板不会加入图文。</p><button id="keepEditing" class="primary">继续编辑</button> <button id="discardEditing">放弃更改</button>';
+    $("sheet").classList.add("show");
+    $("keepEditing").onclick=()=>$("sheet").classList.remove("show");
+    $("discardEditing").onclick=discardEditor;
+  }
+  $("back").onclick = cancelEditor;
+  window.addEventListener("beforeunload", e=>{if(editorOpen()){saveOpenEditor();e.preventDefault();e.returnValue="";}});
+  const stageResize = new ResizeObserver(()=>{if(editor&&!editorLoading) editor.resize();});
+  stageResize.observe($("stage"));
 
   $("connectBtn").onclick = () => {void resumeRemembered().then(ok=>{if(!ok)showPair();}).catch(()=>showPair());};
   $("sendBtn").onclick = () => { void sendBundle().catch(() => {
@@ -845,8 +948,60 @@ export function boot(root: HTMLElement): void {
       if (state.sending && state.last_intent?.id===intentId) {
         state.sending=false;update();toast("上次结果待确认，图文保留；再次点同一稿不会重复投递，可从最近内容召回");
       }
-    },12000);
+    },65000);
   };
+
+  const sendErrors: Record<string,string> = {
+    PHONE_SEND_DISABLED:"请先在电脑常用设置开启「允许手机确认后发送」",
+    TARGET_CHANGED:"电脑输入框已改变。请点回刚才的输入框再确认，没有发送。",
+    SEND_EXPIRED:"这份发送操作已过期，请在电脑处理；不会自动重贴。",
+    SEND_DRAFT_CHANGED:"你已开始编辑新内容，上一份不会再由旧按钮发送。",
+    SEND_ALREADY_USED:"这次发送已处理，不会重复发送。",
+    SEND_SETTINGS_CHANGED:"发送快捷键已改变，请重新确认。",
+    SEND_PERMISSION_DENIED:"插入权限已取消，没有发送。",
+    SEND_RESULT_UNKNOWN:"系统发送结果未知，请查看电脑；不会自动重试。",
+    BUSY:"正在处理另一项操作，没有排队发送。",
+  };
+  async function refreshSubmit() {
+    if(!state.online || !state.session) return;
+    const epoch=state.epoch,rev=state.revision;
+    try {
+      const response=await fetch("/v3/send/status",{headers:headers(),signal:AbortSignal.timeout(3000)});
+      if(!response.ok) return;
+      const info=await response.json();
+      if(state.epoch!==epoch || state.revision!==rev || state.text || state.assets.length) return;
+      submitAvailable=info.available===true;
+      $("submitPanel").hidden=!submitAvailable;
+    } catch { /* 查询失败不触发命令。 */ }
+  }
+  window.setInterval(()=>{if(sessionReady && !submitBusy && !editorOpen() && !state.text && !state.assets.length)void refreshSubmit();},6000);
+  $("submitMessage").onclick = () => {void confirmSubmit();};
+  async function confirmSubmit() {
+    if(!submitAvailable || submitBusy || !state.session || !state.online) return;
+    submitBusy=true; const originalSession=state.session; const epoch=state.epoch,rev=state.revision;
+    try {
+      const response=await fetch("/v3/send/prepare",{method:"POST",headers:headers(),signal:AbortSignal.timeout(4000)});
+      const info=await response.json();
+      if(!response.ok || info.error_code){toast(sendErrors[info.error_code]||"当前不能发送，图文仍在电脑");return;}
+      if(state.epoch!==epoch || state.revision!==rev || state.session!==originalSession || !state.online) return;
+      ++sheetRevision;
+      $("sheetCard").innerHTML='<h3>发送电脑上的上一份图文？</h3><p>请先看电脑，确认图片、文字与目标都正确。这一步只发送，不重复粘贴。</p><p id="submitShortcut"></p><button id="confirmSend" class="primary">确认发送</button> <button id="cancelSend">取消</button>';
+      $("submitShortcut").textContent=`将执行 ${info.shortcut}，不会自动重试。`;
+      $("sheet").classList.add("show");
+      $("cancelSend").onclick=()=>$("sheet").classList.remove("show");
+      $("confirmSend").onclick=()=>{void (async()=>{
+        const btn=$("confirmSend") as HTMLButtonElement; if(btn.disabled)return;btn.disabled=true;
+        if(state.epoch!==epoch || state.revision!==rev || state.session!==originalSession || !state.online){toast("内容或连接已变化，没有发送");$("sheet").classList.remove("show");return;}
+        try {
+          const result=await fetch("/v3/send/commit",{method:"POST",headers:{...headers(),"Content-Type":"application/json"},
+            body:JSON.stringify({ticket:info.ticket,delivery_id:info.delivery_id,confirmed:true}),signal:AbortSignal.timeout(6000)});
+          const status=await result.json();
+          toast(status.result==="KEYS_SENT"?"发送按键已执行，请查看电脑结果":sendErrors[status.error_code]||"发送未确认，请查看电脑，不会自动重试");
+        }catch{toast("发送回执未收到，请看电脑结果；不会自动重试");}
+        finally {submitAvailable=false;$("submitPanel").hidden=true;$("sheet").classList.remove("show");}
+      })();};
+    }catch{toast("电脑未连接，没有发送");}finally{submitBusy=false;}
+  }
 
   function pairCodeFromUrl(): string {
     try {
@@ -988,7 +1143,8 @@ export function boot(root: HTMLElement): void {
       <p>密钥只存在电脑，不配 Key 也能输入、画图和投递。</p>
       <p>拒绝截图仍可同步文字。截图和插入权限由电脑端批准。</p>
       <p>Alt+I 插入并复制 · Alt+Shift+I 召回上次。</p>
-      <p>AI 文字辅助仅在电脑主动调用，不负责手机听写。</p>`;
+      <p>AI 文字辅助仅在电脑主动调用，不负责手机听写。</p>
+      <p>需要纯手机发送：在电脑常用设置开启「允许手机确认后发送」，选择该应用的 Enter / Ctrl+Enter。插入之后，手机另行确认发送。</p>`;
     $("sheet").classList.add("show");
     void fetch("/v3/status", {headers:headers()}).then(async res => {
       if (!res.ok) throw new Error("offline");

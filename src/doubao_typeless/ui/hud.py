@@ -139,6 +139,8 @@ class HudController:
         dismiss.setFixedSize(24, 28)
         dismiss.clicked.connect(self.dismiss)
         row.addWidget(dismiss)
+        for action in (expand, copy, btn, dismiss):
+            action.setFocusPolicy(Qt.NoFocus)
         layout.addWidget(self._status, 0)
         layout.addWidget(self._body, 1)
         thumbs = QWidget()

@@ -591,6 +591,14 @@ class ClientWindow:
         self.start_min.setChecked(bool(stored.get("start_minimized")))
         sl.addRow(self.autostart)
         sl.addRow(self.start_min)
+        self.phone_send_enabled = QCheckBox("允许手机确认后发送（插入仍不自动发送）")
+        self.phone_send_enabled.setChecked(stored.get("phone_send_enabled") is True)
+        self.phone_send_mode = QComboBox()
+        self.phone_send_mode.addItem("Enter", "enter")
+        self.phone_send_mode.addItem("Ctrl+Enter", "ctrl_enter")
+        self.phone_send_mode.setCurrentIndex(1 if stored.get("phone_send_mode") == "ctrl_enter" else 0)
+        sl.addRow(self.phone_send_enabled)
+        sl.addRow("目标应用发送快捷键", self.phone_send_mode)
         ai_intro = QLabel("AI 文字辅助（可选）\n仅在「当前图文」主动检查时调用。不负责语音识别，不影响普通输入和画图。")
         ai_intro.setWordWrap(True)
         sl.addRow(ai_intro)
@@ -953,6 +961,8 @@ class ClientWindow:
             "hotkey_capture": self.hotkey_capture.text().strip() or "<alt>+<shift>+s",
             "autostart": self.autostart.isChecked(),
             "start_minimized": self.start_min.isChecked(),
+            "phone_send_enabled": self.phone_send_enabled.isChecked(),
+            "phone_send_mode": self.phone_send_mode.currentData(),
             "byok_endpoint": self.byok_endpoint.text().strip(),
             "byok_api_key": self.byok_key.text().strip(),
             "byok_model": self.byok_model.text().strip(),

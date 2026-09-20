@@ -185,6 +185,7 @@ def test_production_offline_photo_is_local_then_wakes_pc_with_rendered_version(t
                 await page.fill('#text','离线画好再同步')
                 await page.set_input_files('#file',{'name':'test.png','mimeType':'image/png','buffer':raw.getvalue()})
                 await page.wait_for_selector('#editor.show')
+                await page.click('#captionToggle')
                 await page.fill('#captionInput','按钮往右')
                 await page.click('#done')
                 await page.wait_for_selector('#editor.show',state='hidden')
