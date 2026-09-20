@@ -102,7 +102,7 @@ export class DraftOutbox {
     Object.assign(this, {send, persist, onState, timer, cancel, retryMs, debounceMs});
     this.latest = null; this.flight = null; this.acked = null; this.online = false;
     this.timeout = null; this.preparing = false; this.closed = false; this.waiters = [];
-    this.failure = null;
+    this.failure = null; this.connectionVersion = 0;
   }
   offer(message) {
     this.latest = structuredClone(message); this.failure = null;
@@ -110,10 +110,12 @@ export class DraftOutbox {
     this.settle(); void this.pump();
   }
   connect() {
+    this.connectionVersion++;
     this.online = true; this.flight = null; this.acked = null; this.failure = null;
     this.cancel(this.timeout); void this.pump();
   }
   disconnect() {
+    this.connectionVersion++;
     this.online = false; this.flight = null; this.cancel(this.timeout);
     this.onState("offline");
   }
@@ -121,19 +123,24 @@ export class DraftOutbox {
     if (this.closed || !this.online || this.flight || this.preparing || !this.latest || this.failure) return;
     if (this.acked === this.latest.update_id) { this.onState("synced"); this.settle(); return; }
     this.preparing = true;
+    // 固定这次即将发出的快照。等待本地写盘/合并窗口时产生的新编辑只替换 latest，
+    // 不得使本次快照无限延期，也不能合并掉图片从编辑/上传中到成品的首个通知。
+    // 内存始终只保留一个在途快照和一个最新快照；ACK后再发送最新版本。
+    const preparingMessage = structuredClone(this.latest);
+    const connection = this.connectionVersion;
     try {
       if (this.debounceMs) await new Promise(resolve => this.timer(resolve, this.debounceMs));
-      if (!this.online || this.closed) return;
-      const savingId = this.latest.update_id;
+      if (!this.online || this.closed || connection !== this.connectionVersion) return;
       await this.persist();
-      if (!this.online || this.closed || !this.latest) return;
-      if (this.latest.update_id !== savingId) {
-        this.preparing = false; void this.pump(); return;
-      }
-      this.flight = structuredClone(this.latest);
+      if (!this.online || this.closed || !this.latest || connection !== this.connectionVersion) return;
+      this.flight = preparingMessage;
       this.transmit();
     } catch { this.onState("save_failed"); }
-    finally { this.preparing = false; }
+    finally {
+      this.preparing = false;
+      // 断开后重连时，旧连接等待写盘的快照不可跨会话发出。
+      if (this.online && !this.closed && connection !== this.connectionVersion) void this.pump();
+    }
   }
   transmit() {
     if (!this.flight || !this.online || this.closed) return;
