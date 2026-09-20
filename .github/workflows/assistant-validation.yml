@@ -1,0 +1,28 @@
+name: Assistant candidate validation
+
+on:
+  push:
+    branches: ["v3/assistant-runtime-safety"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Archive tracked sources only
+        run: |
+          mkdir -p /tmp/dt-snapshot
+          git archive --format=tar HEAD > /tmp/dt-snapshot/source.tar
+          git rev-parse HEAD > /tmp/dt-snapshot/SOURCE_SHA.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: assistant-source-${{ github.sha }}
+          path: /tmp/dt-snapshot/
+          retention-days: 7
+          if-no-files-found: error
