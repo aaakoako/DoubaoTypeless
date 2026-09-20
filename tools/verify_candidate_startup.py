@@ -66,7 +66,7 @@ def verify(exe: Path, report: Path) -> int:
             report.parent.mkdir(parents=True,exist_ok=True)
             # 只保留该次隔离进程的运行日志，不复制pair.txt、截图或凭据。
             log_dir = report.parent / (report.stem + "-logs")
-            for name in ("runtime.log", "v3.log"):
+            for name in ("runtime.log", "v3.log", "control.log"):
                 path = data / "logs" / name
                 if path.is_file():
                     log_dir.mkdir(parents=True, exist_ok=True)

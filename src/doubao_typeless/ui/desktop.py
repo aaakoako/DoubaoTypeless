@@ -1274,6 +1274,13 @@ def run_desktop(argv: list[str] | None = None) -> int:
     try:
         app = V3App(data_dir=data_dir, instance_lock=lock)
         app.hud.start()
+        # Build the native surfaces/control listener before exposing HTTP readiness.
+        # Otherwise a second --quit/show can reach a half-started process and time out
+        # while expensive first-use font/icon/widget initialization is still running.
+        shell = DesktopShell(app)
+        if shell._wake is None or not shell._wake.isListening():
+            raise RuntimeError("无法建立本机控制入口，已停止启动")
+        logger("[v3.lifecycle] native_shell_ready")
         loop = app.start_background(start_hud=False)
         app._loop = loop
         try:
@@ -1295,7 +1302,8 @@ def run_desktop(argv: list[str] | None = None) -> int:
                 logger(f"[v3] 热键注册失败: {start['failures']}")
         except Exception as exc:
             logger(f"[v3] 热键未启动: {exc}")
-        shell = DesktopShell(app)
+        shell.client.refresh()
+        logger("[v3.lifecycle] desktop_event_loop_ready")
         stored = load_settings(app.data_dir)
         if minimized or stored.get("start_minimized"):
             shell.tray.show()
