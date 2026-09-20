@@ -1,0 +1,58 @@
+--- a/src/doubao_typeless/app.py
++++ b/src/doubao_typeless/app.py
+@@ -417,7 +417,7 @@
+         if event == "delivery_progress":
+             device = getattr(self, "_active_delivery_device", None)
+             loop = getattr(self, "_loop", None)
+-            if device and loop and loop.is_running():
++            if device and loop and loop.is_running() and getattr(self, "_active_delivery_primary", False):
+                 progress = {"type":"delivery.progress", "stage":kwargs.get("stage"),
+                             "index":kwargs.get("index"), "total":kwargs.get("total")}
+                 for session in list(self.auth.sessions.values()):
+@@ -886,6 +886,7 @@
+                           bundle_id=bundle.get("bundle_id", ""), adapter_id="generic_text")
+         phase = "prepare"
+         self._active_delivery_device = bundle.get("device_id")
++        self._active_delivery_primary = bundle.get("authority") == "phone"
+         try:
+             # 保存完整副本后才允许触碰剪贴板。未准备成功不执行任何按键。
+             self.history.record(bundle, attempt_result="RUNNING")
+@@ -941,6 +942,7 @@
+         finally:
+             self.ledger.finish(intent_id, attempt.result)
+             self._active_delivery_device = None
++            self._active_delivery_primary = False
+         self._last_attempt = attempt
+         self._last_attempt_bundle_id = bundle.get("bundle_id")
+         _log(f"[v3.delivery] result={attempt.result} phase={phase} steps={len(attempt.steps)}")
+--- a/tests/test_v3_editor_transactions.py
++++ b/tests/test_v3_editor_transactions.py
+@@ -115,12 +115,12 @@
+             assert count==1,uploads
+             await page.locator('.attach-card img').click();await stroke(page)
+             # 明确模拟浏览器容量错误；不是修改生产保存函数或放宽验证。
+-            await page.evaluate("window.realPut=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(){throw new DOMException('test quota','QuotaExceededError')}")
++            await page.evaluate("() => {window.realPut=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(){throw new DOMException('test quota','QuotaExceededError')};}")
+             await page.click('#done')
+             await page.wait_for_function("document.querySelector('#editorStatus').textContent.includes('保存失败')")
+             assert await page.locator('#editor').is_visible()
+             assert len(uploads)==count
+-            await page.evaluate("IDBObjectStore.prototype.put=window.realPut")
++            await page.evaluate("() => {IDBObjectStore.prototype.put=window.realPut;}")
+             await page.click('#back');await page.click('#discardEditing')
+             await page.wait_for_selector('#editor.show',state='hidden');await synced(page)
+             assert app.draft.assets[0]['asset_id']==original
+--- a/tests/test_v3_web_source.py
++++ b/tests/test_v3_web_source.py
+@@ -26,7 +26,10 @@
+     assert "openNextQueued" in app
+     assert "dt.v3.device" in app
+     assert "resumeRemembered" in app
+-    assert "if (asset.scene)" in app
++    # Scratch edits take precedence without replacing the saved scene until commit.
++    # Production-page cancellation tests also verify the restored pixel/scene identity.
++    assert "asset.edit_scene || asset.scene" in app
++    assert "editor.importScene(asset.edit_scene || asset.scene!)" in app
+     assert "rebindSource" in app
+     assert "applyRotated" in app
+     assert "applyReady" in app
