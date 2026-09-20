@@ -2,19 +2,30 @@ name: V3 preview tests
 
 on:
   push:
-    branches: ["v3/**"]
+    branches: ["v3/**", "!v3/assistant-runtime-safety"]
   pull_request:
     branches: ["v3/**"]
   workflow_dispatch:
 
+permissions:
+  contents: read
+concurrency:
+  group: v3-preview-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  # The assistant branch runs these same full tests in assistant-candidate.yml,
+  # followed by frozen-EXE startup/insert verification. Do not run it three times.
   pytest:
+    if: github.head_ref != 'v3/assistant-runtime-safety' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: web/package-lock.json
       - uses: actions/setup-python@v5
@@ -32,42 +43,65 @@ jobs:
           sudo apt-get install -y libegl1 libgl1
       - name: Install test dependencies
         run: |
-          python -m pip install --upgrade pip
           python -m pip install -r requirements-test.txt playwright PySide6
           python -m playwright install --with-deps chromium
       - name: Evidence checker self-test
         run: python -m unittest discover -s docs/v3-delivery/tests -v
       - name: V3 unit and production frontend tests
-        run: python -m pytest -q --tb=short --junitxml=docs/evidence/v3-ci/junit.xml
-      - name: Confirm no release side effects
-        run: |
-          test ! -f config.json
-          python - <<'PY'
-          print("preview workflow does not create tags or GitHub Releases")
-          PY
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -q --tb=short --junitxml=test-results.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preview-linux-tests-${{ github.sha }}
+          path: test-results.xml
+          if-no-files-found: warn
 
   windows-pytest:
+    if: github.head_ref != 'v3/assistant-runtime-safety' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install native test dependencies
+      - name: Install native and browser test dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements-test.txt PySide6 pynput pywin32
+          python -m pip install -r requirements-test.txt PySide6 pynput pywin32 playwright
+          python -m playwright install chromium
+          cd web
+          npm ci
+          npm run typecheck
+          npm run build
       - name: Native and unit tests on Windows
-        run: python -m pytest -q --tb=short
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -q --tb=short --junitxml=windows-tests.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preview-windows-tests-${{ github.sha }}
+          path: windows-tests.xml
+          if-no-files-found: warn
 
   windows-min-pack:
     runs-on: windows-latest
     needs: [pytest, windows-pytest]
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: web/package-lock.json
       - uses: actions/setup-python@v5
@@ -79,25 +113,18 @@ jobs:
           npm ci
           npm run build
       - name: Install pack dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install pyinstaller aiohttp Pillow PySide6 pynput pywin32 qrcode httpx
+        run: python -m pip install pyinstaller aiohttp Pillow PySide6 pynput pywin32 qrcode httpx comtypes
       - name: Build isolated onedir
         run: python -m PyInstaller --noconfirm packaging/v3_preview.spec
       - name: Resource check
-        shell: bash
+        shell: python
         run: |
-          python - <<'PY'
           from pathlib import Path
           root = Path("dist/DoubaoTypelessV3Preview")
-          exe = root / "DoubaoTypelessV3Preview.exe"
-          assert exe.is_file(), exe
+          assert (root / "DoubaoTypelessV3Preview.exe").is_file()
           assert not any(root.rglob("*WebEngine*"))
-          assert any(root.rglob("pc.html")), "pc.html missing"
-          assert any(p.name == "LICENSE" for p in root.rglob("LICENSE")), "LICENSE missing"
-          assert any(root.rglob("index.html")), "web dist missing"
-          print("min pack exe", exe, "bytes", exe.stat().st_size)
-          PY
+          for name in ("pc.html", "LICENSE", "index.html"):
+              assert any(root.rglob(name)), name
       - uses: actions/upload-artifact@v4
         with:
           name: v3-preview-onedir

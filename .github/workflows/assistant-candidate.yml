@@ -6,24 +6,32 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: assistant-v3-candidate
-  cancel-in-progress: false
+  group: assistant-v3-candidate-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   source:
     if: github.ref == 'refs/heads/v3/assistant-runtime-safety'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     outputs:
       source_sha: ${{ steps.source.outputs.source_sha }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      - name: Apply reviewed source delta on isolated branch
+          persist-credentials: false
+      - name: Bind immutable source commit
         id: source
-        run: python .github/scripts/import_assistant_delta.py
+        run: |
+          sha=$(git rev-parse HEAD)
+          echo "source_sha=$sha" >> "$GITHUB_OUTPUT"
+          mkdir -p /tmp/dt-current-source
+          git archive --format=tar HEAD > /tmp/dt-current-source/source.tar
+          printf '%s\n' "$sha" > /tmp/dt-current-source/SOURCE_SHA.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: assistant-source-${{ steps.source.outputs.source_sha }}
+          path: /tmp/dt-current-source/
+          retention-days: 3
+          if-no-files-found: error
   validate:
     needs: source
     runs-on: ubuntu-latest
@@ -45,10 +53,14 @@ jobs:
           python -m pip install -r requirements-test.txt PySide6 playwright
           python -m playwright install --with-deps chromium
           cd web && npm ci && npm run typecheck && npm run build
+      - name: Evidence checker self-test
+        run: python -m unittest discover -s docs/v3-delivery/tests -v
       - name: Full tests without exclusions
         env:
           QT_QPA_PLATFORM: offscreen
         run: python -m pytest -q --tb=short --junitxml=test-results.xml
+      - name: Confirm isolated data
+        run: test ! -f config.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
