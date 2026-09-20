@@ -1,124 +1,49 @@
 {
   "schema_version": 1,
-  "product_goal": "按现有 MASTER_PLAN 交付完整、可用的 Windows V3 体验候选；未达成前不发布。",
-  "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
-  "review_sha": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
-  "product_source_at_review": "70aa6b92d13f7c8a69b024c94674835083cffa37",
+  "product_goal": "沿用 MASTER_PLAN，交付保留原版插入并复制等体验的完整 Windows V3 发布前候选。",
   "current_head": "USE_GIT_HEAD_OR_BUILD_INFO_SOURCE_SHA",
-  "working_tree": "本轮容器工作副本；GitHub本轮只提供读取动作，尚未推送。不是新候选包。",
-  "last_completed_slice": "IMPLEMENTED_SHARED_THEME_SCOPED_ATTACHMENTS_AND_RESUME_NOT_YET_NATIVE_VALIDATED",
-  "active_slice": "UNIFIED_UI_AND_MIXED_COMPOSER_INTEGRATION",
-  "next_action": "运行完整Linux/Windows测试与真实无控制台EXE：相册两张处理图加文字、附件焦点变化、未知图片明确确认后续文字、定位唯一Composer，全部通过才给新版整包。不得减少原测试或把缺设备扩大为已知代码缺陷。",
+  "working_tree": "产品改动已进入 v3/assistant-runtime-safety；单次源码传输已清理，候选工作流恢复只读权限。",
+  "source_base": "30421e3cb306402ef2a67ca54b6e8824f9f2630d",
+  "last_completed_slice": "SHARED_MIST_INDIGO_UI_AND_MIXED_DELIVERY_IMPLEMENTED",
+  "active_slice": "VERIFY_FULL_NATIVE_MIXED_CANDIDATE",
+  "next_action": "读取当前 build-info.source_sha 对应的完整 CI 和实际 EXE 报告。原版连续文字、手机主稿连续文字、原生HUD/详情/手机按钮、两张处理图后文字、图片未知后确认续贴、同窗口定位Composer全部通过后才交付同一份完整目录包。失败修真实原因，不放宽断言。",
   "accepted_requirements": [
-    "MASTER_PLAN 为唯一产品/执行规范",
-    "独立复核 REQUEST_CHANGES 不是仅剩真机",
-    "R2–R5 已按复核最小修复落地",
-    "不自动 merge/tag/Release",
-    "不改测试期望、不删用例、不改审计包旧源码"
+    "MASTER_PLAN 是唯一产品规范，不另起方案",
+    "手机主稿和弱网本地保存继续有效；电脑改字是独立审阅副本",
+    "保留插入并复制、独立复制、正常收窗、手机下一段、图文恢复、截图/相册/白板/BYOK",
+    "桌面/HUD/手机/对话框共用雾蓝灰加蓝紫主题和组件层级，不再用绿色主色或凸起阴影",
+    "图片未知不能静默跳过正文；保留明确的继续投递与用户确认，不自动重复图、不发Enter",
+    "定位限当前或已知目标窗口，多个候选明确选择，不宣称所有Agent通用",
+    "不merge、不tag、不Release、不覆盖日用数据、不强制结束用户进程"
+  ],
+  "implemented_this_batch": [
+    "共享设计色值及生成器、原生Qt与手机CSS统一、原图标同色系",
+    "具体Composer容器附件观察、无用户新操作时恢复原文字编辑控件",
+    "完整图文进度、全部图片接收后文字继续、未知图片明确确认续贴且不重复图片",
+    "按源稿版本轮换，最终投递图注不破坏手机主稿匹配",
+    "真实冻结包新增混合图文/成品像素/定位/人工续贴回归",
+    "原生回归发现缺sys导入导致发键后中断，已修复并补正式wrapper测试",
+    "启动时本地命令入口延后建立，show/quit在严格期限内等连接，仅发送一次命令"
   ],
   "open_defects": [
-    "真实Android/豆包和实际Cursor版本尚未验收；本轮泛用UIA语义定位不等于所有Agent已兼容。",
-    "本次统一样式/图文接续的全仓云端与Windows整包验证尚未执行；原崩溃历史没有用户现场日志，不宣布已精确确诊。"
+    "本提交的完整云端与混合图文原生门槛须读取实际结果；未通过不能生成交付结论",
+    "实际 Android/豆包触控与真实 Cursor 版本未在该环境验证，不得把合成网页输入框当作这些产品通过",
+    "用户历史偶发崩溃没有现场证据；当前包可验证恢复能力，但不能声称历史根因已确诊"
   ],
-  "reopened_this_round": [
-    "F03",
-    "F04",
-    "F05",
-    "F06",
-    "F07",
-    "F08",
-    "F09",
-    "F10",
-    "F11",
-    "F12"
-  ],
-  "closed_this_round": [
-    "R2-F03",
-    "R2-F04",
-    "R2-F05",
-    "R2-F06",
-    "R3-F07",
-    "R3-F08",
-    "R3-F09",
-    "R3-F10",
-    "R4-F11",
-    "R4-F12",
-    "R5-pack"
-  ],
-  "kept_from_r0_r1": [
-    "GET pair 403",
-    "POST 不能自授",
-    "未鉴权 WS 拒写",
-    "锁前不写 sqlite",
-    "CI Pillow",
-    "PASS 降级"
-  ],
-  "environment_blockers": [
-    {
-      "missing": "真实 Android + 豆包输入法 + 同网手机浏览器",
-      "blocks": [
-        "真机扫码/相册/白板手感",
-        "记住设备续接手感"
-      ],
-      "who": "设备持有者"
-    },
-    {
-      "missing": "真实 Cursor Composer 目标",
-      "blocks": [
-        "J7 真目标图文",
-        "observe_image 实测"
-      ],
-      "who": "设备持有者；PasteTarget 不能代替"
-    }
-  ],
-  "last_commands": [
-    {
-      "cmd": "PYTHONPATH=src python -m pytest -q tests/test_v3_insert_stabilization.py tests/test_v3_assistant_delivery.py tests/test_v3_s1_commands.py --tb=short",
-      "exit_code": 0,
-      "output": "32 passed; Windows system API is an explicit test fake in newly added tests."
-    }
-  ],
+  "last_commands": [{
+    "cmd": "PYTHONPATH=src python -m pytest -q tests/test_v3_unified_composer.py tests/test_v3_composer_progress.py tests/test_v3_assistant_delivery.py tests/test_v3_s1_commands.py --tb=short",
+    "exit_code": 0,
+    "output": "82 passed，Linux专项，系统接口为明确测试替身；不是Windows整包通过"
+  }],
+  "previous_cloud_evidence": {
+    "run_id": 35510682062,
+    "source_sha": "6166dc47d0cd2a111855707cb3ee5029d83bfdab",
+    "full_linux_and_windows_tests": "passed",
+    "frozen_startup": "failed: quit_command_exit 1 while GUI command pipe was still initializing",
+    "mixed_native": "not run; upstream startup failure"
+  },
   "candidate_artifact": null,
-  "independent_review": {
-    "status": "CURRENT_BATCH_NOT_RELEASE_READY",
-    "release_ready": false
-  },
+  "independent_review": {"status":"NOT_RELEASE_READY","release_ready":false},
   "published": false,
-  "task_complete": false,
-  "source_base": "30421e3cb306402ef2a67ca54b6e8824f9f2630d",
-  "validation_this_patch": {
-    "scope": "进度提示/受限候选选择/业务入口专项",
-    "passed": 78,
-    "failed": 0,
-    "new_cases": 34,
-    "native_windows": "NOT_RUN",
-    "full_suite": "NOT_RUN",
-    "frontend_build": "NOT_RUN",
-    "ui": "HTML配色参考已本地渲染；非原生截图"
-  },
-  "previous_local_validation": {
-    "pytest": {
-      "passed": 257,
-      "failed": 3,
-      "skipped": 4,
-      "exit_code": 1,
-      "failure_reason": "三个Page.goto(127.0.0.1)均ERR_BLOCKED_BY_ADMINISTRATOR"
-    },
-    "new_pytest_cases_passed": 27,
-    "js_receipt_cases_passed": 12,
-    "frontend_typecheck": true,
-    "frontend_build": true,
-    "qt_render": "Linux/offscreen;不是Windows截图",
-    "browser_canvas": "Chromium内联组件真实像素/指针；没有绕过导航限制"
-  },
-  "local_validation": {
-    "targeted": "84 passed; production components, native APIs explicitly substituted",
-    "theme_and_settings": "35 passed",
-    "full_local": "375 passed / 8 failed / 16 skipped / 3 errors before QSS spacing correction; missing PySide6, browser and frontend dependencies. Two QSS compatibility failures corrected with unchanged old tests."
-  },
-  "last_trial": {
-    "source_sha": "f7bb48497f5a1959b803516415d45e8a2901f202",
-    "status": "WITHDRAWN_FROM_DAILY_USE_RECOMMENDATION",
-    "reason": "用户报告插入无效、浮窗提前消失、偶发崩溃；不继续推荐替换日用版，不删除用户已有包或数据。"
-  }
+  "task_complete": false
 }

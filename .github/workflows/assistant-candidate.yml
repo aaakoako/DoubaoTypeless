@@ -12,20 +12,12 @@ jobs:
   source:
     if: github.ref == 'refs/heads/v3/assistant-runtime-safety'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     outputs:
       source_sha: ${{ steps.source.outputs.source_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Import exact source-only delta when present
-        run: |
-          if test -f tools/import_unified_delta.py; then python tools/import_unified_delta.py; fi
+          persist-credentials: false
       - name: Bind immutable source commit
         id: source
         run: |
@@ -68,7 +60,7 @@ jobs:
       - name: Full tests without exclusions
         env:
           QT_QPA_PLATFORM: offscreen
-          DT_UI_EVIDENCE_DIR: ui-evidence/linux
+          DT_UI_EVIDENCE_DIR: ui-evidence
         run: python -m pytest -q --tb=short --junitxml=test-results.xml
       - name: Confirm isolated data
         run: test ! -f config.json
@@ -106,7 +98,7 @@ jobs:
       - name: Windows full tests
         env:
           QT_QPA_PLATFORM: offscreen
-          DT_UI_EVIDENCE_DIR: ui-evidence/windows
+          DT_UI_EVIDENCE_DIR: ui-evidence
         run: python -m pytest -q --tb=short --junitxml=windows-tests.xml
       - name: Generate UIA wrappers and bind actual source version
         env:
@@ -152,7 +144,7 @@ jobs:
             candidate-phone-primary.json
             candidate-phone-primary-logs/
             candidate-browser.json
-            candidate-browser.png
+            candidate-browser*.png
             candidate-browser-logs/
             windows-tests.xml
             ui-evidence/

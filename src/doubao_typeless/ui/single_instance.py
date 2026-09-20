@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import json
+import time
 
 PIPE = "DoubaoTypelessV3Preview"
 
@@ -12,28 +13,46 @@ def pipe_name() -> str:
     return override or PIPE
 
 
-def request_command(command: str, timeout_ms: int = 800) -> bool:
+def request_command(command: str, timeout_ms: int = 2000) -> bool:
+    """Wait within a bounded deadline for a client still creating its UI.
+
+    Connection failure may be immediate on Windows named pipes. Retry only before
+    connecting; once any command bytes were sent, never send the command again.
+    """
+    if command not in {"show", "quit"}:
+        return False
     try:
         from PySide6.QtNetwork import QLocalSocket
     except ImportError:
         return False
-    sock = QLocalSocket()
-    sock.connectToServer(pipe_name())
-    if not sock.waitForConnected(timeout_ms):
-        sock.close()
-        return False
-    sock.write(f"{command}\n".encode("utf-8"))
-    sock.waitForBytesWritten(timeout_ms)
-    sock.disconnectFromServer()
-    sock.close()
-    return True
+    deadline = time.monotonic() + max(0, timeout_ms) / 1000
+    while time.monotonic() < deadline:
+        sock = QLocalSocket()
+        try:
+            remaining = max(1, int((deadline - time.monotonic()) * 1000))
+            sock.connectToServer(pipe_name())
+            if not sock.waitForConnected(min(remaining, 100)):
+                time.sleep(min(.02, max(0, deadline - time.monotonic())))
+                continue
+            payload = f"{command}\n".encode("utf-8")
+            if sock.write(payload) != len(payload):
+                return False
+            if sock.bytesToWrite() > 0:
+                remaining = max(1, int((deadline - time.monotonic()) * 1000))
+                if not sock.waitForBytesWritten(remaining):
+                    return False
+            sock.disconnectFromServer()
+            return True
+        finally:
+            sock.close()
+    return False
 
 
-def request_show(timeout_ms: int = 400) -> bool:
+def request_show(timeout_ms: int = 2000) -> bool:
     return request_command("show", timeout_ms=timeout_ms)
 
 
-def request_quit(timeout_ms: int = 800) -> bool:
+def request_quit(timeout_ms: int = 2000) -> bool:
     return request_command("quit", timeout_ms=timeout_ms)
 
 
