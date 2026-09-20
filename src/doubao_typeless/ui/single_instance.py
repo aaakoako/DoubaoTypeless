@@ -7,6 +7,20 @@ import time
 PIPE = "DoubaoTypelessV3Preview"
 
 
+def _trace(stage: str, command: str = "", **details) -> None:
+    """Bounded local metadata only; never record caller bytes or draft contents."""
+    try:
+        from doubao_typeless.ui.filelog import FileLogger
+        from doubao_typeless.runtime import v3_data_dir
+        event = {"event": "local_control", "pid": os.getpid(), "stage": stage}
+        if command in {"show", "quit", "identify"}:
+            event["command"] = command
+        event.update({k: v for k, v in details.items() if isinstance(v, (bool, int))})
+        FileLogger(v3_data_dir() / "logs" / "control.log", also_print=False)(json.dumps(event))
+    except Exception:
+        pass
+
+
 def pipe_name() -> str:
     return os.environ.get("DT_V3_PIPE", "").strip() or PIPE
 
@@ -37,6 +51,7 @@ def request_command(command: str, timeout_ms: int = 2000) -> bool:
         from PySide6.QtNetwork import QLocalSocket
     except ImportError:
         return False
+    _trace("request", command)
     deadline = time.monotonic() + max(0, timeout_ms) / 1000
     while time.monotonic() < deadline:
         sock = QLocalSocket()
@@ -46,6 +61,7 @@ def request_command(command: str, timeout_ms: int = 2000) -> bool:
             if not sock.waitForConnected(min(remaining, 100)):
                 time.sleep(min(.02, max(0, deadline - time.monotonic())))
                 continue
+            _trace("connected", command)
             payload = f"{command}\n".encode("utf-8")
             if sock.write(payload) != len(payload):
                 return False
@@ -54,9 +70,12 @@ def request_command(command: str, timeout_ms: int = 2000) -> bool:
                 if not sock.waitForBytesWritten(remaining):
                     return False
             reply = _read_reply(sock, deadline)
-            return bool(reply and reply.get("accepted") == command)
+            accepted = bool(reply and reply.get("accepted") == command)
+            _trace("reply", command, accepted=accepted)
+            return accepted
         finally:
             sock.close()
+    _trace("connect_timeout", command)
     return False
 
 
@@ -78,7 +97,9 @@ def listen_for_commands(on_command, parent=None):
     QLocalServer.removeServer(name)
     server = QLocalServer(parent)
     if not server.listen(name):
+        _trace("listen_failed")
         return None
+    _trace("listening")
 
     def accept(sock):
         # Never block the GUI thread waiting for a client to produce Python bytes.
@@ -104,6 +125,7 @@ def listen_for_commands(on_command, parent=None):
             timeout.stop()
             line, tail = state["buffer"].split(b"\n", 1)
             payload = line.decode("utf-8", errors="replace").strip().lower()
+            _trace("received", payload)
             reply = {"accepted": None}
             if not tail.strip() and payload == "identify":
                 from doubao_typeless.build_info import build_info
@@ -111,14 +133,33 @@ def listen_for_commands(on_command, parent=None):
                 reply = {**build_info(), "pid": os.getpid(), "executable": sys.executable,
                          "schema": 1, "command_ack": True}
             elif not tail.strip() and payload in {"show", "quit"}:
-                try:
-                    on_command(payload)
-                    reply = {"accepted": payload}
-                except Exception:
-                    reply = {"accepted": None, "error": "COMMAND_FAILED"}
-            sock.write((json.dumps(reply) + "\n").encode("utf-8"))
+                reply = {"accepted": payload}
+            response = (json.dumps(reply) + "\n").encode("utf-8")
+            dispatched = [False]
+
+            def after_write(_count=0):
+                # Never quit the event loop before the positive response is drained.
+                if dispatched[0] or sock.bytesToWrite() > 0:
+                    return
+                dispatched[0] = True
+                _trace("reply_written", payload)
+                if reply.get("accepted"):
+                    def dispatch():
+                        try:
+                            on_command(payload)
+                            _trace("dispatched", payload)
+                        except Exception:
+                            _trace("dispatch_failed", payload)
+                    QTimer.singleShot(0, server, dispatch)
+                sock.disconnectFromServer()
+
+            sock.bytesWritten.connect(after_write)
+            if sock.write(response) != len(response):
+                _trace("write_failed", payload)
+                sock.abort()
+                return
             sock.flush()
-            sock.disconnectFromServer()
+            after_write()
 
         sock.readyRead.connect(read)
         read()
