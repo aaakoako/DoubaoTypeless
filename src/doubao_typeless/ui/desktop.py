@@ -1174,9 +1174,18 @@ class DesktopShell:
         from doubao_typeless.services.delivery_progress import summarize_delivery
         previous = self.app._last_attempt
         progress = summarize_delivery(self.app.bridge.last_bundle or {}, previous.to_dict()) if previous else None
-        mode = RecoveryDialog(self.client.widget, confirm_image=self.app.can_confirm_image(), progress=progress).exec()
-        if mode != "cancel":
-            self.app.request_recovery(mode)
+        if getattr(self, "_recovery_dialog_open", False):
+            return
+        self._recovery_dialog_open = True
+        try:
+            # The HUD is always-on-top. Without suspension it can cover a modal
+            # button, making a physical click hit the disabled overlay instead.
+            with self.app.hud.modal_pause():
+                mode = RecoveryDialog(self.client.widget, confirm_image=self.app.can_confirm_image(), progress=progress).exec()
+            if mode != "cancel":
+                self.app.request_recovery(mode)
+        finally:
+            self._recovery_dialog_open = False
 
     def quit(self) -> None:
         from PySide6.QtWidgets import QApplication

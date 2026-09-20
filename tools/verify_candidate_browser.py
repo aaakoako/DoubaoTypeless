@@ -342,7 +342,9 @@ const raw=WebSocket.prototype.send;WebSocket.prototype.send=function(data){
                 await until(lambda:win32gui.IsWindowVisible(recovery))
                 assert await target.locator('#prompt-textarea').input_value()==''
                 assert await phone.locator('#text').input_value()==text
+                await until(lambda:not win32gui.IsWindowVisible(hud()), message='HUD covers modal recovery controls')
                 assert inspector.click(recovery,'图片已出现，继续文字'),inspector.text(recovery)
+                await until(lambda:not win32gui.IsWindowVisible(recovery), message='recovery confirmation click did not close the dialog')
                 expected=text+'\n\n图1：手动确认图片'
                 await completed(expected)
                 assert len(await target.evaluate('window.imageRecords'))==1
@@ -381,6 +383,9 @@ const raw=WebSocket.prototype.send;WebSocket.prototype.send=function(data){
                     })''')
                     result['phone_text']=await phone.locator('#text').input_value()
                     result['hud_text']=hud_text()
+                    rw=own_window(child.pid,'上次结果未知')
+                    result['recovery_visible']=bool(rw and win32gui.IsWindowVisible(rw))
+                    result['recovery_text']=inspector.text(rw) if rw else ''
                     await target.screenshot(path=str(report.with_suffix('.png')))
                 except Exception as evidence_error:
                     result['evidence_error_type']=type(evidence_error).__name__

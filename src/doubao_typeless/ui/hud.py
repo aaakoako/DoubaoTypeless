@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Callable
+from contextlib import contextmanager
 from doubao_typeless.ui.theme import style_root
 from doubao_typeless.ui.theme_generated import COLORS
 
@@ -265,6 +266,18 @@ class HudController:
             return
         self._apply_hide()
 
+    @contextmanager
+    def modal_pause(self):
+        """GUI-thread scope: retain data while yielding the screen to a dialog."""
+        self._modal_depth = getattr(self, "_modal_depth", 0) + 1
+        self.dismiss()
+        try:
+            yield
+        finally:
+            self._modal_depth -= 1
+            # Do not pop the overlay back on cancellation. The next actual action
+            # or phone edit can show it normally, without consuming any draft.
+
     def dismiss(self) -> None:
         # 用户主动收起不取消已发出的操作，也不清空草稿。
         self.visible = False
@@ -370,6 +383,13 @@ class HudController:
         self._thumbs.setVisible(bool(self.assets))
 
     def _apply_show(self) -> None:
+        if getattr(self, "_modal_depth", 0):
+            # A non-activating always-on-top HUD must not cover a modal action.
+            # Incoming phone changes are retained, but no overlay is re-shown.
+            self.visible = False
+            if self._widget is not None:
+                self._widget.hide()
+            return
         if self._widget is None:
             return
         self._refresh_thumbnails()

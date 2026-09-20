@@ -269,7 +269,20 @@ class V3App:
         return self._commands.submit(self.recall_last)
 
     def request_recovery(self, mode: str):
-        return self._commands.submit(self.confirm_recovery, mode)
+        future = self._commands.submit(self.confirm_recovery, mode)
+        def completed(done):
+            try:
+                result = done.result() or {}
+                code = result.get("error_code")
+                _log(f"[v3.recovery] result={result.get('result', 'none')} error={code or 'none'}")
+                if code:
+                    # Queue rejection and early target validation must not vanish
+                    # when the modal closes. Never enqueue an automatic retry.
+                    self._notify_ui("delivery_failed", **result)
+            except Exception as exc:
+                self._report_command_error(exc)
+        future.add_done_callback(completed)
+        return future
 
     def update_pc_text(self, text: str) -> None:
         with self._state_lock:
