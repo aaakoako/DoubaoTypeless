@@ -83,3 +83,31 @@ def test_confirmation_cannot_continue_into_other_target(tmp_path):
     app._last_target_fp=("x","old",1)
     app._read_focus=lambda:("x","new",2)
     assert app.confirm_recovery("confirm_continue")["error_code"]=="TARGET_CHANGED"
+
+
+def test_readonly_edit_rejects_paste():
+    kind = classify_element([descriptor(readonly=True, value_available=True)])
+    assert kind == "readonly"
+    assert not may_inject(kind, wants_images=False)
+    assert not may_inject(kind, wants_images=False, remote=True)
+
+
+def test_repository_title_does_not_mean_our_window():
+    from doubao_typeless.core.policy import is_own_window
+    assert not is_own_window("Chrome_WidgetWin_1", "DoubaoTypeless — Cursor")
+    assert not is_own_window("Chrome_WidgetWin_1", "DoubaoTypeless GitHub — Chrome")
+    assert is_own_window("Qt611QWindowIcon", "DoubaoTypeless V3 · 体验版")
+    assert is_own_window("Qt611QWindowIcon", "查看图片")
+
+
+def test_readonly_comes_from_actual_uia_property_reader():
+    from doubao_typeless.platform.windows.focus import describe
+    class ReadOnlyControl:
+        CurrentControlType = 50004
+        CurrentIsEnabled = True
+        CurrentName = "ChatInput"
+        def GetCurrentPropertyValue(self, key):
+            return key in {30043, 30046}
+    desc = describe(ReadOnlyControl())
+    assert desc["readonly"] is True
+    assert classify_element([desc]) == "readonly"

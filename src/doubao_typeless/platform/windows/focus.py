@@ -64,6 +64,8 @@ def classify_element(descriptors: list[dict]) -> str:
     item = descriptors[0]
     if item.get("password"):
         return "password"
+    if item.get("readonly") is True:
+        return "readonly"
     context = " ".join(str(d.get(k) or "") for d in descriptors
                        for k in ("class_name", "automation_id", "name")).lower()
     if any(k in context for k in ("monaco", "scintilla", "codeditor", "editordocument", "view-lines")):
@@ -81,9 +83,12 @@ def classify_element(descriptors: list[dict]) -> str:
 
 def describe(element) -> dict:
     editable = False
+    readonly = None
     try:
         # UIA_IsValuePatternAvailablePropertyId=30043, Value.IsReadOnly=30046.
-        editable = bool(element.GetCurrentPropertyValue(30043)) and not bool(element.GetCurrentPropertyValue(30046))
+        available = bool(element.GetCurrentPropertyValue(30043))
+        readonly = bool(element.GetCurrentPropertyValue(30046)) if available else None
+        editable = available and readonly is False
     except Exception:
         pass
     return {
@@ -95,6 +100,7 @@ def describe(element) -> dict:
         "enabled": bool(property_value(element, "CurrentIsEnabled", False)),
         "offscreen": bool(property_value(element, "CurrentIsOffscreen", False)),
         "value_editable": editable,
+        "readonly": readonly,
     }
 
 
@@ -137,7 +143,8 @@ def read_target() -> FocusSnapshot:
                 int(property_value(element, "CurrentNativeWindowHandle", 0) or 0), runtime_id(element), kind)
     except Exception:
         # UIA不可用时仍能复制；不猜一个Composer来放行图片。
-        return FocusSnapshot(cls, title, hwnd, pid, kind=base_kind)
+        return FocusSnapshot(cls, title, hwnd, pid,
+            kind=base_kind if base_kind in {"code", "terminal", "paste"} else "unknown")
 
 
 def same_target(left, right) -> bool:
