@@ -317,6 +317,7 @@ const raw=WebSocket.prototype.send;WebSocket.prototype.send=function(data){
                 await phone.fill('#text',text)
                 await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
                 expected_text=text+'\n\n图1：第一张标注\n图2：第二张标注'
+                await phone.screenshot(path=str(report.with_name(report.stem+'-phone.png')))
                 expected_images=await phone.evaluate("""async()=>{const out=[];for(const im of document.querySelectorAll('.attach-card img')){await im.decode();const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;c.getContext('2d').drawImage(im,0,0);const a=c.getContext('2d').getImageData(0,0,c.width,c.height).data,r=new Uint8Array(c.width*c.height*3);for(let i=0,j=0;i<a.length;i+=4){r[j++]=a[i];r[j++]=a[i+1];r[j++]=a[i+2]}const d=await crypto.subtle.digest('SHA-256',r);out.push({w:c.width,h:c.height,sha256:[...new Uint8Array(d)].map(v=>v.toString(16).padStart(2,'0')).join('')})}return out}""")
                 await target.bring_to_front();await target.locator('#prompt-textarea').click()
                 await until(lambda:'2 张图片已更新' in hud_text(),message='mixed images not visible in native HUD')

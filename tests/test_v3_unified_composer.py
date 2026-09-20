@@ -153,3 +153,29 @@ def test_icon_uses_same_accent():
     from tools.export_v3_icon import export
     export()
     assert '#5B5CE2' in (ROOT/'assets/icon.svg').read_text(encoding='utf-8')
+
+
+def test_production_paste_records_stamp_only_after_one_native_call(monkeypatch):
+    # Exercise the production wrapper itself; platform fixture otherwise replaces it.
+    from doubao_typeless.app import V3App
+    from doubao_typeless.platform.windows import clipboard
+    import types
+    calls=[]
+    monkeypatch.setattr(clipboard,'send_paste',lambda:calls.append('paste'))
+    stub=types.SimpleNamespace(_input_stamp=lambda:77)
+    V3App._paste(stub)
+    assert calls==['paste'] and stub._injected_input_stamp==77
+
+
+def test_production_input_stamp_without_windows_does_not_raise(monkeypatch):
+    from doubao_typeless.app import V3App
+    monkeypatch.setattr(sys,'platform','linux')
+    assert V3App._input_stamp() is None
+
+
+def test_production_input_stamp_uses_windows_state(monkeypatch):
+    from doubao_typeless.app import V3App
+    import types
+    monkeypatch.setitem(sys.modules,'win32api',types.SimpleNamespace(GetLastInputInfo=lambda:1234))
+    monkeypatch.setattr(sys,'platform','win32')
+    assert V3App._input_stamp()==1234
