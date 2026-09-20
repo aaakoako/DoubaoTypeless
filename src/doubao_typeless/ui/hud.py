@@ -159,7 +159,7 @@ class HudController:
             def receive(inner, message):
                 kind, payload = message
                 if kind == "show":
-                    controller._apply_show()
+                    controller._apply_content_update()
                 elif kind == "hide":
                     controller._apply_hide()
                 elif kind == "operation":
@@ -199,10 +199,10 @@ class HudController:
             else:
                 # 支持既有嵌入式HUD：外部提供widget、尚未创建专用接收器。
                 from PySide6.QtCore import QTimer
-                slot = self._apply_show if kind == "show" else (self._apply_hide if kind == "hide" else lambda: self._apply_operation(**payload))
+                slot = self._apply_content_update if kind == "show" else (self._apply_hide if kind == "hide" else lambda: self._apply_operation(**payload))
                 QTimer.singleShot(0, self._widget, slot)
         elif kind == "show":
-            self._apply_show()
+            self._apply_content_update()
         elif kind == "hide":
             self._apply_hide()
         else:
@@ -240,10 +240,16 @@ class HudController:
         if self._widget is not None:
             self._apply_show()
 
+    def _apply_content_update(self) -> None:
+        # 新的一次编辑解除旧结果提示；忙碌期间的同步不得覆盖进度。
+        if self._mode in {"failed", "result"}:
+            self._mode, self._operation_message = "receiving", ""
+        self._apply_show()
+
     def _idle_timeout(self) -> None:
         if self._mode == "busy":
             return
-        if self._reading() or (self._widget is not None and self._widget.underMouse()):
+        if self._mode != "result" and (self._reading() or (self._widget is not None and self._widget.underMouse())):
             self._timer.start(TOKENS["idle_ms"])
             return
         self._apply_hide()
@@ -311,7 +317,7 @@ class HudController:
     def _pause_or_resume_idle(self) -> None:
         if self._timer is None:
             return
-        if self._mode == "busy" or self._reading():
+        if self._mode == "busy" or (self._mode != "result" and self._reading()):
             self._timer.stop()
             return
         self._timer.start(12000 if self._mode == "failed" else (900 if self._mode == "result" else TOKENS["idle_ms"]))
@@ -413,7 +419,7 @@ class HudController:
                 self._body.verticalScrollBar().setValue(self._body.verticalScrollBar().maximum())
         QTimer.singleShot(0, self._widget, settle_tail)
         if self._timer:
-            if reading or self._mode == "busy":
+            if self._mode == "busy" or (reading and self._mode != "result"):
                 self._timer.stop()
             else:
                 self._timer.start(12000 if self._mode == "failed" else (900 if self._mode == "result" else TOKENS["idle_ms"]))

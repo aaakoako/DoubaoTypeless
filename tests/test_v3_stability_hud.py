@@ -68,3 +68,26 @@ def test_image_updates_do_not_remove_waiting_feedback(hud):
     assert hud._mode=='busy' and not hud._timer.isActive()
     assert '确认手机' in hud._status.text()
     assert not hud._insert.isEnabled()
+
+
+def test_success_hides_even_when_pointer_still_over_clicked_button(hud):
+    QTest.mouseMove(hud._insert, hud._insert.rect().center())
+    hud.operation_event('delivery_start')
+    hud.operation_event('delivery_complete',result='UNKNOWN',rotated=True,text_sent=True)
+    hud._idle_timeout()
+    assert not hud._widget.isVisible()
+
+
+def test_new_edit_clears_old_failure_without_clearing_text(hud):
+    hud.operation_event('delivery_failed',error_code='PHONE_OFFLINE')
+    hud.show_receiving('新的输入', revision=8)
+    assert hud._mode=='receiving'
+    assert hud._body.toPlainText()=='新的输入'
+    assert '离线' not in hud._status.text()
+
+
+def test_result_timer_does_not_stop_for_old_selected_text(hud):
+    hud._body.selectAll()
+    hud.operation_event('delivery_start')
+    hud.operation_event('delivery_complete',result='UNKNOWN',rotated=True,text_sent=True)
+    assert hud._timer.isActive() and hud._timer.interval()==900
