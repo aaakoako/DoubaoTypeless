@@ -1,6 +1,6 @@
 """CI专用：实际无控制台EXE连续三次Alt+I，真实剪贴板/键盘/外部输入框。
 
-不使用PasteTarget/平台替身，不代表Cursor/手机输入法通过。
+不使用投递接口替身，不代表Cursor/手机输入法通过。
 只在临时GitHub Windows runner执行，只管理本脚本创建的两个PID。
 """
 from __future__ import annotations
@@ -41,10 +41,28 @@ async def message(ws, kind: str, timeout: float=8):
         if msg.get('type')==kind:return msg
     raise TimeoutError(kind)
 
-async def exercise(exe: Path, data: Path, env: dict, child, target, textfile: Path, title: str):
+async def target_ready(target, textfile: Path, title: str) -> int:
+    """进程创建不代表Tk已经完成DLL加载和窗口映射，等待真实就绪信号。"""
+    import win32gui, win32process
+    deadline=time.monotonic()+20
+    while time.monotonic()<deadline:
+        if target.poll() is not None:
+            raise RuntimeError(f'test input process exited: {target.returncode}')
+        hwnd=win32gui.FindWindow(None,title)
+        if hwnd and win32process.GetWindowThreadProcessId(hwnd)[1]==target.pid and textfile.is_file():
+            try:
+                json.loads(textfile.read_text(encoding='utf-8'))
+                return hwnd
+            except (OSError,ValueError):
+                pass
+        await asyncio.sleep(.1)
+    raise TimeoutError('test-owned input window did not become ready')
+
+async def exercise(exe: Path, data: Path, child, target, textfile: Path, title: str, result: dict):
     from aiohttp import ClientSession
     import win32gui, win32con, win32process, win32clipboard
     from pynput.keyboard import Controller, Key
+    result['stage']='candidate_startup'
     note=data/'pair.txt'
     for _ in range(300):
         if child.poll() is not None: raise RuntimeError('candidate exited during startup')
@@ -53,7 +71,11 @@ async def exercise(exe: Path, data: Path, env: dict, child, target, textfile: Pa
     else:raise TimeoutError('pair note not ready')
     address,code=note.read_text(encoding='utf-8').splitlines()[:2]
     base='http://127.0.0.1:'+str(urlparse(address).port)
+    result['stage']='target_startup'
+    hwnd=await target_ready(target,textfile,title)
+    result['target_window_ready']=True
     async with ClientSession() as http:
+        result['stage']='pairing'
         async with http.post(base+'/v3/pair',json={'code':code},headers={'Origin':base}) as r:
             if r.status!=200:raise RuntimeError('test pairing rejected')
             creds=await r.json()
@@ -61,20 +83,23 @@ async def exercise(exe: Path, data: Path, env: dict, child, target, textfile: Pa
             await ws.send_json({'type':'session.hello','session_id':creds['session_id'],'token':creds['token']})
             state=await message(ws,'session.ready')
             key=Controller(); aggregate='';rounds=[]
-            for text in ['第一段  保留空格\n','第二段 Image2 / Opus\n','第三段连续输入完成']:
-                hwnd=win32gui.FindWindow(None,title)
-                if not hwnd or win32process.GetWindowThreadProcessId(hwnd)[1]!=target.pid:
-                    raise RuntimeError('test-owned input window not found')
+            result['rounds']=rounds
+            for index,text in enumerate(['第一段  保留空格\n','第二段 Image2 / Opus\n','第三段连续输入完成'],start=1):
+                result['stage']=f'round_{index}_focus'
+                if not win32gui.IsWindow(hwnd) or win32process.GetWindowThreadProcessId(hwnd)[1]!=target.pid:
+                    raise RuntimeError('test-owned input window disappeared')
                 win32gui.SetForegroundWindow(hwnd)
                 for _ in range(30):
                     if win32gui.GetForegroundWindow()==hwnd:break
                     await asyncio.sleep(.05)
                 else:raise RuntimeError('test target cannot receive focus')
+                result['stage']=f'round_{index}_sync'
                 await ws.send_json({'protocol':3,'type':'draft.update','draft_id':state['draft_id'],
                     'epoch':state['epoch'],'revision':state['revision']+1,'text':text,
                     'asset_refs':[],'asset_documents':[]})
                 ack=await message(ws,'draft.ack')
                 if not ack.get('durable'):raise RuntimeError('draft not durable')
+                result['stage']=f'round_{index}_native_insert'
                 # 实际进入全局热键监听器，再由EXE自己的队列/平台代码执行Ctrl+V。
                 key.press(Key.alt_l); key.press('i'); key.release('i'); key.release(Key.alt_l)
                 rotated=await message(ws,'draft.rotated',15)
@@ -82,6 +107,7 @@ async def exercise(exe: Path, data: Path, env: dict, child, target, textfile: Pa
                 archived=rotated.get('archived') or {}
                 if archived.get('source_text',archived.get('text'))!=text:raise RuntimeError('wrong archived text')
                 aggregate+=text
+                result['stage']=f'round_{index}_verify_target'
                 for _ in range(80):
                     if child.poll() is not None:raise RuntimeError('candidate exited after insert')
                     try:received=json.loads(textfile.read_text(encoding='utf-8')).get('text')
@@ -98,7 +124,7 @@ async def exercise(exe: Path, data: Path, env: dict, child, target, textfile: Pa
                         break
                     except Exception:await asyncio.sleep(.025)
                 if copied!=text:raise RuntimeError('insert-and-copy clipboard mismatch')
-                rounds.append({'round':len(rounds)+1,'exact_text':True,'clipboard':True,
+                rounds.append({'round':index,'exact_text':True,'clipboard':True,
                     'rotated':True,'process_alive':child.poll() is None})
                 state=rotated
             return rounds
@@ -112,20 +138,25 @@ def verify(exe: Path, report: Path) -> int:
     with tempfile.TemporaryDirectory(prefix='dt-native-text-') as temp:
         root=Path(temp);data=root/'data';state=root/'target.json';script=root/'target.py'
         script.write_text(TARGET,encoding='utf-8');title='DT-Native-Input-'+uuid.uuid4().hex[:8]
-        env={**os.environ,'DT_V3_DATA_DIR':str(data),'DT_V3_PIPE':'DT-smoke-'+uuid.uuid4().hex}
-        env.pop('QT_QPA_PLATFORM',None) # 真正桌面，不用离屏替代系统焦点。
+        env={**os.environ,'DT_V3_DATA_DIR':str(data),'DT_V3_PIPE':'DT-smoke-'+uuid.uuid4().hex,'PYTHONUTF8':'1'}
+        env.pop('QT_QPA_PLATFORM',None)
+        output=(root/'target-output.log').open('wb')
         child=subprocess.Popen([str(exe),'--minimized'],env=env)
-        target=subprocess.Popen([sys.executable,str(script),str(state),title],env=env)
+        target=subprocess.Popen([sys.executable,str(script),str(state),title],env=env,
+                                stdout=output,stderr=subprocess.STDOUT)
         result.update(pid=child.pid,target_pid=target.pid)
         try:
-            result['rounds']=asyncio.run(exercise(exe,data,env,child,target,state,title))
+            asyncio.run(exercise(exe,data,child,target,state,title,result))
+            result['stage']='graceful_exit'
             quitproc=subprocess.run([str(exe),'--quit'],env=env,timeout=15)
             result['quit_command_exit']=quitproc.returncode
             result['process_exit']=child.wait(timeout=15)
             if quitproc.returncode or result['process_exit']:raise RuntimeError('not graceful exit')
             result['passed']=True
+            result['stage']='complete'
         except Exception as exc:
-            result.update(error_type=type(exc).__name__,error=str(exc),passed=False)
+            result.update(error_type=type(exc).__name__,error=str(exc),passed=False,
+                          candidate_exit_before_cleanup=child.poll(),target_exit_before_cleanup=target.poll())
         finally:
             import win32gui,win32con,win32process
             hwnd=win32gui.FindWindow(None,title)
@@ -139,11 +170,12 @@ def verify(exe: Path, report: Path) -> int:
                     try:process.wait(timeout=5)
                     except subprocess.TimeoutExpired:process.kill();process.wait()
                     result['test_owned_cleanup']=True
+            output.close()
             report.parent.mkdir(parents=True,exist_ok=True)
             logs=report.parent/(report.stem+'-logs');logs.mkdir(exist_ok=True)
             for path in (data/'logs').glob('*.log'):
-                # 只有临时CI配对凭据和固定测试文本；仍不包含pair.txt/真实用户数据。
                 shutil.copyfile(path,logs/path.name)
+            shutil.copyfile(root/'target-output.log',logs/'test-target.log')
             report.write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
     return 0 if result['passed'] else 1
 
