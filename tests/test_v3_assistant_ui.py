@@ -94,7 +94,7 @@ def test_accept_phone_conflict_preserves_old_pc_draft(tmp_path):
         app.accept_phone_pending()
         assert app.draft.text=='手机冲突稿'
         import json
-        backups=[json.loads(p.read_text()) for p in (tmp_path/'recovery').glob('*.json')]
+        backups=[json.loads(p.read_text(encoding='utf-8')) for p in (tmp_path/'recovery').glob('*.json')]
         assert any(b['text']=='电脑已再次修改' for b in backups)
     finally:
         app._commands.close();app.db.conn.close();app._lock.release()
