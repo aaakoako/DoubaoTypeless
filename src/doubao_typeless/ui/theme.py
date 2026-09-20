@@ -40,6 +40,7 @@ QCheckBox::indicator {{ width:16px; height:16px; border:1px solid {C['line']}; b
 QCheckBox::indicator:checked {{ background:{C['accent']}; border:3px solid {C['accent']}; }}
 QCheckBox::indicator:hover {{ border-color:{C['accent']}; }}
 QScrollArea {{ background:transparent; border:0; }}
+QScrollArea > QWidget, QScrollArea > QWidget > QWidget, QTabWidget > QStackedWidget {{ background:{C['bg']}; }}
 QScrollBar:vertical {{ background:transparent; width:8px; margin:0; }}
 QScrollBar::handle:vertical {{ background:{C['line']}; min-height:24px; border-radius:4px; }}
 QScrollBar::add-line:vertical,QScrollBar::sub-line:vertical {{ height:0; }}
