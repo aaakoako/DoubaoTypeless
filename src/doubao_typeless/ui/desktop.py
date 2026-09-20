@@ -1107,10 +1107,6 @@ class DesktopShell:
         self.tray.show()
         self._wake = listen_for_commands(self._on_ipc)
         self.app.ui_hook = self._from_service
-        if app.hud._widget is not None:
-            expand = getattr(app.hud, "_expand", None)
-            if expand is not None:
-                expand.clicked.connect(self.review.show)
 
     def _explained_tray(self) -> None:
         if not load_settings(self.app.data_dir).get("tray_explained"):
@@ -1141,19 +1137,19 @@ class DesktopShell:
 
         host = self.client.widget
         if event == "sync_wait":
-            QTimer.singleShot(0, host, lambda: self.app.hud._status and self.app.hud._status.setText("正在确认手机当前稿…"))
+            pass  # 统一HUD状态机已处理，不能只改一行文字却忘记停空闲计时。
         elif event == "restore_on_phone":
             QTimer.singleShot(0, host, lambda: self.tray.showMessage("恢复图文", "已发到手机，请在手机确认；当前内容没有被覆盖"))
         elif event == "delivery_failed":
             code = str(_kw.get("error_code") or "")
-            labels = {"PHONE_OFFLINE": "手机离线，未插入旧缓存；上次图文仍可召回",
-                      "PHONE_NOT_CURRENT": "手机当前稿尚未同步，未插入旧缓存",
-                      "PHONE_CHANGED_REVIEW": "手机稿已变化，电脑修改保留；请先对比或复制",
-                      "IMAGE_EDITING": "手机图片尚未完成", "SOURCE_NOT_RENDERED": "请先在手机完成截图标注",
-                      "ASSET_MISSING": "有图片文件缺失，图文已保留", "NEEDS_TARGET": "请先选中支持的输入框",
-                      "OWN_WINDOW": "请选中其他应用的输入框", "DELIVERY_FAILED": "插入未完成，内容已保留"}
-            text = labels.get(code, "未完成插入，内容已保留；可打开当前图文查看")
-            QTimer.singleShot(0, host, lambda: self.tray.showMessage("DoubaoTypeless", text))
+            from doubao_typeless.ui.insert_status import error_message
+            text = error_message(_kw)
+            def show_error():
+                self.client.byok_status.setText(text)
+                if self.review.widget.isVisible():
+                    self.review.banner.setText(text)
+                    self.review.banner.show()
+            QTimer.singleShot(0, host, show_error)
         elif event == "capture_region":
             QTimer.singleShot(0, host, self.app.capture_region)
         elif event == "recovery_ask":

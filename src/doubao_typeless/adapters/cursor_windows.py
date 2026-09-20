@@ -42,7 +42,7 @@ def cursor_windows() -> list[dict]:
     return [w for w in found if "cursor" in w["title"].lower()]
 
 
-def probe_uia() -> dict:
+def _probe_uia_direct() -> dict:
     """通过UIA类型库调用真实接口；失败保持unknown，不按进程名猜输入框。"""
     report = {"cursor_windows": [], "focus": None, "composer_control": None,
               "image_children": [], "text_value": None, "engine": None, "error": None}
@@ -74,6 +74,13 @@ def probe_uia() -> dict:
     except Exception as exc:
         report["error"] = type(exc).__name__
         return report
+
+
+def probe_uia() -> dict:
+    if win32gui is None:
+        return {"composer_control": None, "image_children": []}
+    from doubao_typeless.platform.windows.automation_host import host
+    return host().call("attachments")
 
 
 def _collect_image_children(uia, element, *, depth: int = 0, found: list | None = None, budget: list | None = None) -> list:

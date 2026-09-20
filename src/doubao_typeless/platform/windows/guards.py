@@ -25,7 +25,7 @@ def wait_modifiers_up(*, timeout_s: float = 1.5, now: Callable[[], float] | None
     clock = now or time.monotonic
     deadline = clock() + timeout_s
     while clock() < deadline:
-        if not any(key_down(vk, get_async=get_async) for vk in (VK_MENU, VK_SHIFT, VK_LWIN, VK_RWIN)):
+        if not any(key_down(vk, get_async=get_async) for vk in (VK_MENU, VK_CONTROL, VK_SHIFT, VK_LWIN, VK_RWIN)):
             return True
         time.sleep(0.02)
     return False

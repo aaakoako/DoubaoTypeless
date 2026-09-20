@@ -47,10 +47,15 @@ class HudController:
         self._insert = None
         self._copy = None
         self._body = None
+        self._mode = "receiving"
+        self._operation_message = ""
+        self._content_serial = 0
+        self._operation_content_serial = 0
+        self._dispatch = None
 
     def start(self) -> None:
         try:
-            from PySide6.QtCore import Qt, QTimer
+            from PySide6.QtCore import Qt, QTimer, QObject, Signal
             from PySide6.QtWidgets import (
                 QApplication,
                 QHBoxLayout,
@@ -79,6 +84,8 @@ class HudController:
         )
         layout = QVBoxLayout(w)
         self._status = QLabel("手机输入中")
+        self._status.setObjectName("DTInsertStatus")
+        self._status.setWordWrap(True)
         self._status.setStyleSheet(f"color:{TOKENS['muted']}; font-size:11px;")
         self._body = QTextEdit()
         self._body.setReadOnly(True)
@@ -114,6 +121,8 @@ class HudController:
         copy.clicked.connect(lambda: self._on_copy and self._on_copy())
         self._copy = copy
         btn = QPushButton("插入并复制")
+        btn.setObjectName("DTInsertAction")
+        btn.setAccessibleName("插入并复制")
         btn.setFixedHeight(32)
         btn.setStyleSheet(f"background:{TOKENS['accent']}; color:white; border:0; border-radius:9px; padding:6px 10px;")
         btn.clicked.connect(lambda: self._on_insert and self._on_insert())
@@ -122,6 +131,11 @@ class HudController:
         row.addWidget(copy, 0)
         row.addWidget(btn, 0)
         row.addStretch(1)
+        dismiss = QPushButton("×")
+        dismiss.setToolTip("收起，不清空草稿")
+        dismiss.setFixedSize(24, 28)
+        dismiss.clicked.connect(self.dismiss)
+        row.addWidget(dismiss)
         layout.addWidget(self._status, 0)
         layout.addWidget(self._body, 1)
         thumbs = QWidget()
@@ -136,9 +150,24 @@ class HudController:
         self._bar = bar
         w.hide()
         self._widget = w
-        self._timer = QTimer()
+        controller = self
+        class Dispatcher(QObject):
+            called = Signal(object)
+            def __init__(inner):
+                super().__init__(w)
+                inner.called.connect(inner.receive, Qt.QueuedConnection)
+            def receive(inner, message):
+                kind, payload = message
+                if kind == "show":
+                    controller._apply_show()
+                elif kind == "hide":
+                    controller._apply_hide()
+                elif kind == "operation":
+                    controller._apply_operation(**payload)
+        self._dispatch = Dispatcher()
+        self._timer = QTimer(w)
         self._timer.setSingleShot(True)
-        self._timer.timeout.connect(self.hide)
+        self._timer.timeout.connect(self._idle_timeout)
         try:
             self._body.selectionChanged.connect(self._pause_or_resume_idle)
             bar = self._body.verticalScrollBar()
@@ -149,6 +178,7 @@ class HudController:
 
     def show_receiving(self, text: str, image_count: int = 0, *, assets: list[dict] | None = None,
                        revision: int = 0, phone_primary: bool = False) -> None:
+        self._content_serial += 1
         self.text = text
         self.image_count = image_count
         self.assets = [dict(a) for a in (assets or [])]
@@ -157,15 +187,75 @@ class HudController:
         self.visible = True
         if self._widget is None:
             return
-        try:
-            from PySide6.QtCore import QThread, QTimer
+        self._invoke("show")
 
-            if QThread.currentThread() != self._widget.thread():
-                QTimer.singleShot(0, self._widget, self._apply_show)
-                return
-        except Exception:
+    def _invoke(self, kind: str, **payload) -> None:
+        if self._widget is None:
             return
-        self._apply_show()
+        from PySide6.QtCore import QThread
+        if QThread.currentThread() != self._widget.thread():
+            if self._dispatch is not None:
+                self._dispatch.called.emit((kind, payload))
+            else:
+                # 支持既有嵌入式HUD：外部提供widget、尚未创建专用接收器。
+                from PySide6.QtCore import QTimer
+                slot = self._apply_show if kind == "show" else (self._apply_hide if kind == "hide" else lambda: self._apply_operation(**payload))
+                QTimer.singleShot(0, self._widget, slot)
+        elif kind == "show":
+            self._apply_show()
+        elif kind == "hide":
+            self._apply_hide()
+        else:
+            self._apply_operation(**payload)
+
+    def operation_event(self, event: str, **payload) -> None:
+        if self._widget is None:
+            self._apply_operation(event, **payload)
+        else:
+            self._invoke("operation", event=event, **payload)
+
+    def _apply_operation(self, event: str, **payload) -> None:
+        from doubao_typeless.ui.insert_status import error_message
+        if event in {"sync_wait", "delivery_start"}:
+            self._mode = "busy"
+            self._operation_message = "正在确认手机最新内容…" if event == "sync_wait" else "正在插入，请勿切换输入框…"
+            self._operation_content_serial = self._content_serial
+        elif event == "delivery_failed":
+            self._mode = "failed"
+            self._operation_message = error_message(payload)
+        elif event == "delivery_complete":
+            new_content = self._content_serial > self._operation_content_serial and (self.text or self.assets)
+            if new_content and not payload.get("rotated"):
+                self._mode, self._operation_message = "receiving", ""
+            else:
+                self._mode = "result"
+                if payload.get("result") == "CONFIRMED":
+                    self._operation_message = "目标已接收，上次图文可恢复"
+                elif payload.get("text_sent"):
+                    self._operation_message = "已发出粘贴并复制；上次内容可恢复"
+                else:
+                    self._mode = "failed"
+                    self._operation_message = "接收结果待确认，图文已保留；请查看目标"
+        self.visible = self._mode != "result" or self._widget is not None
+        if self._widget is not None:
+            self._apply_show()
+
+    def _idle_timeout(self) -> None:
+        if self._mode == "busy":
+            return
+        if self._reading() or (self._widget is not None and self._widget.underMouse()):
+            self._timer.start(TOKENS["idle_ms"])
+            return
+        self._apply_hide()
+
+    def dismiss(self) -> None:
+        # 用户主动收起不取消已发出的操作，也不清空草稿。
+        self.visible = False
+        if self._widget is not None:
+            if self._timer:
+                self._timer.stop()
+            self._widget.hide()
+
 
     def _max_height(self) -> int:
         max_h = TOKENS["max_h"]
@@ -221,10 +311,10 @@ class HudController:
     def _pause_or_resume_idle(self) -> None:
         if self._timer is None:
             return
-        if self._reading():
+        if self._mode == "busy" or self._reading():
             self._timer.stop()
             return
-        self._timer.start(TOKENS["idle_ms"])
+        self._timer.start(12000 if self._mode == "failed" else (900 if self._mode == "result" else TOKENS["idle_ms"]))
 
     def _refresh_thumbnails(self) -> None:
         if self._thumbs is None:
@@ -271,9 +361,9 @@ class HudController:
         status = f"手机稿 · r{self.revision}" if self.phone_primary else "手机输入中"
         if self.assets:
             status += f" · {ready}/{len(self.assets)} 张已收到" if unfinished else f" · {ready} 张图片已更新"
-        self._status.setText(status)
-        self._insert.setEnabled(not unfinished)
-        self._insert.setText("图片同步中" if unfinished else "插入并复制")
+        self._status.setText(self._operation_message if self._mode != "receiving" else status)
+        self._insert.setEnabled(not unfinished and self._mode != "busy")
+        self._insert.setText("处理中…" if self._mode == "busy" else ("图片同步中" if unfinished else "插入并复制"))
         body = self.text if self.text else ("图片准备中，可继续在手机写说明" if unfinished else "")
         # 程序主动写字造成的滚动条变化，不能被误判成用户正在读前文。
         reading = self._widget.isVisible() and self._reading()
@@ -323,21 +413,24 @@ class HudController:
                 self._body.verticalScrollBar().setValue(self._body.verticalScrollBar().maximum())
         QTimer.singleShot(0, self._widget, settle_tail)
         if self._timer:
-            if reading:
+            if reading or self._mode == "busy":
                 self._timer.stop()
             else:
-                self._timer.start(TOKENS["idle_ms"])
+                self._timer.start(12000 if self._mode == "failed" else (900 if self._mode == "result" else TOKENS["idle_ms"]))
 
     def hide(self) -> None:
-        self.visible = False
-        if self._widget is None:
+        # 普通空稿/活动回执不能提前隐藏等待中的操作。
+        if self._mode == "busy":
             return
-        try:
-            from PySide6.QtCore import QThread, QTimer
+        self.visible = False
+        self._invoke("hide")
 
-            if QThread.currentThread() != self._widget.thread():
-                QTimer.singleShot(0, self._widget, self._widget.hide)
-                return
-        except Exception:
-            pass
-        self._widget.hide()
+    def _apply_hide(self) -> None:
+        if self._mode == "busy":
+            return
+        self.visible = False
+        if self._timer is not None:
+            self._timer.stop()
+        if self._widget is not None:
+            self._widget.hide()
+        self._mode, self._operation_message = "receiving", ""

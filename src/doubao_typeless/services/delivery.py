@@ -6,6 +6,7 @@ from typing import Callable
 from doubao_typeless.core.attempt import Attempt, Step
 from doubao_typeless.core.policy import classify_focus, may_inject
 from doubao_typeless.platform.windows.guards import clipboard_still_ours
+from doubao_typeless.platform.windows.focus import same_target
 
 VK_CONTROL = 0x11
 VK_V = 0x56
@@ -84,7 +85,7 @@ class DeliveryService:
         index = len(attempt.steps)
         for asset in assets:
             current = self._read_focus()
-            if current != focus:
+            if not same_target(current, focus):
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "TARGET_CHANGED"
                 return attempt
@@ -96,7 +97,7 @@ class DeliveryService:
                 attempt.error_code = "MODIFIERS_HELD"
                 return attempt
             current = self._read_focus()
-            if current != focus:
+            if not same_target(current, focus):
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "TARGET_CHANGED"
                 return attempt
@@ -129,7 +130,7 @@ class DeliveryService:
             index += 1
         text = bundle.get("text") or ""
         if text:
-            if self._read_focus() != focus:
+            if not same_target(self._read_focus(), focus):
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "TARGET_CHANGED"
                 return attempt
@@ -142,7 +143,7 @@ class DeliveryService:
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "MODIFIERS_HELD"
                 return attempt
-            if self._read_focus() != focus:
+            if not same_target(self._read_focus(), focus):
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "TARGET_CHANGED"
                 return attempt

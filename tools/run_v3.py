@@ -1,5 +1,9 @@
-"""V3 正式构建入口：先安装本地运行取证，再导入应用。"""
-from doubao_typeless.runtime_diagnostics import run_application as main
+"""正式入口，先分流PyInstaller辅助进程，再安装主程序日志和Qt。"""
+def main():
+    from doubao_typeless.runtime_diagnostics import run_application
+    run_application()
 
 if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()
     main()

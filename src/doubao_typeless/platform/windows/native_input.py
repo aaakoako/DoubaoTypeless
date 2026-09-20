@@ -41,9 +41,10 @@ class InputInjectionError(OSError):
     def __init__(self, accepted: int, expected: int, winerror: int = 0):
         self.accepted = accepted
         self.expected = expected
-        self.winerror = winerror
         self.error_code = "INPUT_REJECTED" if accepted == 0 else "INPUT_PARTIAL"
         super().__init__(winerror, self.error_code)
+        # Windows OSError.__init__ 会初始化 winerror；在其后保存原系统错误号。
+        self.winerror = winerror
 
 
 def _key(vk: int, up: bool = False) -> INPUT:

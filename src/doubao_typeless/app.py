@@ -13,6 +13,7 @@ from doubao_typeless.core.attempt import Attempt
 from doubao_typeless.core.bundle import Draft, archive_if_match, freeze_bundle, source_snapshot
 from doubao_typeless.core.intent import IntentLedger
 from doubao_typeless.core.policy import classify_focus, is_own_window
+from doubao_typeless.platform.windows.focus import same_target
 from doubao_typeless.runtime import lan_ip, pick_port, v3_data_dir
 from doubao_typeless.services.bridge_v3 import V3Bridge
 from doubao_typeless.services.byok import ByokService
@@ -68,6 +69,7 @@ class V3App:
         self._acquire_instance_lock()
         from doubao_typeless.services.command_queue import CommandQueue
         self._commands = CommandQueue(on_error=self._report_command_error)
+        self._last_delivery_status: dict = {}
         self.auth = AuthService(store_path=self.data_dir / "trusted_devices.json")
         self.store = AssetStore(self.data_dir / "assets")
         from doubao_typeless.storage.db import V3DB
@@ -172,6 +174,8 @@ class V3App:
         from doubao_typeless.runtime_diagnostics import record_runtime_exception
         record_runtime_exception("delivery", exc, self.data_dir)
         _log(f"[v3.delivery] error_type={type(exc).__name__}")
+        self._notify_ui("delivery_failed", error_code="COMMAND_FAILED",
+                        detail_code=getattr(exc, "error_code", ""))
 
     def submit_delivery(self, intent: dict, bundle: dict):
         """正式网络与桌面入口共用，入队前已冻结当前版本。"""
@@ -184,6 +188,7 @@ class V3App:
             return self._commands.submit(self._insert_primary, False)
         with self._state_lock:
             if not (self.draft.text or self.draft.assets):
+                self._notify_ui("delivery_failed", error_code="EMPTY_DRAFT")
                 done = Future(); done.set_result({"result":"NO_STEPS", "error_code":"EMPTY_DRAFT"})
                 return done
             try:
@@ -230,6 +235,7 @@ class V3App:
 
     def _insert_primary(self, use_desktop_edit: bool = False) -> dict:
         """本机快捷键先向作者确认当前稿；手机离线时不偷偷贴旧镜像。"""
+        self._notify_ui("sync_wait")
         try:
             if self.bridge.paused:
                 raise ValueError("CONNECTION_PAUSED")
@@ -238,11 +244,13 @@ class V3App:
             loop = getattr(self, "_loop", None)
             if loop is None or not loop.is_running():
                 raise ValueError("PHONE_OFFLINE")
-            self._notify_ui("sync_wait")
             pending = asyncio.run_coroutine_threadsafe(
                 self.bridge.prepare_phone(self.draft.editor_device_id), loop)
             try:
                 pending.result(timeout=7)
+            except ValueError:
+                pending.cancel()
+                raise
             except Exception:
                 pending.cancel()
                 raise ValueError("PHONE_NOT_CURRENT") from None
@@ -265,6 +273,11 @@ class V3App:
             code = str(exc)
             self._notify_ui("delivery_failed", error_code=code)
             return {"result": "NO_STEPS", "error_code": code, "steps": []}
+        except Exception as exc:
+            self._report_command_error(exc)
+            detail = getattr(exc, "error_code", "")
+            self._notify_ui("delivery_failed", error_code="DELIVERY_FAILED", detail_code=detail)
+            return {"result": "NO_STEPS", "error_code": "DELIVERY_FAILED", "detail_code": detail, "steps": []}
 
 
     def remember_connected(self) -> int:
@@ -299,6 +312,12 @@ class V3App:
         return count
 
     def _notify_ui(self, event: str, **kwargs) -> None:
+        # 状态首先进入真正的HUD，托盘提示只是补充；未知结果不能伪装成成功。
+        if event in {"sync_wait", "delivery_start", "delivery_failed", "delivery_complete"}:
+            self._last_delivery_status = {"event": event, **kwargs}
+            hud = getattr(self, "hud", None)
+            if hud is not None:
+                hud.operation_event(event, **kwargs)
         hook = getattr(self, "ui_hook", None)
         if hook:
             hook(event, **kwargs)
@@ -312,23 +331,16 @@ class V3App:
             self._saved_target = focus
 
     def _restore_external_target(self) -> tuple[str, str]:
-        try:
+        # 检查超时/辅助进程退出必须停止本次操作，不能用空字符串降级放行。
+        current = self._read_focus()
+        if is_own_window(*current[:2]):
+            if not self._saved_target:
+                return ("DT-V3-HUD", "无法确认原输入框")
+            from doubao_typeless.platform.windows.focus import restore_target
+            if not restore_target(self._saved_target):
+                return ("DT-V3-HUD", "无法恢复原输入框")
             current = self._read_focus()
-        except Exception:
-            current = ("", "")
-        if is_own_window(*current[:2]) and self._saved_target:
-            try:
-                from doubao_typeless.platform.windows.focus import restore_target
-
-                if not restore_target(self._saved_target):
-                    return ("DoubaoTypeless", "无法恢复上次输入框，请先点击目标")
-            except Exception:
-                pass
-            try:
-                current = self._read_focus()
-            except Exception:
-                current = ("DoubaoTypeless", "无法确认焦点")
-        return (str(current[0] if current else ""), str(current[1] if current and len(current) > 1 else ""))
+        return current[0], current[1]
 
     def apply_phone_update(self, data: dict, *, allow_server_assets: bool = False) -> dict:
         with self._state_lock:
@@ -446,9 +458,7 @@ class V3App:
         self._notify_ui("pc_kept")
 
     def _on_activity(self, text: str, image_count: int) -> None:
-        # 自动浮窗不抢焦点；真正展开/插入时再记录目标，避免每个字都查询UIA。
-        if self._saved_target is None:
-            self._remember_external_target()
+        # 同步线程只更新稿件与GUI消息；输入框检查只在明确操作时进行。
         if self.review_editing and self.draft.authority != "phone":
             self.phone_pending = {"text": text, "image_count": image_count}
             self._notify_ui("phone_pending")
@@ -521,7 +531,8 @@ class V3App:
         return session_locked()
 
     def _target_elevated(self) -> bool:
-        return False
+        from doubao_typeless.platform.windows.integrity import target_above_ours
+        return target_above_ours()
 
     def _read_clipboard_text(self) -> str | None:
         try:
@@ -696,13 +707,18 @@ class V3App:
         self._notify_ui("hide_after_insert")
         if payload.get("error_code"):
             self._notify_ui("delivery_failed", **payload)
-        elif bundle.get("assets") and payload.get("result") in {"UNKNOWN", "PARTIAL"}:
+        else:
+            self._notify_ui("delivery_complete", result=payload.get("result"), rotated=rotated,
+                            text_sent=any(s.get("kind") == "text" for s in payload.get("steps") or []),
+                            image_count=len(bundle.get("assets") or []))
+        if not payload.get("error_code") and bundle.get("assets") and payload.get("result") in {"UNKNOWN", "PARTIAL"}:
             # 主流程暂停而不是自动重贴。用户的明确确认才允许继续下一张。
             self._notify_ui("recovery_ask")
         return payload
 
     def deliver_and_finish(self, intent: dict, bundle: dict) -> dict:
-        self.hud.hide()
+        # 仅收起可编辑详情以归还目标焦点，非激活HUD保持实际进度。
+        self._notify_ui("delivery_start")
         self._notify_ui("hide_after_insert")
         try:
             payload = self._on_intent(intent, bundle)
@@ -739,7 +755,7 @@ class V3App:
             self._last_target_fp = tuple(focus)
             if not is_own_window(*focus[:2]):
                 self._saved_target = focus
-            if intent.get("expected_focus") and tuple(focus) != tuple(intent["expected_focus"]):
+            if intent.get("expected_focus") and not same_target(focus, intent["expected_focus"]):
                 attempt.result, attempt.error_code = "NO_STEPS", "TARGET_CHANGED"
                 return attempt.to_dict()
             if is_own_window(class_name, control):
@@ -769,6 +785,7 @@ class V3App:
             # 完整命令边界包括读图、焦点、平台、观察和持久化。
             attempt.result = "UNKNOWN"
             attempt.error_code = "ASSET_MISSING" if isinstance(exc, FileNotFoundError) else "DELIVERY_FAILED"
+            attempt.detail_code = getattr(exc, "error_code", "")
             self._report_command_error(exc)
             try:
                 self.history.record(bundle, attempt_result="UNKNOWN")
@@ -968,10 +985,10 @@ class V3App:
                 current_fp = tuple(self._read_focus())
             except Exception:
                 current_fp = ("", "", 0)
-            same_target = bool(self._last_target_fp and current_fp == self._last_target_fp)
+            same = bool(self._last_target_fp and same_target(current_fp, self._last_target_fp))
             plan = plan_retry(
                 previous_result=self._last_attempt.result,
-                same_target=same_target,
+                same_target=same,
                 images_observed=images_obs,
                 images_total=images_total,
                 text_sent=text_sent,
@@ -1016,7 +1033,7 @@ class V3App:
             return {"result": "NO_STEPS", "error_code": "NO_IMAGE_TO_CONFIRM"}
         self._restore_external_target()
         focus = self._read_focus()
-        if tuple(focus) != self._last_target_fp:
+        if not same_target(focus, self._last_target_fp):
             self._notify_ui("delivery_failed", error_code="TARGET_CHANGED")
             return {"result": "NO_STEPS", "error_code": "TARGET_CHANGED"}
         bundle = copy.deepcopy(self.bridge.last_bundle)
@@ -1169,6 +1186,8 @@ class V3App:
             _log("[v3] 当前目标仍未返回，未强制结束；可稍后再退出")
             return False
         await self.bridge.stop()
+        from doubao_typeless.platform.windows.automation_host import close_host
+        await asyncio.to_thread(close_host)
         try:
             self.db.conn.close()
         except Exception:

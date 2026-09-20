@@ -20,27 +20,22 @@ class FocusSnapshot(NamedTuple):
     kind: str = "unknown"
 
 
+_INSIDE_HELPER = False
+_AUTOMATION_ROOT = None
+
+
 @contextmanager
 def automation():
-    """动态生成UIA类型包装；非Windows/缺依赖由调用方安全降级。"""
-    import comtypes
-    import comtypes.client
-    initialized = False
-    try:
-        try:
-            comtypes.CoInitializeEx(0)
-            initialized = True
-        except OSError as exc:
-            # 已由Qt初始化为STA；不改变该线程公寓，也不配对多余的Uninitialize。
-            if (getattr(exc, "winerror", 0) or getattr(exc, "hresult", 0)) & 0xFFFFFFFF != 0x80010106:
-                raise
+    """仅在自建MTA辅助进程调用，保持COM根对象到进程退出，不逐次拆公寓。"""
+    global _AUTOMATION_ROOT
+    if not _INSIDE_HELPER:
+        raise RuntimeError("UIA must run in the isolated helper")
+    if _AUTOMATION_ROOT is None:
+        import comtypes.client
         module = comtypes.client.GetModule("UIAutomationCore.dll")
-        uia = comtypes.client.CreateObject(
+        _AUTOMATION_ROOT = comtypes.client.CreateObject(
             "{FF48DBA4-60EF-4201-AA87-54103EEF594E}", interface=module.IUIAutomation)
-        yield uia
-    finally:
-        if initialized:
-            comtypes.CoUninitialize()
+    yield _AUTOMATION_ROOT
 
 
 def property_value(element, name: str, fallback=None):
@@ -118,7 +113,7 @@ def focused_chain(uia, element, limit: int = 6):
     return chain
 
 
-def read_target() -> FocusSnapshot:
+def _read_target_direct() -> FocusSnapshot:
     if sys.platform != "win32":
         return FocusSnapshot("", "", 0)
     import win32gui
@@ -148,10 +143,16 @@ def read_target() -> FocusSnapshot:
 
 
 def same_target(left, right) -> bool:
-    return bool(left and right and tuple(left) == tuple(right))
+    if not left or not right:
+        return False
+    if len(left) >= 7 and len(right) >= 7:
+        # 标题可随着输入/网络变化，不能把动态标题当控件身份。
+        return (left[2], left[3], left[4], tuple(left[5]), left[6]) == (
+            right[2], right[3], right[4], tuple(right[5]), right[6])
+    return tuple(left) == tuple(right)
 
 
-def restore_target(saved) -> bool:
+def _restore_target_direct(saved) -> bool:
     """只恢复明确保存的那一个控件；不按同名窗口枚举兜底。"""
     if sys.platform != "win32" or len(saved) < 3 or not saved[2]:
         return False
@@ -181,7 +182,46 @@ def restore_target(saved) -> bool:
                         child = uia.ControlViewWalker.GetNextSiblingElement(child)
                 else:
                     return False
-        current = read_target()
+        current = _read_target_direct()
         return same_target(saved, current) if len(saved) > 3 else current.hwnd == hwnd
+    except Exception:
+        return False
+
+
+def read_target() -> FocusSnapshot:
+    if sys.platform != "win32":
+        return FocusSnapshot("", "", 0)
+    import os
+    import win32gui, win32process
+    from doubao_typeless.platform.windows.automation_host import host, TargetProbeError
+    hwnd = int(win32gui.GetForegroundWindow() or 0)
+    if not hwnd:
+        return FocusSnapshot("", "", 0)
+    pid = win32process.GetWindowThreadProcessId(hwnd)[1]
+    cls, title = win32gui.GetClassName(hwnd), win32gui.GetWindowText(hwnd)
+    # 不让UIA查询自身窗口，避免GUI线程等待自己的无障碍请求。
+    if pid == os.getpid():
+        return FocusSnapshot(cls, title, hwnd, pid)
+    result = host().call("focus")
+    snap = FocusSnapshot(*result[:5], tuple(result[5]), result[6])
+    if int(win32gui.GetForegroundWindow() or 0) != hwnd or snap.hwnd != hwnd or snap.pid != pid:
+        raise TargetProbeError("TARGET_CHANGED")
+    return snap
+
+
+def restore_target(saved) -> bool:
+    if sys.platform != "win32" or len(saved) < 3 or not saved[2]:
+        return False
+    import win32gui, win32process
+    hwnd = int(saved[2])
+    if not win32gui.IsWindow(hwnd):
+        return False
+    if len(saved) > 3 and win32process.GetWindowThreadProcessId(hwnd)[1] != saved[3]:
+        return False
+    try:
+        # 前台申请仍由用户正在操作的主程序做，不让辅助进程抢窗口。
+        win32gui.SetForegroundWindow(hwnd)
+        from doubao_typeless.platform.windows.automation_host import host
+        return bool(host().call("restore", {"saved": list(saved)}))
     except Exception:
         return False
