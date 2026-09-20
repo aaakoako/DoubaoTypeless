@@ -12,12 +12,19 @@ jobs:
   source:
     if: github.ref == 'refs/heads/v3/assistant-runtime-safety'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       source_sha: ${{ steps.source.outputs.source_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false
+          fetch-depth: 2
+      - name: Import exact source patch when present
+        run: |
+          if test -f .github/scripts/apply_stability_delta.py; then
+            python .github/scripts/apply_stability_delta.py
+          fi
       - name: Bind immutable source commit
         id: source
         run: |
@@ -112,6 +119,9 @@ jobs:
         run: python tools/verify_candidate_text.py dist/DoubaoTypelessV3PreviewUI/DoubaoTypelessV3PreviewUI.exe --report candidate-text.json
       - name: Phone-owned latest draft with real frozen hotkey and clipboard
         run: python tools/verify_candidate_text.py dist/DoubaoTypelessV3PreviewUI/DoubaoTypelessV3PreviewUI.exe --phone-primary --report candidate-phone-primary.json
+      - name: Frozen production phone, native HUD and real browser failure recovery
+        timeout-minutes: 5
+        run: python tools/verify_candidate_browser.py dist/DoubaoTypelessV3PreviewUI/DoubaoTypelessV3PreviewUI.exe --report candidate-browser.json
       - name: Full folder inventory and candidate archive
         shell: pwsh
         run: |
@@ -134,6 +144,9 @@ jobs:
             candidate-text-logs/
             candidate-phone-primary.json
             candidate-phone-primary-logs/
+            candidate-browser.json
+            candidate-browser.png
+            candidate-browser-logs/
             windows-tests.xml
           if-no-files-found: warn
           retention-days: 14
