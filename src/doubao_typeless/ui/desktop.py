@@ -254,6 +254,7 @@ class ReviewPanel:
 
         self._hide_filter = _HideRelease(w)
         w.installEventFilter(self._hide_filter)
+        self.app.hud.bind_foreground_surface(w)
         self.reload()
 
     def _mark_editing(self) -> None:
@@ -704,6 +705,7 @@ class ClientWindow:
 
         self.tabs = tabs
         self.widget = w
+        self.app.hud.bind_foreground_surface(w)
         self._clipboard = QGuiApplication.clipboard()
         self._hist_sig = None
         self._pairing_url = ""
@@ -1144,6 +1146,11 @@ class DesktopShell:
             QTimer.singleShot(0, host, show_error)
         elif event == "capture_region":
             QTimer.singleShot(0, host, self.app.capture_region)
+        elif event == "composer_located":
+            def reveal_target():
+                self.review.widget.hide()
+                self.app.hud.operation_event("composer_located")
+            QTimer.singleShot(0, host, reveal_target)
         elif event == "composer_pick":
             candidates=list(_kw.get("candidates") or [])
             QTimer.singleShot(0, host, lambda:self._pick_composer(candidates))
@@ -1166,7 +1173,8 @@ class DesktopShell:
         if getattr(self,"_picker_open",False):return
         self._picker_open=True
         try:
-            choice=ComposerPicker(self.client.widget,candidates).exec()
+            with self.app.hud.modal_pause():
+                choice=ComposerPicker(self.client.widget,candidates).exec()
             if choice:self.app.request_choose_composer(choice)
         finally:self._picker_open=False
 

@@ -78,7 +78,13 @@ class NativeInspector:
             if element.CurrentName==name and element.CurrentControlType==50000 and element.CurrentIsEnabled:
                 r=element.CurrentBoundingRectangle
                 if r.right>r.left and r.bottom>r.top:
-                    mouse=Controller();mouse.position=((r.left+r.right)//2,(r.top+r.bottom)//2)
+                    import win32gui, win32con
+                    point=((r.left+r.right)//2,(r.top+r.bottom)//2)
+                    mouse=Controller();mouse.position=point
+                    hit=win32gui.WindowFromPoint(point)
+                    root=win32gui.GetAncestor(hit,win32con.GA_ROOT) if hit else 0
+                    if root!=hwnd:
+                        raise AssertionError(f"native button occluded: {name}; expected={hwnd}, actual={root}")
                     mouse.click(Button.left)
                     return True
         return False
@@ -360,8 +366,12 @@ const raw=WebSocket.prototype.send;WebSocket.prototype.send=function(data){
                 await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
                 await target.bring_to_front();await target.locator('#other').click();hotkey(expand=True)
                 review=await until(lambda:own_window(child.pid,'当前图文'));await until(lambda:win32gui.IsWindowVisible(review))
+                await until(lambda:not win32gui.IsWindowVisible(hud()),message='HUD covers expanded review controls')
+                before_locate=await target.evaluate('window.pasteCount')
                 assert inspector.click(review,'定位输入框'),inspector.text(review)
                 await until(lambda:target.evaluate("document.activeElement.id==='prompt-textarea'"),message='unique composer was not focused')
+                assert await target.evaluate('window.pasteCount')==before_locate,'locating must never paste'
+                assert await phone.locator('#text').input_value()=='定位但不自动发送'
                 assert await target.locator('#prompt-textarea').input_value()==''
                 hotkey();await completed('定位但不自动发送')
                 cases.append({'name':'locate_unique_composer_then_explicit_insert','passed':True})

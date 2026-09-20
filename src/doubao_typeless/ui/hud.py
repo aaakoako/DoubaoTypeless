@@ -55,6 +55,7 @@ class HudController:
         self._content_serial = 0
         self._operation_content_serial = 0
         self._dispatch = None
+        self._foreground_surfaces = set()
 
     def start(self) -> None:
         try:
@@ -266,6 +267,32 @@ class HudController:
             return
         self._apply_hide()
 
+    def bind_foreground_surface(self, widget):
+        """GUI-thread binding: one desktop action surface at a time.
+
+        Visibility, not activation, owns the lease: clicking a non-activating HUD
+        must never hit an action sitting above the expanded review/settings UI.
+        No content is discarded and hiding a surface never starts an insertion.
+        """
+        from PySide6.QtCore import QObject, QEvent
+        identity = id(widget)
+        hud = self
+        class SurfaceGate(QObject):
+            def eventFilter(self, obj, event):
+                if event.type() == QEvent.Show:
+                    hud._foreground_surfaces.add(identity)
+                    hud.dismiss()
+                elif event.type() == QEvent.Hide:
+                    hud._foreground_surfaces.discard(identity)
+                return False
+        gate = SurfaceGate(widget)
+        widget.installEventFilter(gate)
+        widget._dt_hud_surface_gate = gate
+        widget.destroyed.connect(lambda *_: hud._foreground_surfaces.discard(identity))
+        if widget.isVisible():
+            self._foreground_surfaces.add(identity)
+            self.dismiss()
+
     @contextmanager
     def modal_pause(self):
         """GUI-thread scope: retain data while yielding the screen to a dialog."""
@@ -383,7 +410,7 @@ class HudController:
         self._thumbs.setVisible(bool(self.assets))
 
     def _apply_show(self) -> None:
-        if getattr(self, "_modal_depth", 0):
+        if getattr(self, "_modal_depth", 0) or self._foreground_surfaces:
             # A non-activating always-on-top HUD must not cover a modal action.
             # Incoming phone changes are retained, but no overlay is re-shown.
             self.visible = False
