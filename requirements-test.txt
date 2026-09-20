@@ -3,3 +3,5 @@ httpx
 aiohttp
 Pillow
 qrcode
+
+comtypes>=1.4.8; sys_platform == "win32"

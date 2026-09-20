@@ -1,4 +1,4 @@
-"""BYOK secrets stay out of settings.json. Windows uses Credential Manager; tests/Linux use the isolated data dir."""
+"""BYOK密钥使用Windows凭据库；失败仅在内存保留，不默认写明文文件。"""
 from __future__ import annotations
 
 import hashlib
@@ -28,6 +28,7 @@ def put_secret(data_dir: Path, name: str, value: str) -> str:
         try:
             import win32cred
 
+            # pywin32把str编码为WCHAR；读取必须按UTF-16LE，不能按UTF-8。
             win32cred.CredWrite(
                 {
                     "Type": win32cred.CRED_TYPE_GENERIC,
@@ -35,6 +36,7 @@ def put_secret(data_dir: Path, name: str, value: str) -> str:
                     "UserName": SERVICE,
                     "CredentialBlob": value,
                     "Comment": "isolated V3 preview BYOK",
+                    "Persist": win32cred.CRED_PERSIST_LOCAL_MACHINE,
                 },
                 0,
             )
@@ -44,11 +46,6 @@ def put_secret(data_dir: Path, name: str, value: str) -> str:
             _MEMORY.pop(_target(data_dir, name), None)
             return "os"
         except Exception:
-            if os.environ.get("DT_V3_SECRET_FILE") == "1":
-                path = _file_path(data_dir, name)
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(value, encoding="utf-8")
-                return "file"
             _MEMORY[_target(data_dir, name)] = value
             return "memory"
     if os.environ.get("DT_V3_SECRET_FILE") == "1":
@@ -61,35 +58,41 @@ def put_secret(data_dir: Path, name: str, value: str) -> str:
 
 
 def get_secret(data_dir: Path, name: str) -> str:
+    key = _target(data_dir, name)
+    # 凭据库本次写入失败时，新输入的内存值应优先于旧凭据；空值也是明确清除。
+    if key in _MEMORY:
+        return _MEMORY[key]
     if sys.platform == "win32" and os.environ.get("DT_V3_SECRET_FILE") != "1":
         try:
             import win32cred
 
-            blob = win32cred.CredRead(_target(data_dir, name), win32cred.CRED_TYPE_GENERIC)
+            blob = win32cred.CredRead(key, win32cred.CRED_TYPE_GENERIC)
             raw = blob.get("CredentialBlob") or b""
             if isinstance(raw, bytes):
-                return raw.decode("utf-8", errors="replace").strip()
+                return raw.decode("utf-16-le").rstrip("\x00").strip()
             return str(raw).strip()
         except Exception:
-            mem = _MEMORY.get(_target(data_dir, name), "")
-            if mem:
-                return mem
+            return ""
     if os.environ.get("DT_V3_SECRET_FILE") == "1":
         path = _file_path(data_dir, name)
         if path.is_file():
             return path.read_text(encoding="utf-8").strip()
-    return _MEMORY.get(_target(data_dir, name), "")
+    return ""
 
 
 def delete_secret(data_dir: Path, name: str) -> None:
+    key = _target(data_dir, name)
+    failed = False
     if sys.platform == "win32":
         try:
             import win32cred
-
-            win32cred.CredDelete(_target(data_dir, name), win32cred.CRED_TYPE_GENERIC)
+            win32cred.CredDelete(key, win32cred.CRED_TYPE_GENERIC)
         except Exception:
-            pass
+            failed = True
     path = _file_path(data_dir, name)
     if path.is_file():
         path.unlink()
-    _MEMORY.pop(_target(data_dir, name), None)
+    if failed:
+        _MEMORY[key] = ""
+    else:
+        _MEMORY.pop(key, None)

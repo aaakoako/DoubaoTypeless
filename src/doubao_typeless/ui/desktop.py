@@ -21,14 +21,10 @@ from doubao_typeless.ui.filelog import FileLogger
 from doubao_typeless.ui.single_instance import listen_for_commands, request_quit, request_show
 from doubao_typeless.ui.v3_startup import apply_v3_autostart
 
-TOKENS = {
-    "accent": "#167D71",
-    "surface": "#F7F6F2",
-    "card": "#FFFFFF",
-    "ink": "#1D2826",
-    "muted": "#63716D",
-    "danger": "#B42318",
-}
+from doubao_typeless.ui.theme import QSS as STYLESHEET, style_root
+from doubao_typeless.ui.theme_generated import COLORS
+TOKENS = {"accent":COLORS["accent"], "surface":COLORS["bg"], "card":COLORS["surface"],
+          "ink":COLORS["ink"], "muted":COLORS["muted"], "danger":COLORS["danger"]}
 
 RESULT_LABELS = {
     "CONFIRMED": "已插入",
@@ -45,35 +41,6 @@ def _result_label(code: object) -> str:
         return "未记录"
     return RESULT_LABELS.get(str(code), str(code))
 
-STYLESHEET = f"""
-QWidget {{ background: {TOKENS['surface']}; color: {TOKENS['ink']}; font-size: 13px; font-family: "Microsoft YaHei UI","Microsoft YaHei","Segoe UI"; }}
-QTabWidget::pane {{ border: 0; }}
-QTabBar::tab {{ padding: 8px 16px; color: {TOKENS['muted']}; border-bottom: 2px solid transparent; }}
-QTabBar::tab:hover {{ color: {TOKENS['ink']}; background: #E7EEEC; }}
-QTabBar::tab:selected {{ color: {TOKENS['accent']}; font-weight: 600; border-bottom: 2px solid {TOKENS['accent']}; }}
-QTabBar::tab:focus {{ outline: 2px solid {TOKENS['accent']}; }}
-QFrame#card {{ background: {TOKENS['card']}; border-radius: 12px; }}
-QPushButton {{ border: 0; border-radius: 9px; padding: 8px 12px; }}
-QPushButton:hover {{ background: #D8E4E1; }}
-QPushButton:pressed {{ background: #C5D6D2; }}
-QPushButton:disabled {{ color: #9AA6A3; background: #EEF1F0; }}
-QPushButton:focus {{ outline: 2px solid {TOKENS['accent']}; }}
-QPushButton#primary {{ background: {TOKENS['accent']}; color: white; }}
-QPushButton#primary:hover {{ background: #12655B; }}
-QPushButton#primary:pressed {{ background: #0E524A; }}
-QPushButton#primary:disabled {{ background: #8BB8B2; color: #F4F7F6; }}
-QPushButton#ghost {{ background: #E7EEEC; color: {TOKENS['ink']}; }}
-QPushButton#ghost:hover {{ background: #D5E0DD; }}
-QPushButton#danger {{ background: #F4E4E1; color: {TOKENS['danger']}; }}
-QPushButton#danger:hover {{ background: #EED3CE; }}
-QLineEdit, QPlainTextEdit {{ background: white; border: 1px solid #D5DDDA; border-radius: 8px; padding: 6px; }}
-QLineEdit:focus, QPlainTextEdit:focus {{ border: 1px solid {TOKENS['accent']}; }}
-QLineEdit:disabled, QPlainTextEdit:disabled {{ background: #EEF1F0; color: #9AA6A3; }}
-QListWidget::item:selected {{ background: #E3F2EF; color: {TOKENS['ink']}; }}
-QListWidget::item:hover {{ background: #F0F5F3; }}
-QLabel#muted {{ color: {TOKENS['muted']}; }}
-QLabel#error {{ color: {TOKENS['danger']}; }}
-"""
 
 
 def _repo_root() -> Path:
@@ -104,7 +71,7 @@ def apply_ui_font(qt=None) -> str:
     if qt is None:
         return ""
     families = set(QFontDatabase.families())
-    for name in ("Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI"):
+    for name in ("Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI"):
         if name in families:
             qt.setFont(QFont(name, 10))
             return name
@@ -127,21 +94,33 @@ def app_icon():
 
 
 class RecoveryDialog:
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, confirm_image: bool = False, progress: dict | None = None):
         from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
         self.choice = "cancel"
         dlg = QDialog(parent)
         dlg.setWindowTitle("上次结果未知")
         dlg.setModal(True)
+        style_root(dlg)
         dlg.resize(420, 180)
         layout = QVBoxLayout(dlg)
-        layout.addWidget(QLabel("上次插入结果不确定。不自动重贴，也不全选删除。"))
+        message = QLabel("程序不能确认刚才的图片是否已加入。请查看目标输入框，再决定继续或重贴。"
+                         if confirm_image else "上次插入结果不确定。不自动重贴，也不全选删除。")
+        if progress and progress.get("message"):
+            message.setText(progress["message"] + "。\n确认图片已出现后继续，不会重贴该图。")
+        message.setWordWrap(True)
+        layout.addWidget(message)
+        if confirm_image:
+            caption = "图片已出现，继续文字" if progress and progress.get("images_attempted")==progress.get("images_total") and progress.get("text_state")=="not_attempted" else "我已看到刚才的图片，继续剩余内容"
+            confirmed = QPushButton(caption)
+            confirmed.setObjectName("primary")
+            confirmed.clicked.connect(lambda: self._pick(dlg, "confirm_continue"))
+            layout.addWidget(confirmed)
         row = QHBoxLayout()
         for label, mode, name in (
-            ("完整重贴", "full", "primary"),
+            ("完整重贴", "full", "ghost"),
             ("只贴文字", "text_only", "ghost"),
-            ("取消", "cancel", "danger"),
+            ("取消", "cancel", "ghost"),
         ):
             btn = QPushButton(label)
             btn.setObjectName(name)
@@ -157,6 +136,26 @@ class RecoveryDialog:
     def exec(self) -> str:
         self._dlg.exec()
         return self.choice
+
+
+class ComposerPicker:
+    """多候选只列明确的输入框；选中后聚焦但不自动发送或投递。"""
+    def __init__(self, parent, candidates):
+        from PySide6.QtWidgets import QDialog,QLabel,QListWidget,QPushButton,QVBoxLayout,QHBoxLayout
+        self.candidate=None
+        dlg=QDialog(parent);dlg.setWindowTitle("选择对话输入框");dlg.resize(420,280);style_root(dlg)
+        layout=QVBoxLayout(dlg);layout.setContentsMargins(16,16,16,16);layout.setSpacing(12)
+        note=QLabel("当前窗口有多个对话输入框。选中后只定位，不会自动插入或发送。");note.setWordWrap(True);layout.addWidget(note)
+        choices=QListWidget()
+        for n,item in enumerate(candidates,1):choices.addItem(f"{n}. {item.get('label','对话输入框')} · {item.get('title','')[:55]}")
+        layout.addWidget(choices);row=QHBoxLayout();cancel=QPushButton("取消");cancel.clicked.connect(dlg.reject)
+        use=QPushButton("使用此输入框");use.setObjectName("primary");use.setEnabled(False)
+        choices.currentRowChanged.connect(lambda n:use.setEnabled(0<=n<len(candidates)))
+        def choose():
+            index=choices.currentRow()
+            if 0<=index<len(candidates):self.candidate=candidates[index];dlg.accept()
+        use.clicked.connect(choose);row.addWidget(cancel);row.addWidget(use);layout.addLayout(row);self.widget=dlg
+    def exec(self):self.widget.exec();return self.candidate
 
 
 class ReviewPanel:
@@ -175,10 +174,13 @@ class ReviewPanel:
         w = QWidget(parent)
         w.setWindowTitle("当前图文")
         w.resize(420, 320)
-        w.setStyleSheet(STYLESHEET)
+        style_root(w)
         layout = QVBoxLayout(w)
+        layout.setContentsMargins(16,16,16,16)
+        layout.setSpacing(8)
         self.banner = QLabel("")
         self.banner.setObjectName("error")
+        self.banner.setWordWrap(True)
         self.banner.hide()
         layout.addWidget(self.banner)
         self.images = QLabel("没有图片")
@@ -214,12 +216,20 @@ class ReviewPanel:
         insert = QPushButton("插入并复制")
         insert.setObjectName("primary")
         insert.clicked.connect(self.insert)
-        row.addWidget(use_phone)
-        row.addWidget(keep)
-        row.addWidget(terms_btn)
-        row.addWidget(suggest)
-        row.addWidget(apply_s)
-        row.addWidget(reject_s)
+        context_row = QHBoxLayout()
+        for button in (use_phone, keep, apply_s, reject_s):
+            context_row.addWidget(button)
+        context_row.addStretch(1)
+        layout.addLayout(context_row)
+        tools_row = QHBoxLayout()
+        tools_row.addWidget(terms_btn)
+        tools_row.addWidget(suggest)
+        locate = QPushButton("定位输入框")
+        locate.setObjectName("ghost")
+        locate.clicked.connect(lambda: self.app.request_locate_composer())
+        tools_row.addWidget(locate)
+        tools_row.addStretch(1)
+        layout.addLayout(tools_row)
         row.addStretch(1)
         row.addWidget(copy)
         row.addWidget(insert)
@@ -244,11 +254,13 @@ class ReviewPanel:
 
         self._hide_filter = _HideRelease(w)
         w.installEventFilter(self._hide_filter)
+        self.app.hud.bind_foreground_surface(w)
         self.reload()
 
     def _mark_editing(self) -> None:
         self._editing = True
         self.app.review_editing = True
+        self.app.update_pc_text(self.editor.toPlainText())
 
     def _sync_buttons(self) -> None:
         pending = bool(self.app.phone_pending)
@@ -264,7 +276,7 @@ class ReviewPanel:
         self.app.review_editing = False
         self.banner.hide()
         self.editor.blockSignals(True)
-        self.editor.setPlainText(self.app.draft.text or "")
+        self.editor.setPlainText(self.app.review_text() or "")
         self.editor.blockSignals(False)
         self._refresh_images()
         self._sync_buttons()
@@ -273,7 +285,7 @@ class ReviewPanel:
         if not self._editing:
             self.reload()
             return
-        self.banner.setText("手机有更新。采用手机版或保留电脑稿，插入时冻结当前这一版。")
+        self.banner.setText("手机有更新；电脑修改仍保留。默认以手机为准，可复制电脑修改或采用手机版继续。")
         self.banner.show()
         self._sync_buttons()
 
@@ -284,12 +296,13 @@ class ReviewPanel:
     def keep_pc(self) -> None:
         self.app.keep_pc_edit()
         self.banner.hide()
+        self._sync_buttons()
 
     def copy_only(self) -> None:
-        self.app.draft.text = self.editor.toPlainText()
+        self.app.update_pc_text(self.editor.toPlainText())
         self.app.review_editing = False
         self.app._save_draft()
-        self.app.copy_text()
+        self.app.copy_text(self.editor.toPlainText())
 
     def _clear_image_row(self) -> None:
         while self.image_row.count():
@@ -320,7 +333,8 @@ class ReviewPanel:
             if item["present"] and item["data"]:
                 pix = QPixmap()
                 pix.loadFromData(item["data"])
-                thumb.setIcon(pix)
+                from PySide6.QtGui import QIcon
+                thumb.setIcon(QIcon(pix))
                 thumb.setIconSize(thumb.size() * 0.9)
                 thumb.clicked.connect(lambda _=False, payload=item["data"]: self._enlarge(payload))
             else:
@@ -334,6 +348,7 @@ class ReviewPanel:
 
         dlg = QDialog(self.widget)
         dlg.setWindowTitle("查看图片")
+        style_root(dlg)
         box = QVBoxLayout(dlg)
         label = QLabel()
         pix = QPixmap()
@@ -352,7 +367,7 @@ class ReviewPanel:
         import threading
 
         text = self.editor.toPlainText()
-        self.app.draft.text = text
+        self.app.update_pc_text(text)
         self.banner.setText("正在请求建议，仍可改字或插入")
         self.banner.show()
 
@@ -365,34 +380,35 @@ class ReviewPanel:
                 else:
                     self.banner.setText(out.get("message") or "没有可用的改写建议")
                 self.banner.show()
+                self._sync_buttons()
             try:
                 from PySide6.QtCore import QTimer
 
                 QTimer.singleShot(0, self.widget, apply)
-            except Exception:
-                apply()
+            except RuntimeError:
+                pass  # 窗口已销毁，不能在工作线程操作 Qt 控件。
 
         threading.Thread(target=work, daemon=True).start()
 
     def apply_rewrite(self) -> None:
-        self.app.draft.text = self.editor.toPlainText()
+        self.app.update_pc_text(self.editor.toPlainText())
         if not self.app.apply_suggestion():
             self.banner.setText("建议已过期，请再点建议改写")
             self.banner.show()
             return
         self.editor.blockSignals(True)
-        self.editor.setPlainText(self.app.draft.text)
+        self.editor.setPlainText(self.app.review_text())
         self.editor.blockSignals(False)
-        self.banner.setText("已采用建议，可再点不用建议前的稿已替换")
+        self.banner.setText("已采用建议；继续编辑前可撤回这次改写。")
         self.banner.show()
         self._sync_buttons()
 
     def reject_rewrite(self) -> None:
         self.app.reject_suggestion()
         self.editor.blockSignals(True)
-        self.editor.setPlainText(self.app.draft.text)
+        self.editor.setPlainText(self.app.review_text())
         self.editor.blockSignals(False)
-        self.banner.setText("已不用这次建议，原文未改")
+        self.banner.setText("已取消本次建议；较新的编辑不会被覆盖。")
         self.banner.show()
         self._sync_buttons()
 
@@ -409,16 +425,15 @@ class ReviewPanel:
         self.banner.show()
 
     def insert(self) -> None:
-        self.app.draft.text = self.editor.toPlainText()
-        self.app.draft.revision += 1
+        self.app.update_pc_text(self.editor.toPlainText())
         self.app.review_editing = False
         self.app._save_draft()
-        self.app.insert_current()
-        self._editing = False
-        self.app.review_editing = False
         self.widget.hide()
+        self._editing = False
+        self.app.request_review_insert()
 
     def show(self) -> None:
+        self.app._remember_external_target()
         if not self._editing:
             self.reload()
         self.widget.show()
@@ -444,6 +459,7 @@ class ClientWindow:
             QPushButton,
             QScrollArea,
             QTabWidget,
+            QToolButton,
             QVBoxLayout,
             QWidget,
         )
@@ -460,10 +476,12 @@ class ClientWindow:
                 self._close_event(event)
 
         w = ShellWindow()
-        w.setWindowTitle("DoubaoTypeless 预览")
+        w.setWindowTitle("DoubaoTypeless V3 · 体验版")
         w.resize(560, 600)
-        w.setStyleSheet(STYLESHEET)
+        style_root(w)
         root = QVBoxLayout(w)
+        root.setContentsMargins(16, 14, 16, 14)
+        root.setSpacing(12)
         tabs = QTabWidget()
         root.addWidget(tabs, 1)
 
@@ -477,6 +495,8 @@ class ClientWindow:
         cl.addWidget(version)
         card = QFrame()
         card.setObjectName("card")
+        from PySide6.QtWidgets import QSizePolicy
+        card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         card_l = QHBoxLayout(card)
         self.qr = QLabel()
         self.qr.setFixedSize(168, 168)
@@ -515,16 +535,27 @@ class ClientWindow:
         self.device_name.setPlaceholderText("给已连接的手机起个名字")
         self.device_name.hide()
         cl.addWidget(self.device_name)
-        self.grant_row = QHBoxLayout()
+        self.grant_row = QVBoxLayout()
         cl.addLayout(self.grant_row)
         self.remember_box = QCheckBox("记住这台设备 30 天（需明确勾选，不是默认）")
         self.remember_box.clicked.connect(self._toggle_remember)
         cl.addWidget(self.remember_box)
-        cl.addWidget(QLabel("本机练习框（引导用，不是 Cursor）"))
+        self.practice_toggle = QToolButton()
+        self.practice_toggle.setText("试一段文字（可选）")
+        self.practice_toggle.setCheckable(True)
+        self.practice_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.practice_toggle.setArrowType(Qt.RightArrow)
+        cl.addWidget(self.practice_toggle)
         self.practice = QPlainTextEdit()
-        self.practice.setPlaceholderText("点这里，再按 Alt+I 练习插入并复制。")
+        self.practice.setPlaceholderText("可选：输入测试文字，再到「当前图文」预览。实际插入请选中外部输入框。")
+        self.practice.textChanged.connect(lambda: self.app.update_pc_text(self.practice.toPlainText()))
         self.practice.setFixedHeight(88)
         cl.addWidget(self.practice)
+        self.practice.hide()
+        self.practice_toggle.toggled.connect(lambda opened: (
+            self.practice.setVisible(opened),
+            self.practice_toggle.setArrowType(Qt.DownArrow if opened else Qt.RightArrow)))
+        cl.addStretch(1)
         foot = QHBoxLayout()
         start = QPushButton("开始使用，收起窗口")
         start.setObjectName("primary")
@@ -544,6 +575,8 @@ class ClientWindow:
 
         settings = QWidget()
         sl = QFormLayout(settings)
+        sl.setVerticalSpacing(12)
+        sl.addRow(QLabel("输入与启动"))
         self.hotkey_insert = QLineEdit(str(stored.get("hotkey_insert") or "<alt>+i"))
         self.hotkey_recall = QLineEdit(str(stored.get("hotkey_recall") or "<alt>+<shift>+i"))
         sl.addRow("插入并复制", self.hotkey_insert)
@@ -558,7 +591,17 @@ class ClientWindow:
         self.start_min.setChecked(bool(stored.get("start_minimized")))
         sl.addRow(self.autostart)
         sl.addRow(self.start_min)
-        sl.addRow(QLabel("可选模型。不配密钥也能用文字、图片和白板。"))
+        self.phone_send_enabled = QCheckBox("允许手机确认后发送（插入仍不自动发送）")
+        self.phone_send_enabled.setChecked(stored.get("phone_send_enabled") is True)
+        self.phone_send_mode = QComboBox()
+        self.phone_send_mode.addItem("Enter", "enter")
+        self.phone_send_mode.addItem("Ctrl+Enter", "ctrl_enter")
+        self.phone_send_mode.setCurrentIndex(1 if stored.get("phone_send_mode") == "ctrl_enter" else 0)
+        sl.addRow(self.phone_send_enabled)
+        sl.addRow("目标应用发送快捷键", self.phone_send_mode)
+        ai_intro = QLabel("AI 文字辅助（可选）\n仅在「当前图文」主动检查时调用。不负责语音识别，不影响普通输入和画图。")
+        ai_intro.setWordWrap(True)
+        sl.addRow(ai_intro)
         self.byok_provider = QComboBox()
         for name, _url, _model in PROVIDER_PRESETS:
             self.byok_provider.addItem(name)
@@ -580,9 +623,11 @@ class ClientWindow:
         sl.addRow(self.byok_url_note)
         from PySide6.QtWidgets import QGroupBox
 
-        advanced = QGroupBox("高级模型参数（默认不用）")
-        advanced.setCheckable(True)
-        advanced.setChecked(bool(stored.get("byok_prompt") or stored.get("byok_temperature") or stored.get("byok_timeout")))
+        advanced_toggle = QToolButton()
+        advanced_toggle.setText("高级模型参数")
+        advanced_toggle.setCheckable(True)
+        advanced_toggle.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        advanced = QWidget()
         adv = QFormLayout(advanced)
         self.byok_prompt = QPlainTextEdit()
         self.byok_prompt.setPlainText(str(stored.get("byok_prompt") or ""))
@@ -592,10 +637,18 @@ class ClientWindow:
         adv.addRow("附加说明", self.byok_prompt)
         adv.addRow("温度", self.byok_temperature)
         adv.addRow("超时秒", self.byok_timeout)
+        sl.addRow(advanced_toggle)
         sl.addRow(advanced)
+        opened = bool(stored.get("byok_prompt") or stored.get("byok_temperature") or stored.get("byok_timeout"))
+        advanced_toggle.setChecked(opened)
+        advanced_toggle.setArrowType(Qt.DownArrow if opened else Qt.RightArrow)
+        advanced.setVisible(opened)
+        advanced_toggle.toggled.connect(lambda yes: (
+            advanced.setVisible(yes), advanced_toggle.setArrowType(Qt.DownArrow if yes else Qt.RightArrow)))
         self.byok_advanced = advanced
         self.byok_status = QLabel("")
         self.byok_status.setObjectName("muted")
+        self.byok_status.setWordWrap(True)
         sl.addRow(self.byok_status)
         sl.addRow(QLabel("词库（仅本预览目录，一行 错词 -> 正确）"))
         self.vocab = QPlainTextEdit()
@@ -618,17 +671,25 @@ class ClientWindow:
         save = QPushButton("保存设置")
         save.setObjectName("primary")
         save.clicked.connect(self.save_settings)
-        srow.addWidget(probe)
+        model_actions = QHBoxLayout()
+        model_actions.addWidget(probe)
+        model_actions.addWidget(import_vocab)
+        model_actions.addStretch(1)
+        sl.addRow(model_actions)
         srow.addWidget(export)
-        srow.addWidget(import_vocab)
         srow.addWidget(update)
+        srow.addStretch(1)
         srow.addWidget(save)
-        sl.addRow(srow)
         settings_scroll = QScrollArea()
         settings_scroll.setWidgetResizable(True)
         settings_scroll.setFrameShape(QFrame.NoFrame)
         settings_scroll.setWidget(settings)
-        tabs.addTab(settings_scroll, "常用设置")
+        settings_page = QWidget()
+        settings_layout = QVBoxLayout(settings_page)
+        settings_layout.setContentsMargins(0,0,0,0)
+        settings_layout.addWidget(settings_scroll, 1)
+        settings_layout.addLayout(srow)
+        tabs.addTab(settings_page, "常用设置")
 
         recent = QWidget()
         rl = QVBoxLayout(recent)
@@ -652,6 +713,7 @@ class ClientWindow:
 
         self.tabs = tabs
         self.widget = w
+        self.app.hud.bind_foreground_surface(w)
         self._clipboard = QGuiApplication.clipboard()
         self._hist_sig = None
         self._pairing_url = ""
@@ -784,12 +846,13 @@ class ClientWindow:
 
     def refresh(self) -> None:
         from PySide6.QtCore import Qt
-        from PySide6.QtWidgets import QListWidgetItem, QPushButton
+        from PySide6.QtWidgets import QListWidgetItem, QPushButton, QWidget, QHBoxLayout
 
         url = self.pairing_url()
         if url != getattr(self, "_pairing_url", ""):
             self._pairing_url = url
-            self.url_label.setText(url)
+            self.url_label.setText(self.phone_url())
+            self.url_label.setToolTip("扫码已包含一次性配对信息，无需抄写长码")
             pix = qr_pixmap(url)
             if not pix.isNull():
                 self.qr.setPixmap(pix)
@@ -801,12 +864,14 @@ class ClientWindow:
             self._clear_grant_row()
             if not sessions:
                 self.qr.show()
-                self.practice.show()
+                self.practice_toggle.show()
+                self.practice.setVisible(self.practice_toggle.isChecked())
                 self.device_box.setText("还没有手机连上。扫码后在这里批准插入和截图。")
                 self.device_name.hide()
             else:
                 self.qr.hide()
                 self.practice.hide()
+                self.practice_toggle.hide()
                 from doubao_typeless.storage.credentials import device_label
 
                 nicks = load_settings(self.app.data_dir).get("device_nicknames") or {}
@@ -827,9 +892,13 @@ class ClientWindow:
                     revoke = QPushButton("撤销设备")
                     revoke.setObjectName("danger")
                     revoke.clicked.connect(lambda _=False, s=sid: self.revoke(s))
-                    self.grant_row.addWidget(allow_i)
-                    self.grant_row.addWidget(allow_c)
-                    self.grant_row.addWidget(revoke)
+                    row_widget = QWidget()
+                    row = QHBoxLayout(row_widget)
+                    row.setContentsMargins(0,0,0,0)
+                    row.addWidget(allow_i)
+                    row.addWidget(allow_c)
+                    row.addWidget(revoke)
+                    self.grant_row.addWidget(row_widget)
                 self.device_name.show()
                 if not self.device_name.hasFocus():
                     self.device_name.setText(device_label(sessions[0]["device_id"], nicks, 1))
@@ -892,6 +961,8 @@ class ClientWindow:
             "hotkey_capture": self.hotkey_capture.text().strip() or "<alt>+<shift>+s",
             "autostart": self.autostart.isChecked(),
             "start_minimized": self.start_min.isChecked(),
+            "phone_send_enabled": self.phone_send_enabled.isChecked(),
+            "phone_send_mode": self.phone_send_mode.currentData(),
             "byok_endpoint": self.byok_endpoint.text().strip(),
             "byok_api_key": self.byok_key.text().strip(),
             "byok_model": self.byok_model.text().strip(),
@@ -961,8 +1032,8 @@ class ClientWindow:
                 from PySide6.QtCore import QTimer
 
                 QTimer.singleShot(0, host, apply)
-            except Exception:
-                apply()
+            except RuntimeError:
+                pass  # 窗口已销毁，不能在工作线程操作 Qt 控件。
 
         threading.Thread(target=work, daemon=True).start()
 
@@ -996,7 +1067,7 @@ class ClientWindow:
         if bundle is None:
             return
         self.app.bridge.last_bundle = self.app.history.replay_bundle(bundle)
-        self.app.insert_last()
+        self.app._commands.submit(self.app.insert_last)
 
     def export_diagnostics(self) -> None:
         from doubao_typeless.services.v3_diagnostics import write_snapshot
@@ -1028,7 +1099,8 @@ class DesktopShell:
         menu = QMenu()
         menu.addAction("打开客户端", self.client.show_window)
         menu.addAction("当前图文", self.review.show)
-        menu.addAction("召回上次", app.recall_last)
+        menu.addAction("定位当前窗口输入框（不插入）", app.request_locate_composer)
+        menu.addAction("召回上次", app.request_recall)
         menu.addAction("截图给手机", app.capture_region)
         self._pause_action = menu.addAction("暂停连接", self.toggle_pause)
         menu.addSeparator()
@@ -1039,10 +1111,6 @@ class DesktopShell:
         self.tray.show()
         self._wake = listen_for_commands(self._on_ipc)
         self.app.ui_hook = self._from_service
-        if app.hud._widget is not None:
-            expand = getattr(app.hud, "_expand", None)
-            if expand is not None:
-                expand.clicked.connect(self.review.show)
 
     def _explained_tray(self) -> None:
         if not load_settings(self.app.data_dir).get("tray_explained"):
@@ -1072,36 +1140,102 @@ class DesktopShell:
         from PySide6.QtCore import QTimer
 
         host = self.client.widget
-        if event == "recovery_ask":
+        if event == "sync_wait":
+            pass  # 统一HUD状态机已处理，不能只改一行文字却忘记停空闲计时。
+        elif event == "restore_on_phone":
+            QTimer.singleShot(0, host, lambda: self.tray.showMessage("恢复图文", "已发到手机，请在手机确认；当前内容没有被覆盖"))
+        elif event == "delivery_failed":
+            code = str(_kw.get("error_code") or "")
+            from doubao_typeless.ui.insert_status import error_message
+            text = error_message(_kw)
+            def show_error():
+                self.client.byok_status.setText(text)
+                if self.review.widget.isVisible():
+                    self.review.banner.setText(text)
+                    self.review.banner.show()
+            QTimer.singleShot(0, host, show_error)
+        elif event == "capture_region":
+            QTimer.singleShot(0, host, self.app.capture_region)
+        elif event == "composer_located":
+            def reveal_target():
+                self.review.widget.hide()
+                self.app.hud.operation_event("composer_located")
+            QTimer.singleShot(0, host, reveal_target)
+        elif event == "composer_pick":
+            candidates=list(_kw.get("candidates") or [])
+            QTimer.singleShot(0, host, lambda:self._pick_composer(candidates))
+        elif event == "recovery_ask":
             QTimer.singleShot(0, host, self._ask_recovery)
         elif event == "phone_pending":
             QTimer.singleShot(0, host, self.review.note_phone_pending)
         elif event == "activity":
             QTimer.singleShot(0, host, self.client.refresh)
+            def refresh_visible_review():
+                if self.review.widget.isVisible() and not self.review._editing:
+                    self.review.reload()
+            QTimer.singleShot(0, self.review.widget, refresh_visible_review)
         elif event == "expand":
             QTimer.singleShot(0, host, self.review.show)
         elif event in {"hide_after_insert", "new_draft"}:
             QTimer.singleShot(0, self.review.widget, self.review.widget.hide)
 
+    def _pick_composer(self, candidates) -> None:
+        if getattr(self,"_picker_open",False):return
+        self._picker_open=True
+        try:
+            with self.app.hud.modal_pause():
+                choice=ComposerPicker(self.client.widget,candidates).exec()
+            if choice:self.app.request_choose_composer(choice)
+        finally:self._picker_open=False
+
     def _ask_recovery(self) -> None:
-        mode = RecoveryDialog(self.client.widget).exec()
-        if mode != "cancel":
-            self.app.confirm_recovery(mode)
+        from doubao_typeless.services.delivery_progress import summarize_delivery
+        previous = self.app._last_attempt
+        progress = summarize_delivery(self.app.bridge.last_bundle or {}, previous.to_dict()) if previous else None
+        if getattr(self, "_recovery_dialog_open", False):
+            return
+        self._recovery_dialog_open = True
+        try:
+            # The HUD is always-on-top. Without suspension it can cover a modal
+            # button, making a physical click hit the disabled overlay instead.
+            with self.app.hud.modal_pause():
+                mode = RecoveryDialog(self.client.widget, confirm_image=self.app.can_confirm_image(), progress=progress).exec()
+            if mode != "cancel":
+                self.app.request_recovery(mode)
+        finally:
+            self._recovery_dialog_open = False
 
     def quit(self) -> None:
         from PySide6.QtWidgets import QApplication
+        from PySide6.QtCore import QTimer
+        import asyncio
 
-        self.client._closing_for_quit = True
-        self.tray.hide()
-        try:
-            import asyncio
+        if getattr(self, "_quit_pending", False):
+            return
+        loop = getattr(self.app, "_loop", None)
+        if loop is None:
+            QApplication.instance().quit()
+            return
+        self._quit_pending = True
+        future = asyncio.run_coroutine_threadsafe(self.app.stop(), loop)
+        self.tray.showMessage("DoubaoTypeless", "正在结束当前操作，草稿已保留")
 
-            loop = getattr(self.app, "_loop", None)
-            if loop is not None:
-                asyncio.run_coroutine_threadsafe(self.app.stop(), loop).result(5)
-        except Exception:
-            pass
-        QApplication.instance().quit()
+        def check() -> None:
+            if not future.done():
+                QTimer.singleShot(75, self.client.widget, check)
+                return
+            self._quit_pending = False
+            try:
+                stopped = future.result()
+            except Exception:
+                stopped = False
+            if stopped is False:
+                self.tray.showMessage("暂未退出", "目标程序尚未返回，未强制终止。请稍后再点退出。")
+                return
+            self.client._closing_for_quit = True
+            self.tray.hide()
+            QApplication.instance().quit()
+        QTimer.singleShot(0, self.client.widget, check)
 
 
 def _show_startup_error(exc: BaseException) -> None:
@@ -1129,11 +1263,22 @@ def run_desktop(argv: list[str] | None = None) -> int:
 
     qt = QApplication.instance() or QApplication(argv)
     qt.setQuitOnLastWindowClosed(False)
+    qt.setStyleSheet(STYLESHEET)
     apply_ui_font(qt)
     if "--quit" in argv:
         return 0 if request_quit() else 1
-    if request_show():
-        return 0
+    from doubao_typeless.ui.single_instance import identify_running
+    from doubao_typeless.build_info import build_info
+    active = identify_running()
+    if active:
+        expected = build_info()["source_sha"]
+        if active.get("unknown") or active.get("source_sha") != expected:
+            QMessageBox.warning(None, "已有另一版本正在运行",
+                "为避免重复快捷键和打开错版本，请先从旧版托盘正常退出，再打开这份新版本。\n"
+                "程序不会结束旧进程，也不会覆盖其数据。")
+            return 1
+        if request_show():
+            return 0
 
     from doubao_typeless.app import V3App, set_log
     from doubao_typeless.runtime import v3_data_dir
@@ -1153,19 +1298,27 @@ def run_desktop(argv: list[str] | None = None) -> int:
 
     logger = FileLogger(data_dir / "logs" / "v3.log", also_print=True)
     set_log(logger)
-    app = V3App(data_dir=data_dir)
-    app._lock = lock
     try:
+        app = V3App(data_dir=data_dir, instance_lock=lock)
         app.hud.start()
+        # Build the native surfaces/control listener before exposing HTTP readiness.
+        # Otherwise a second --quit/show can reach a half-started process and time out
+        # while expensive first-use font/icon/widget initialization is still running.
+        shell = DesktopShell(app)
+        if shell._wake is None or not shell._wake.isListening():
+            raise RuntimeError("无法建立本机控制入口，已停止启动")
+        logger("[v3.lifecycle] native_shell_ready")
+        loop = app.start_background(start_hud=False)
+        app._loop = loop
         try:
             from doubao_typeless.platform.windows.hotkeys import start_hotkeys
 
             stored = load_settings(app.data_dir)
             start = start_hotkeys(
-                on_insert=app.insert_current,
-                on_recall=app.recall_last,
+                on_insert=app.request_insert,
+                on_recall=app.request_recall,
                 on_expand=lambda: app._notify_ui("expand"),
-                on_region=app.capture_region,
+                on_region=lambda: app._notify_ui("capture_region"),
                 insert_combo=str(stored.get("hotkey_insert") or "<alt>+i"),
                 recall_combo=str(stored.get("hotkey_recall") or "<alt>+<shift>+i"),
                 expand_combo=str(stored.get("hotkey_expand") or "<alt>+<shift>+e"),
@@ -1176,9 +1329,8 @@ def run_desktop(argv: list[str] | None = None) -> int:
                 logger(f"[v3] 热键注册失败: {start['failures']}")
         except Exception as exc:
             logger(f"[v3] 热键未启动: {exc}")
-        loop = app.start_background(start_hud=False)
-        app._loop = loop
-        shell = DesktopShell(app)
+        shell.client.refresh()
+        logger("[v3.lifecycle] desktop_event_loop_ready")
         stored = load_settings(app.data_dir)
         if minimized or stored.get("start_minimized"):
             shell.tray.show()

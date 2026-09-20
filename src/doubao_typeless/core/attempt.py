@@ -26,6 +26,7 @@ class Attempt:
     result: Result = "RUNNING"
     steps: list[Step] = field(default_factory=list)
     error_code: str = ""
+    detail_code: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         payload = {
@@ -47,6 +48,8 @@ class Attempt:
         }
         if self.error_code:
             payload["error_code"] = self.error_code
+        if self.detail_code:
+            payload["detail_code"] = self.detail_code
         return payload
 
     def confirm_if_observed(self) -> None:

@@ -87,3 +87,6 @@ archive/scratch/
 # V3 设计包解压缓存与隔离运行时（禁止提交日用/临时目录）
 _v3_spec_extract/
 preview-v3-00/
+
+# Local rendering output; curated evidence is tracked separately
+/qt-shots/

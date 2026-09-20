@@ -2,12 +2,21 @@
 from __future__ import annotations
 
 from typing import Callable
+import sys
 
 
 from doubao_typeless.core.hotkey_gate import HotkeyGate
 
 
-def start_hotkeys(
+def start_hotkeys(**kwargs):
+    """Windows 使用真实系统注册；其他环境保留非产品的兼容测试路径。"""
+    if sys.platform == "win32":
+        from doubao_typeless.platform.windows.native_hotkeys import start_native_hotkeys
+        return start_native_hotkeys(**kwargs)
+    return _start_pynput_hotkeys(**kwargs)
+
+
+def _start_pynput_hotkeys(
     *,
     on_insert: Callable[[], None],
     on_recall: Callable[[], None],
@@ -18,7 +27,7 @@ def start_hotkeys(
     expand_combo: str = "<alt>+<shift>+e",
     capture_combo: str = "<alt>+<shift>+s",
 ):
-    from pynput.keyboard import GlobalHotKeys, Key, Listener
+    from pynput.keyboard import GlobalHotKeys, HotKey, Listener
 
     insert_gate = HotkeyGate()
     recall_gate = HotkeyGate()
@@ -28,7 +37,11 @@ def start_hotkeys(
     def wrap(gate: HotkeyGate, fn: Callable[[], None]):
         def _inner():
             if gate.press():
-                fn()
+                try:
+                    fn()  # 正式调用者只提交队列或GUI信号，不在钩子执行投递。
+                except Exception as exc:
+                    from doubao_typeless.runtime_diagnostics import record_runtime_exception
+                    record_runtime_exception("hotkey_dispatch", exc)
 
         return _inner
 
@@ -48,12 +61,25 @@ def start_hotkeys(
         failures.append(f"热键注册失败，不会把语法合法当成成功: {exc}")
         listener = None
 
+    # 按实际配置的组合释放，不能把用户改成Ctrl+Q后仍只识别I/S/E。
+    configured = [(insert_combo or "<alt>+i", insert_gate),
+                  (recall_combo or "<alt>+<shift>+i", recall_gate)]
+    if on_expand:
+        configured.append((expand_combo or "<alt>+<shift>+e", expand_gate))
+    if on_region:
+        configured.append((capture_combo or "<alt>+<shift>+s", region_gate))
+    release_keys = []
+    for combo, gate in configured:
+        try:
+            release_keys.append((set(HotKey.parse(combo)), gate))
+        except ValueError:
+            failures.append("快捷键格式无效，请重新设置")
+
     def on_release(key):
-        if key in {Key.alt, Key.alt_l, Key.alt_r, Key.shift, Key.shift_l, Key.shift_r} or getattr(key, "char", "") in {"i", "I", "s", "S", "e", "E"}:
-            insert_gate.release()
-            recall_gate.release()
-            region_gate.release()
-            expand_gate.release()
+        canonical = listener.canonical(key) if listener is not None else key
+        for keys, gate in release_keys:
+            if canonical in keys:
+                gate.release()
 
     release_listener = Listener(on_release=on_release)
     try:

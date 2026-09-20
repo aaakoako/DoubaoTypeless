@@ -26,7 +26,10 @@ def test_vite_konva_sources_exist():
     assert "openNextQueued" in app
     assert "dt.v3.device" in app
     assert "resumeRemembered" in app
-    assert "if (asset.scene)" in app
+    # Scratch edits take precedence without replacing the saved scene until commit.
+    # Production-page cancellation tests also verify the restored pixel/scene identity.
+    assert "asset.edit_scene || asset.scene" in app
+    assert "editor.importScene(asset.edit_scene || asset.scene!)" in app
     assert "rebindSource" in app
     assert "applyRotated" in app
     assert "applyReady" in app

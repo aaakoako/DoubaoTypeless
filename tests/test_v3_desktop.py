@@ -41,7 +41,8 @@ def test_client_window_shows_live_url_and_grants(tmp_path):
         assert str(app.port) in win.url_label.text()
         assert "http://" in win.url_label.text()
         assert "扫码即连" in win.code_label.text()
-        assert "?pair=" in win.url_label.text()
+        assert "?pair=" not in win.url_label.text()  # 长凭据只进入二维码，不要求手抄。
+        assert "?pair=" in win.pairing_url()
         assert win.qr.pixmap() is not None and not win.qr.pixmap().isNull()
         code = app.auth.current_pairing_challenge()
         session = app.auth.complete_pairing(code, allow_insert=False, allow_capture=False)

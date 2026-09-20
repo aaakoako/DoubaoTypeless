@@ -2,16 +2,19 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import os
+import sys
 import threading
 import time
 import uuid
 from pathlib import Path
 
 from doubao_typeless.core.attempt import Attempt
-from doubao_typeless.core.bundle import Draft, archive_if_match, freeze_bundle
+from doubao_typeless.core.bundle import Draft, archive_if_match, freeze_bundle, source_snapshot
 from doubao_typeless.core.intent import IntentLedger
 from doubao_typeless.core.policy import classify_focus, is_own_window
+from doubao_typeless.platform.windows.focus import same_target
 from doubao_typeless.runtime import lan_ip, pick_port, v3_data_dir
 from doubao_typeless.services.bridge_v3 import V3Bridge
 from doubao_typeless.services.byok import ByokService
@@ -58,12 +61,16 @@ def _optional_float(value: object) -> float | None:
 
 
 class V3App:
-    def __init__(self, *, data_dir: Path | None = None, port: int = 8766):
+    def __init__(self, *, data_dir: Path | None = None, port: int = 8766, instance_lock=None):
         self.data_dir = Path(data_dir or v3_data_dir())
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.port = pick_port(port) if port else 0
-        self._lock = None
+        self._state_lock = threading.RLock()
+        self._lock = instance_lock
         self._acquire_instance_lock()
+        from doubao_typeless.services.command_queue import CommandQueue
+        self._commands = CommandQueue(on_error=self._report_command_error)
+        self._last_delivery_status: dict = {}
         self.auth = AuthService(store_path=self.data_dir / "trusted_devices.json")
         self.store = AssetStore(self.data_dir / "assets")
         from doubao_typeless.storage.db import V3DB
@@ -98,9 +105,16 @@ class V3App:
             "draft_id": self.draft.draft_id,
             "revision": self.draft.revision,
         }
+        from doubao_typeless.services.phone_send import PhoneSendService
+        from doubao_typeless.platform.windows.native_input import send_submit
+        self.phone_send = PhoneSendService(data_dir=self.data_dir,
+            options=lambda: load_settings(self.data_dir), read_focus=lambda: self._read_focus(),
+            wait_modifiers=lambda: self._wait_modifiers(), emit=send_submit,
+            authorize=self.auth.authorize, current_draft=lambda: self.draft,
+            is_locked=lambda: self._session_locked(), is_elevated=lambda: self._target_elevated())
         self._last_suggestion = None
         self.hud = HudController(
-            on_insert=self.insert_current,
+            on_insert=self.request_insert,
             on_copy=self.copy_text,
             on_expand=lambda: self._notify_ui("expand"),
         )
@@ -111,6 +125,7 @@ class V3App:
         self._copied_text = ""
         self._last_target_fp: tuple[str, str, int] | None = None
         self.review_editing = False
+        self._stopping = False
         self.phone_pending = None
         self.ui_hook = None
         from doubao_typeless.storage.draft_snapshot import load_draft, save_draft
@@ -121,15 +136,23 @@ class V3App:
             if missing:
                 _log(f"[v3.draft] 快照缺图 {len(missing)}，不造假像素")
         self._save_draft = lambda: save_draft(self.data_dir, self.draft)
+        self._desktop_edit = None
+        try:
+            import json
+            raw_edit = json.loads((self.data_dir / "desktop-edit.json").read_text(encoding="utf-8"))
+            if isinstance(raw_edit, dict) and isinstance(raw_edit.get("text"), str):
+                self._desktop_edit = raw_edit
+        except (OSError, ValueError):
+            pass
         self.bridge = V3Bridge(
             port=self.port,
             auth=self.auth,
             store=self.store,
             draft=self.draft,
             on_activity=self._on_activity,
-            on_intent=self.deliver_and_finish,
+            on_intent=self.submit_delivery,
             on_capture=self._on_capture,
-            on_recall=self.recall_last,
+            on_recall=self.request_recall,
             on_phone_draft=self.apply_phone_update,
             is_pc_editing=lambda: self.review_editing,
             history_list=self._history_public,
@@ -137,6 +160,8 @@ class V3App:
             logger=_log,
             byok=self.byok,
             data_dir=self.data_dir,
+            phone_send=self.phone_send,
+            on_send=lambda session, body: self._commands.submit(self.phone_send.commit, session, body),
         )
         self.capture = CaptureService(grab=self._grab, hide_surfaces=self.hud.hide)
         self.delivery = DeliveryService(
@@ -150,7 +175,206 @@ class V3App:
             is_locked=self._session_locked,
             is_elevated=self._target_elevated,
             read_clipboard_text=self._read_clipboard_text,
+            prepare_image=self._prepare_image_observation,
+            is_cancelled=lambda: self._stopping,
+            resume_input=self._resume_after_image,
+            progress=lambda progress:self._notify_ui("delivery_progress", **progress),
         )
+
+    def _report_command_error(self, exc: BaseException) -> None:
+        # 不记录异常消息：系统/模型异常可能包含原文、密钥或私人路径。
+        from doubao_typeless.runtime_diagnostics import record_runtime_exception
+        record_runtime_exception("delivery", exc, self.data_dir)
+        _log(f"[v3.delivery] error_type={type(exc).__name__}")
+        self._notify_ui("delivery_failed", error_code="COMMAND_FAILED",
+                        detail_code=getattr(exc, "error_code", ""))
+
+    def submit_delivery(self, intent: dict, bundle: dict):
+        """正式网络与桌面入口共用，入队前已冻结当前版本。"""
+        return self._commands.submit(self.deliver_and_finish, dict(intent), copy.deepcopy(bundle))
+
+    def request_insert(self):
+        """UI/热键非阻塞入口；总是返回Future，校验失败同样有明确结果。"""
+        from concurrent.futures import Future
+        if self.draft.authority == "phone":
+            return self._commands.submit(self._insert_primary, False)
+        with self._state_lock:
+            if not (self.draft.text or self.draft.assets):
+                self._notify_ui("delivery_failed", error_code="EMPTY_DRAFT")
+                done = Future(); done.set_result({"result":"NO_STEPS", "error_code":"EMPTY_DRAFT"})
+                return done
+            try:
+                bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
+            except ValueError as exc:
+                code = str(exc)
+                self._notify_ui("delivery_failed", error_code=code)
+                done = Future(); done.set_result({"result":"NO_STEPS", "error_code":code})
+                return done
+            intent = self._session_intent("insert_current")
+        return self.submit_delivery(intent, bundle)
+
+    def request_locate_composer(self):
+        """用户明确点定位；只定位不投递，不改变草稿或之前的投递结果。"""
+        return self._commands.submit(self._locate_composer)
+
+    def _locate_composer(self) -> dict:
+        from doubao_typeless.platform.windows.composer_locator import locate_current
+        from doubao_typeless.platform.windows.focus import FocusSnapshot, restore_target
+        self._notify_ui("composer_locating")
+        try:
+            before = self._read_focus()
+            result = locate_current(self._saved_target)
+            if result.get("status") != "found":
+                if result.get("status") == "ambiguous":
+                    self._composer_candidates = result.get("candidates") or []
+                    self._notify_ui("composer_pick", candidates=self._composer_candidates)
+                code = "COMPOSER_AMBIGUOUS" if result.get("status") == "ambiguous" else "COMPOSER_NOT_FOUND"
+                self._notify_ui("delivery_failed", error_code=code)
+                return result
+            item = result["candidate"]
+            target = FocusSnapshot(item["class_name"], item["title"], item["hwnd"], item["pid"],
+                                   item["control_hwnd"], tuple(item["runtime_id"]), item["kind"])
+            # 查找期间用户切到其他应用时，不抢回来。自身控件点击仍允许恢复已保存窗口。
+            current = self._read_focus()
+            if (not is_own_window(*before[:2]) and not same_target(before, current)):
+                self._notify_ui("delivery_failed", error_code="TARGET_CHANGED")
+                return {"status": "changed"}
+            if (not is_own_window(*current[:2]) and len(current) >= 4
+                    and (current[2], current[3]) != (target.hwnd, target.pid)):
+                self._notify_ui("delivery_failed", error_code="TARGET_CHANGED")
+                return {"status": "changed"}
+            if not restore_target(target):
+                self._notify_ui("delivery_failed", error_code="NEEDS_TARGET")
+                return {"status": "focus_failed"}
+            self._saved_target = target
+            self._notify_ui("composer_located")
+            return {"status": "located", "reason": result["reason"]}
+        except Exception as exc:
+            self._report_command_error(exc)
+            self._notify_ui("delivery_failed", error_code="COMPOSER_NOT_FOUND")
+            return {"status": "failed"}
+
+    def request_choose_composer(self, candidate: dict):
+        return self._commands.submit(self._choose_composer, dict(candidate))
+
+    def _choose_composer(self, candidate: dict) -> dict:
+        # 候选只来自上次受限扫描；选择不触发插入、不清当前稿。
+        if candidate not in getattr(self, "_composer_candidates", []):
+            return {"status":"stale"}
+        from doubao_typeless.platform.windows.focus import FocusSnapshot,restore_target
+        target=FocusSnapshot(candidate["class_name"],candidate["title"],candidate["hwnd"],candidate["pid"],
+                             candidate["control_hwnd"],tuple(candidate["runtime_id"]),candidate["kind"])
+        before=self._read_focus()
+        if not is_own_window(*before[:2]) and (len(before)<4 or tuple(before[2:4])!=tuple(target[2:4])):
+            return {"status":"changed"}
+        if not restore_target(target) or not same_target(target,self._read_focus()):
+            self._notify_ui("delivery_failed",error_code="NEEDS_TARGET")
+            return {"status":"focus_failed"}
+        self._saved_target=target;self._composer_candidates=[]
+        self._notify_ui("composer_located")
+        return {"status":"located"}
+
+    def request_recall(self):
+        return self._commands.submit(self.recall_last)
+
+    def request_recovery(self, mode: str):
+        future = self._commands.submit(self.confirm_recovery, mode)
+        def completed(done):
+            try:
+                result = done.result() or {}
+                code = result.get("error_code")
+                _log(f"[v3.recovery] result={result.get('result', 'none')} error={code or 'none'}")
+                if code:
+                    # Queue rejection and early target validation must not vanish
+                    # when the modal closes. Never enqueue an automatic retry.
+                    self._notify_ui("delivery_failed", **result)
+            except Exception as exc:
+                self._report_command_error(exc)
+        future.add_done_callback(completed)
+        return future
+
+    def update_pc_text(self, text: str) -> None:
+        with self._state_lock:
+            if self.draft.authority == "phone":
+                # 电脑改字是明确的编辑副本，不抢手机稿的 revision。
+                from doubao_typeless.storage.draft_snapshot import write_json_atomic
+                if self._desktop_edit is None:
+                    self._desktop_edit = {"base": source_snapshot(self.draft), "text": text}
+                else:
+                    self._desktop_edit["text"] = text
+                write_json_atomic(self.data_dir / "desktop-edit.json", self._desktop_edit)
+                return
+            if self.draft.text != text:
+                self.draft.text = text
+                self.draft.revision += 1
+                self._save_draft()
+
+    def review_text(self) -> str:
+        if self._desktop_edit and (self.review_editing or self._desktop_edit["base"] == source_snapshot(self.draft)):
+            return self._desktop_edit["text"]
+        return self.draft.text
+
+    def request_review_insert(self):
+        if self.draft.authority == "phone":
+            return self._commands.submit(self._insert_primary, True)
+        return self.request_insert()
+
+    def _insert_primary(self, use_desktop_edit: bool = False) -> dict:
+        """本机快捷键先向作者确认当前稿；手机离线时不偷偷贴旧镜像。"""
+        self._notify_ui("sync_wait")
+        try:
+            if self.bridge.paused:
+                raise ValueError("CONNECTION_PAUSED")
+            self._restore_external_target()
+            focus = self._read_focus()
+            kind = getattr(focus, "kind", focus[6] if len(focus)>6 else "")
+            # A user-triggered local text insert is not restricted to AI composers.
+            # Tk/native editors may expose no UIA editable pattern. Keep their text
+            # path, but require a located composer for images or our own window.
+            # DeliveryService rechecks the final bundle and target after prepare.
+            if (kind in {"unknown", "edit"} and bool(self.draft.assets)) or is_own_window(*focus[:2]):
+                located = self._locate_composer()
+                if located.get("status") != "located": raise ValueError("COMPOSER_NOT_FOUND")
+                focus = self._read_focus()
+            expected = tuple(focus)
+            loop = getattr(self, "_loop", None)
+            if loop is None or not loop.is_running():
+                raise ValueError("PHONE_OFFLINE")
+            pending = asyncio.run_coroutine_threadsafe(
+                self.bridge.prepare_phone(self.draft.editor_device_id), loop)
+            try:
+                pending.result(timeout=7)
+            except ValueError:
+                pending.cancel()
+                raise
+            except Exception:
+                pending.cancel()
+                raise ValueError("PHONE_NOT_CURRENT") from None
+            with self._state_lock:
+                bound = source_snapshot(self.draft)
+                current = copy.deepcopy(self.draft)
+                if use_desktop_edit and self._desktop_edit is not None:
+                    if self._desktop_edit["base"] != bound:
+                        raise ValueError("PHONE_CHANGED_REVIEW")
+                    current.text = self._desktop_edit["text"]
+                bundle = freeze_bundle(current, bundle_id=str(uuid.uuid4()))
+                bundle["source_text"] = self.draft.text
+                bundle["source_snapshot"] = bound
+                from doubao_typeless.core.bundle import canonical_manifest_hash
+                bundle["manifest_hash"] = canonical_manifest_hash(bundle)
+            intent = self._session_intent("insert_current")
+            intent["expected_focus"] = expected
+            return self.deliver_and_finish(intent, bundle)
+        except ValueError as exc:
+            code = str(exc)
+            self._notify_ui("delivery_failed", error_code=code)
+            return {"result": "NO_STEPS", "error_code": code, "steps": []}
+        except Exception as exc:
+            self._report_command_error(exc)
+            detail = getattr(exc, "error_code", "")
+            self._notify_ui("delivery_failed", error_code="DELIVERY_FAILED", detail_code=detail)
+            return {"result": "NO_STEPS", "error_code": "DELIVERY_FAILED", "detail_code": detail, "steps": []}
+
 
     def remember_connected(self) -> int:
         count = 0
@@ -184,6 +408,21 @@ class V3App:
         return count
 
     def _notify_ui(self, event: str, **kwargs) -> None:
+        # 状态首先进入真正的HUD，托盘提示只是补充；未知结果不能伪装成成功。
+        if event in {"sync_wait", "delivery_start", "delivery_failed", "delivery_complete", "composer_locating", "composer_located", "delivery_progress"}:
+            self._last_delivery_status = {"event": event, **kwargs}
+            hud = getattr(self, "hud", None)
+            if hud is not None:
+                hud.operation_event(event, **kwargs)
+        if event == "delivery_progress":
+            device = getattr(self, "_active_delivery_device", None)
+            loop = getattr(self, "_loop", None)
+            if device and loop and loop.is_running() and getattr(self, "_active_delivery_primary", False):
+                progress = {"type":"delivery.progress", "stage":kwargs.get("stage"),
+                            "index":kwargs.get("index"), "total":kwargs.get("total")}
+                for session in list(self.auth.sessions.values()):
+                    if session.device_id == device:
+                        asyncio.run_coroutine_threadsafe(self.bridge.send_to_session(session.session_id, progress), loop)
         hook = getattr(self, "ui_hook", None)
         if hook:
             hook(event, **kwargs)
@@ -197,26 +436,36 @@ class V3App:
             self._saved_target = focus
 
     def _restore_external_target(self) -> tuple[str, str]:
-        try:
+        # 检查超时/辅助进程退出必须停止本次操作，不能用空字符串降级放行。
+        current = self._read_focus()
+        if is_own_window(*current[:2]):
+            if not self._saved_target:
+                return ("DT-V3-HUD", "无法确认原输入框")
+            from doubao_typeless.platform.windows.focus import restore_target
+            if not restore_target(self._saved_target):
+                return ("DT-V3-HUD", "无法恢复原输入框")
             current = self._read_focus()
-        except Exception:
-            current = ("", "")
-        if is_own_window(*current[:2]) and self._saved_target:
-            try:
-                from doubao_typeless.platform.windows.clipboard import restore_focus
-
-                saved = self._saved_target
-                hwnd = int(saved[2]) if len(saved) > 2 else 0
-                restore_focus(saved[0], saved[1], hwnd)
-            except Exception:
-                pass
-            try:
-                current = self._read_focus()
-            except Exception:
-                current = self._saved_target
-        return (str(current[0] if current else ""), str(current[1] if current and len(current) > 1 else ""))
+        return current[0], current[1]
 
     def apply_phone_update(self, data: dict, *, allow_server_assets: bool = False) -> dict:
+        with self._state_lock:
+            return self._apply_phone_update(data, allow_server_assets=allow_server_assets)
+
+    def _apply_phone_update(self, data: dict, *, allow_server_assets: bool = False) -> dict:
+        if data.get("authority") == "phone":
+            from doubao_typeless.services.phone_primary import apply_phone_snapshot
+            from doubao_typeless.storage.draft_snapshot import save_draft, save_recovery
+            ack = apply_phone_snapshot(self.draft, data, self.store,
+                lambda draft: save_draft(self.data_dir, draft),
+                lambda draft: save_recovery(self.data_dir, draft))
+            if ack["changed"]:
+                if self._desktop_edit and self._desktop_edit["base"] != source_snapshot(self.draft):
+                    self.phone_pending = {"text": self.draft.text, "phone_primary": True}
+                    self._notify_ui("phone_pending")
+                self._on_activity(self.draft.text, len(self.draft.assets))
+            return ack
+        if self.draft.authority == "phone":
+            raise ValueError("PHONE_PRIMARY_REQUIRED")
         if self.review_editing:
             self.phone_pending = dict(data)
             self._notify_ui("phone_pending")
@@ -248,11 +497,11 @@ class V3App:
         from doubao_typeless.services.assets import resolve_asset_refs
 
         refs = data.get("asset_refs")
-        assets = None
-        if refs is not None:
-            assets = resolve_asset_refs(self.store, refs)
-        elif allow_server_assets and data.get("assets") is not None:
-            assets = data.get("assets")
+        from doubao_typeless.services.draft_assets import resolve_draft_assets
+        if allow_server_assets and data.get("assets") is not None:
+            assets = copy.deepcopy(data["assets"])
+        else:
+            assets = resolve_draft_assets(self.store, data, self.draft.assets)
         try:
             revision = int(data["revision"])
         except (KeyError, TypeError, ValueError):
@@ -267,17 +516,10 @@ class V3App:
             "asset_refs": refs if refs is not None else [a.get("asset_id") for a in self.draft.assets],
         }
         if assets is not None:
-            captions = data.get("captions")
-            statuses = data.get("asset_status")
-            if isinstance(captions, list):
-                for asset, caption in zip(assets, captions):
-                    asset["caption"] = str(caption or "")
-            if isinstance(statuses, list):
-                for asset, status in zip(assets, statuses):
-                    if status:
-                        asset["status"] = str(status)
             update["assets"] = assets
         apply_draft_update(self.draft, update)
+        if data.get("_device_id"):
+            self.draft.editor_device_id = str(data["_device_id"])
         changed = (self.draft.text, self.draft.revision) != before
         if changed:
             self._save_draft()
@@ -290,25 +532,56 @@ class V3App:
         }
 
     def accept_phone_pending(self) -> None:
-        pending = self.phone_pending
-        self.review_editing = False
-        self.phone_pending = None
-        if pending:
-            self.apply_phone_update(pending, allow_server_assets=True)
+        if self.draft.authority == "phone":
+            # 手机版一直是镜像主稿，采用时只释放独立电脑编辑副本。
+            self._desktop_edit = None
+            self.phone_pending = None
+            self.review_editing = False
+            from doubao_typeless.storage.draft_snapshot import write_json_atomic
+            write_json_atomic(self.data_dir / "desktop-edit.json", {})
+            return
+        # 用户明确选择采用冲突稿时才生成当前身份下的新修订；重连绝不自动这么做。
+        with self._state_lock:
+            pending = copy.deepcopy(self.phone_pending)
+            if not pending:
+                return
+            self._preserve_current_draft()
+            pending.update(draft_id=self.draft.draft_id, epoch=self.draft.epoch,
+                           revision=self.draft.revision + 1)
+            self.review_editing = False
+            self._apply_phone_update(pending, allow_server_assets=True)
+            self.phone_pending = None
 
     def keep_pc_edit(self) -> None:
+        if self.draft.authority == "phone" and self._desktop_edit is not None:
+            # 用户明确保留电脑文字：只改变本次编辑副本的基线，手机内容仍不被覆盖。
+            from doubao_typeless.storage.draft_snapshot import write_json_atomic
+            self._desktop_edit["base"] = source_snapshot(self.draft)
+            write_json_atomic(self.data_dir / "desktop-edit.json", self._desktop_edit)
+            self.phone_pending = None
         self.review_editing = True
         self._notify_ui("pc_kept")
 
     def _on_activity(self, text: str, image_count: int) -> None:
-        self._remember_external_target()
-        if self.review_editing:
+        # 同步线程只更新稿件与GUI消息；输入框检查只在明确操作时进行。
+        if self.review_editing and self.draft.authority != "phone":
             self.phone_pending = {"text": text, "image_count": image_count}
             self._notify_ui("phone_pending")
             return
-        self._save_draft()
         if text or image_count:
-            self.hud.show_receiving(text, image_count)
+            previews = []
+            for asset in self.draft.assets:
+                item = {"id": asset.get("local_id") or asset.get("asset_id"),
+                        "status": asset.get("status", "ready"),
+                        "render_revision": asset.get("render_revision", 1)}
+                if item["status"] == "ready" and asset.get("asset_id"):
+                    # 路径只由服务器资源存储构造；不接受手机提供的磁盘路径。
+                    item["path"] = str(self.store.root / (asset["asset_id"] + ".bin"))
+                previews.append(item)
+            self.hud.show_receiving(text, image_count, assets=previews,
+                revision=self.draft.revision, phone_primary=self.draft.authority == "phone")
+        else:
+            self.hud.hide()
         self._notify_ui("activity")
 
     def _history_public(self) -> list:
@@ -343,23 +616,13 @@ class V3App:
             meta["sha256"],
             meta["bytes"],
             referenced=True,
-            owner_session_id=session.session_id,
+            owner_session_id="device:" + session.device_id,
         )
         meta = dict(meta)
         meta["status"] = "editing"
         meta["role"] = "source"
-        if self.review_editing:
-            pending = dict(self.phone_pending or {})
-            pending_assets = list(pending.get("assets") or [])
-            pending_assets.append(meta)
-            pending["assets"] = pending_assets
-            pending["text"] = pending.get("text", self.draft.text)
-            self.phone_pending = pending
-            self._notify_ui("phone_pending")
-            return meta
-        self.draft.assets.append(meta)
-        self.draft.revision += 1
-        self._on_activity(self.draft.text, len(self.draft.assets))
+        # 截图只生成源资源，不擅自提升手机稿的版本或把原图混入可投递附件。
+        # capture.result 到手机后，由统一 draft.update 显式声明 editing 附件。
         return meta
 
     def _wait_modifiers(self) -> bool:
@@ -373,7 +636,8 @@ class V3App:
         return session_locked()
 
     def _target_elevated(self) -> bool:
-        return False
+        from doubao_typeless.platform.windows.integrity import target_above_ours
+        return target_above_ours()
 
     def _read_clipboard_text(self) -> str | None:
         try:
@@ -384,14 +648,38 @@ class V3App:
             return None
 
     def _read_focus(self):
-        from doubao_typeless.platform.windows.clipboard import read_focus_fp
+        from doubao_typeless.platform.windows.focus import read_target
 
-        return read_focus_fp()
+        return read_target()
 
     def _paste(self) -> None:
         from doubao_typeless.platform.windows.clipboard import send_paste
 
         send_paste()
+        self._injected_input_stamp = self._input_stamp()
+
+    @staticmethod
+    def _input_stamp():
+        if sys.platform != "win32":return None
+        try:
+            import win32api
+            return win32api.GetLastInputInfo()
+        except Exception:return None
+
+    def _resume_after_image(self, expected):
+        current = self._read_focus()
+        if same_target(current, expected):return current
+        # 只在没有新键鼠动作、焦点仍在原附件容器时恢复。用户切走绝不抢回。
+        stamp = getattr(self, "_injected_input_stamp", None)
+        if stamp is None or self._input_stamp()!=stamp:return None
+        anchor=getattr(self, "_image_baseline", None)
+        if not anchor or not anchor.get("scope"):return None
+        from doubao_typeless.platform.windows.automation_host import host
+        from doubao_typeless.platform.windows.focus import FocusSnapshot
+        value=host().call("resume_composer", {"anchor":anchor,"expected":list(expected)})
+        if not value:return None
+        actual=FocusSnapshot(*value[:5],tuple(value[5]),value[6])
+        return actual if same_target(actual,self._read_focus()) else None
 
     def _set_image(self, data: bytes) -> None:
         from doubao_typeless.platform.windows.clipboard import set_clipboard_png
@@ -405,12 +693,18 @@ class V3App:
 
         set_clipboard_text(text)
 
+    def _prepare_image_observation(self) -> None:
+        if self._observer is not None:
+            return
+        from doubao_typeless.adapters.cursor_windows import capture_image_baseline
+        self._image_baseline = capture_image_baseline()
+
     def _observe_image(self) -> str:
         if self._observer is not None:
             return self._observer.observe_image()
         from doubao_typeless.adapters.cursor_windows import observe_image
 
-        return observe_image()
+        return observe_image(getattr(self, "_image_baseline", None), cancelled=lambda:self._stopping)
 
     def _observe_text(self) -> str:
         if self._observer is not None:
@@ -426,6 +720,10 @@ class V3App:
             item = dict(asset)
             if "bytes_data" not in item:
                 item["bytes_data"] = self.store.get(item["asset_id"])
+            if item.get("sha256"):
+                import hashlib
+                if hashlib.sha256(item["bytes_data"]).hexdigest() != item["sha256"]:
+                    raise ValueError("ASSET_CHANGED")
             assets.append(item)
         hydrated["assets"] = assets
         return hydrated
@@ -463,56 +761,65 @@ class V3App:
         return ""
 
     def _maybe_start_next_draft(self, bundle: dict, payload: dict) -> bool:
+        if payload.get("duplicate") or payload.get("error_code"):
+            return False
         result = payload.get("result")
         steps = payload.get("steps") or []
-        text_done = any(
-            (step.get("kind") if isinstance(step, dict) else getattr(step, "kind", None)) == "text"
-            for step in steps
-        )
-        images = bundle.get("assets") or []
-        if result == "CONFIRMED":
-            rotated = self.draft.epoch != bundle.get("epoch") or (not self.draft.text and not self.draft.assets)
-            if rotated:
-                self._notify_ui("new_draft")
-            return rotated
-        if images:
+        text_done = any(s.get("kind") == "text" and s.get("state") in {"injected", "observed", "unknown"}
+                        for s in steps if isinstance(s, dict))
+        planned = {a.get("asset_id") for a in bundle.get("assets") or []}
+        observed = {st.get("asset_id") for st in steps if st.get("kind")=="image" and st.get("state")=="observed"}
+        # 图片全部有接收证据 + 文字已成功发键，可归档但仍诚实保留UNKNOWN接收状态。
+        text_injected = any(st.get("kind")=="text" and st.get("state") in {"injected","observed"}
+                            and st.get("evidence") in {"os_input_count","target_text"} for st in steps)
+        complete_attempt = (bool(planned) and planned <= observed and bool(bundle.get("text"))
+                            and text_injected and not payload.get("text_only"))
+        may_rotate = result == "CONFIRMED" or (result in {"UNKNOWN","PARTIAL"} and
+                       ((not planned and text_done) or complete_attempt))
+        if not may_rotate:
             return False
-        if result in {"UNKNOWN", "PARTIAL"} and text_done:
-            before = self.draft.epoch
-            archive_if_match(
-                self.draft,
-                {
-                    "draft_id": bundle.get("draft_id"),
-                    "epoch": bundle.get("epoch"),
-                    "revision": bundle.get("revision"),
-                    "manifest_hash": bundle.get("manifest_hash"),
-                },
-                current_hash=bundle.get("manifest_hash") or "",
-            )
-            self._save_draft()
-            self._notify_ui("new_draft")
-            return self.draft.epoch != before
-        return False
+        with self._state_lock:
+            bound = bundle.get("source_snapshot")
+            if bound is None or source_snapshot(self.draft) != bound:
+                return False
+            if self.draft.authority == "phone":
+                # 仅通知已消耗这个确定快照。手机保存上次图文后自行创建下一段。
+                self._notify_ui("new_draft")
+                return True
+            # 已在投递前保留快照。原子保存失败则恢复内存，不能回执清手机。
+            before = copy.deepcopy(self.draft.__dict__)
+            self.draft.text = ""
+            self.draft.assets = []
+            self.draft.revision += 1
+            self.draft.epoch = str(uuid.uuid4())
+            try:
+                self._save_draft()
+            except Exception:
+                self.draft.__dict__.update(before)
+                raise
+        self._notify_ui("new_draft")
+        return True
 
     def _phone_rotate_event(self, bundle: dict, rotated: bool, result: str = "") -> dict:
+        source = bundle.get("source_snapshot") or {}
         archived = {
-            "draft_id": bundle.get("draft_id"),
-            "epoch": bundle.get("epoch"),
-            "revision": bundle.get("revision"),
-            "hash": bundle.get("manifest_hash"),
-            "text": bundle.get("text") or "",
+            "draft_id": bundle.get("draft_id"), "epoch": bundle.get("epoch"),
+            "revision": bundle.get("revision"), "hash": bundle.get("manifest_hash"),
+            "text": bundle.get("source_text", bundle.get("text") or ""),
+            "source_text": bundle.get("source_text", bundle.get("text") or ""),
+            "assets": source.get("assets"),
             "asset_refs": [a.get("asset_id") for a in (bundle.get("assets") or [])],
             "result": result,
         }
         return {
-            "type": "draft.rotated",
-            "rotated": rotated,
-            "result": result,
+            "type": "draft.rotated", "event_id": str(uuid.uuid4()),
+            "rotated": rotated, "result": result,
+            "phone_primary": bundle.get("authority") == "phone",
+            "generation": bundle.get("generation", 0),
+            "owner_device_id": bundle.get("device_id") if bundle.get("authority") == "phone" else None,
             "archived": archived if rotated else None,
-            "draft_id": self.draft.draft_id,
-            "epoch": self.draft.epoch,
-            "revision": self.draft.revision,
-            "text": self.draft.text,
+            "draft_id": self.draft.draft_id, "epoch": self.draft.epoch,
+            "revision": self.draft.revision, "text": self.draft.text,
             "asset_refs": [a.get("asset_id") for a in self.draft.assets],
         }
 
@@ -522,20 +829,51 @@ class V3App:
         if loop is not None:
             asyncio.run_coroutine_threadsafe(self.bridge.publish_phone_event(event), loop)
 
-    def _after_insert(self, bundle: dict, payload: dict) -> dict:
-        self._keep_inserted_copy(bundle, payload)
+    def _after_insert(self, bundle: dict, payload: dict, *, publish: bool = True) -> dict:
+        if payload.get("duplicate"):
+            self._notify_ui("delivery_failed", error_code="DUPLICATE_INTENT")
+            return payload
+        if payload.get("result") == "BUSY":
+            return payload
+        # 无发键结果不覆盖用户剪贴板；未知或部分图片仍留在恢复副本中。
+        if any(step.get("kind") == "text" for step in payload.get("steps") or []) and not payload.get("error_code"):
+            self._keep_inserted_copy(bundle, payload)
+        from doubao_typeless.services.delivery_progress import summarize_delivery
+        payload = {**payload, "progress": summarize_delivery(bundle, payload)}
         rotated = self._maybe_start_next_draft(bundle, payload)
         event = self._phone_rotate_event(bundle, rotated, str(payload.get("result") or ""))
-        self._publish_phone_event(event)
-        payload = dict(payload)
-        payload["phone_event"] = event
+        event["progress"] = payload["progress"]
+        self.phone_send.record_delivery(bundle, payload, self._last_target_fp)
+        if payload.get("error_code"): event["error_code"] = payload["error_code"]
+        self.bridge.last_phone_event = event
+        if publish:
+            self._publish_phone_event(event)
+        payload = {**payload, "phone_event": event}
         self._notify_ui("hide_after_insert")
+        if payload.get("error_code"):
+            self._notify_ui("delivery_failed", **payload)
+        else:
+            self._notify_ui("delivery_complete", result=payload.get("result"), rotated=rotated,
+                            text_sent=any(s.get("kind") == "text" for s in payload.get("steps") or []),
+                            image_count=len(bundle.get("assets") or []), progress=payload["progress"])
+        if (not rotated and not payload.get("error_code") and bundle.get("assets")
+                and payload.get("result") in {"UNKNOWN", "PARTIAL"}):
+            # 主流程暂停而不是自动重贴。用户的明确确认才允许继续下一张。
+            self._notify_ui("recovery_ask")
         return payload
 
     def deliver_and_finish(self, intent: dict, bundle: dict) -> dict:
-        self.hud.hide()
-        payload = self._on_intent(intent, bundle)
-        return self._after_insert(bundle, payload)
+        # 仅收起可编辑详情以归还目标焦点，非激活HUD保持实际进度。
+        self._notify_ui("delivery_start")
+        self._notify_ui("hide_after_insert")
+        try:
+            payload = self._on_intent(intent, bundle)
+            return self._after_insert(bundle, payload, publish=intent.get("_source") != "remote")
+        except Exception as exc:
+            self._report_command_error(exc)
+            self._notify_ui("delivery_failed", error_code="FINALIZE_FAILED")
+            return {"result": "UNKNOWN", "error_code": "FINALIZE_FAILED",
+                    "steps": payload.get("steps", []) if "payload" in locals() else []}
 
     def _on_intent(self, intent: dict, bundle: dict) -> dict:
         intent_id = str(intent.get("intent_id") or "")
@@ -544,64 +882,77 @@ class V3App:
             return {"result": self.ledger.status(intent_id) or "UNKNOWN", "duplicate": True}
         if decision == "busy":
             return {"result": "BUSY", "error_code": "BUSY"}
-        class_name, control = self._restore_external_target()
+        attempt = Attempt(attempt_id=str(uuid.uuid4()), intent_id=intent_id,
+                          bundle_id=bundle.get("bundle_id", ""), adapter_id="generic_text")
+        phase = "prepare"
+        self._active_delivery_device = bundle.get("device_id")
+        self._active_delivery_primary = bundle.get("authority") == "phone"
         try:
-            from doubao_typeless.platform.windows.clipboard import read_focus_fp
-
-            self._last_target_fp = read_focus_fp()
-        except Exception:
-            self._last_target_fp = (class_name, control, 0)
-        if is_own_window(class_name, control):
-            self.ledger.finish(intent_id, "NO_STEPS")
-            return {"result": "NO_STEPS", "error_code": "OWN_WINDOW"}
-        remote = str(intent.get("trigger") or "") not in {"insert_current", "recall_retry", "hotkey"}
-        kind = classify_focus(class_name, control)
-        if kind == "paste":
-            adapter_id = "s2_paste_target"
-        elif "V3ComposerTarget" in f"{class_name} {control}":
-            adapter_id = "product_target"
-        else:
-            from doubao_typeless.adapters.cursor_windows import identify
-
-            adapter_id = identify(class_name, control)
-        attempt = Attempt(
-            attempt_id=str(uuid.uuid4()),
-            intent_id=intent_id,
-            bundle_id=bundle["bundle_id"],
-            adapter_id=adapter_id,
-        )
-        hydrated = self._hydrate_bundle(bundle)
-        frozen_text = hydrated.get("text")
-        mode = str(intent.get("recovery_mode") or "full")
-        skip = set(intent.get("skip_asset_ids") or [])
-        try:
-            result = self.delivery.run(
-                attempt, hydrated, mode=mode, skip_asset_ids=skip, remote=remote
-            )
-        except Exception:
-            self.ledger.finish(intent_id, "UNKNOWN")
-            raise
-        self.ledger.finish(intent_id, result.result)
-        self._last_attempt = result
-        self.history.record(bundle, attempt_result=result.result)
-        if result.result == "CONFIRMED":
-            archive_if_match(
-                self.draft,
-                {
-                    "draft_id": bundle.get("draft_id"),
-                    "epoch": bundle.get("epoch"),
-                    "revision": bundle.get("revision"),
-                    "manifest_hash": bundle.get("manifest_hash"),
-                },
-                current_hash=bundle.get("manifest_hash") or "",
-            )
-        _log(f"[v3.delivery] {result.result} enter={self.delivery.enter_count} text_frozen={frozen_text == bundle.get('text')}")
-        payload = result.to_dict()
-        payload["result"] = result.result
-        self._save_draft()
-        return payload
+            # 保存完整副本后才允许触碰剪贴板。未准备成功不执行任何按键。
+            self.history.record(bundle, attempt_result="RUNNING")
+            self.bridge.last_bundle = copy.deepcopy(bundle)
+            hydrated = self._hydrate_bundle(bundle)
+            phase = "focus"
+            remote = intent.get("_source") == "remote"
+            if remote:
+                focus_now = self._read_focus()
+                class_name, control = focus_now[0], focus_now[1]
+            else:
+                class_name, control = self._restore_external_target()
+            focus = self._read_focus()
+            self._last_target_fp = tuple(focus)
+            if not is_own_window(*focus[:2]):
+                self._saved_target = focus
+            if intent.get("expected_focus") and not same_target(focus, intent["expected_focus"]):
+                attempt.result, attempt.error_code = "NO_STEPS", "TARGET_CHANGED"
+                return attempt.to_dict()
+            if is_own_window(class_name, control):
+                attempt.result, attempt.error_code = "NO_STEPS", "OWN_WINDOW"
+            else:
+                remote = intent.get("_source") == "remote"
+                kind = classify_focus(class_name, control)
+                from doubao_typeless.adapters.cursor_windows import identify
+                attempt.adapter_id = "s2_paste_target" if kind == "paste" else identify(class_name, control)
+                phase = "delivery"
+                from doubao_typeless.core.attempt import Step
+                valid_ids = {a["asset_id"] for a in bundle.get("assets") or []}
+                for old in intent.get("verified_steps") or []:
+                    if old.get("asset_id") in valid_ids and old.get("state") == "observed":
+                        attempt.steps.append(Step(len(attempt.steps), "image", old["asset_id"], "observed", old["evidence"]))
+                attempt = self.delivery.run(attempt, hydrated,
+                    mode=str(intent.get("recovery_mode") or "full"),
+                    skip_asset_ids=set(intent.get("skip_asset_ids") or []), remote=remote)
+            if intent.get("recovery_mode") == "text_only" and bundle.get("assets") and attempt.steps:
+                # 用户选择只贴文字，不等于全部图片都已收到；保留待恢复图文。
+                attempt.result = "PARTIAL"
+            phase = "journal"
+            self.history.record(bundle, attempt_result=attempt.result)
+            self.db.record_attempt(attempt.attempt_id, bundle["bundle_id"], attempt.result,
+                                   attempt.to_dict()["steps"])
+        except Exception as exc:
+            # 完整命令边界包括读图、焦点、平台、观察和持久化。
+            attempt.result = "UNKNOWN"
+            attempt.error_code = "ASSET_MISSING" if isinstance(exc, FileNotFoundError) else "DELIVERY_FAILED"
+            attempt.detail_code = getattr(exc, "error_code", "")
+            self._report_command_error(exc)
+            try:
+                self.history.record(bundle, attempt_result="UNKNOWN")
+            except Exception:
+                pass  # 投递前成功写下的 RUNNING 副本仍然用于恢复。
+        finally:
+            self.ledger.finish(intent_id, attempt.result)
+            self._active_delivery_device = None
+            self._active_delivery_primary = False
+        self._last_attempt = attempt
+        self._last_attempt_bundle_id = bundle.get("bundle_id")
+        _log(f"[v3.delivery] result={attempt.result} phase={phase} steps={len(attempt.steps)}")
+        result = attempt.to_dict()
+        if intent.get("recovery_mode") == "text_only": result["text_only"] = True
+        return result
 
     def insert_current(self) -> dict | None:
+        if self.draft.authority == "phone":
+            return self._insert_primary(False)
         if not (self.draft.text or self.draft.assets):
             return None
         blocked = self._delivery_blocked()
@@ -610,9 +961,8 @@ class V3App:
         try:
             bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
         except ValueError as exc:
-            if str(exc) == "IMAGE_EDITING":
-                return {"result": "NO_STEPS", "error_code": "IMAGE_EDITING"}
-            raise
+            self._notify_ui("delivery_failed", error_code=str(exc))
+            return {"result": "NO_STEPS", "error_code": str(exc)}
         self.bridge.last_bundle = bundle
         intent = self._session_intent("insert_current")
         return self.deliver_and_finish(intent, bundle)
@@ -660,7 +1010,7 @@ class V3App:
             self.draft.draft_id == bound["draft_id"]
             and self.draft.epoch == bound["epoch"]
             and self.draft.revision == bound["revision"]
-            and self.draft.text == bound["original"]
+            and self.review_text() == bound["original"]
         )
         if not live_match:
             out = {**out, "status": "stale", "reason": "draft moved after response", "text": None}
@@ -672,6 +1022,14 @@ class V3App:
         last = self._last_suggestion or {}
         if not last.get("suggested"):
             return False
+        if self.draft.authority == "phone":
+            if (last.get("draft_id"), last.get("epoch"), last.get("revision"), last.get("original")) != (
+                    self.draft.draft_id, self.draft.epoch, self.draft.revision, self.review_text()):
+                return False
+            last["before_apply"] = self.review_text()
+            self.update_pc_text(str(last["suggested"]))
+            last["primary_applied"] = self.review_text()
+            return True
         if (
             last.get("draft_id") != self.draft.draft_id
             or last.get("epoch") != self.draft.epoch
@@ -688,6 +1046,12 @@ class V3App:
 
     def reject_suggestion(self) -> None:
         last = self._last_suggestion or {}
+        if self.draft.authority == "phone":
+            if (last.get("draft_id"), last.get("epoch"), last.get("revision"), last.get("primary_applied")) == (
+                    self.draft.draft_id, self.draft.epoch, self.draft.revision, self.review_text()):
+                self.update_pc_text(str(last["before_apply"]))
+            self._last_suggestion = None
+            return
         if (
             last.get("before_apply") is not None
             and last.get("draft_id") == self.draft.draft_id
@@ -700,16 +1064,27 @@ class V3App:
             self._save_draft()
         self._last_suggestion = None
 
-    def copy_text(self) -> str:
-        text = self.draft.text or ""
+    def copy_text(self, text: str | None = None) -> str:
+        text = self.draft.text if text is None else text or ""
         self._copied_text = text
         try:
             self._set_text(text)
         except Exception:
             _log("[v3.copy] 只复制失败，稿未清")
+            self._notify_ui("delivery_failed", error_code="COPY_FAILED")
         return text
 
+    def _preserve_current_draft(self) -> None:
+        if not (self.draft.text or self.draft.assets):
+            return
+        from doubao_typeless.storage.draft_snapshot import save_recovery
+        save_recovery(self.data_dir, self.draft)
+
     def start_new_draft(self) -> None:
+        if self.draft.authority == "phone":
+            self._offer_phone_restore({"text":"", "assets":[]})
+            return
+        self._preserve_current_draft()
         self.draft.text = ""
         self.draft.assets = []
         self.draft.revision += 1
@@ -718,9 +1093,27 @@ class V3App:
         self.hud.hide()
         self._notify_ui("new_draft")
 
+    def _offer_phone_restore(self, bundle: dict) -> str:
+        loop = getattr(self, "_loop", None)
+        sessions = [s for s in self.auth.sessions.values() if s.device_id == self.draft.editor_device_id]
+        if loop is None or not loop.is_running() or not sessions:
+            self._notify_ui("delivery_failed", error_code="PHONE_OFFLINE")
+            return "phone_offline"
+        from doubao_typeless.core.bundle import source_assets
+        event = {"type":"draft.restore_proposal", "text":bundle.get("source_text", bundle.get("text", "")),
+                 "assets":source_assets(bundle.get("assets") or [])}
+        for session in sessions:
+            asyncio.run_coroutine_threadsafe(self.bridge.send_to_session(session.session_id,event),loop)
+        self._notify_ui("restore_on_phone")
+        return "sent_to_phone"
+
     def restore_history(self, bundle: dict, *, replace: bool = False) -> str:
+        if self.draft.authority == "phone":
+            # 历史仍能复制/重投。恢复成手机新稿必须由手机保全当前稿并确认。
+            return self._offer_phone_restore(bundle)
         if (self.draft.text or self.draft.assets) and not replace:
             return "ask"
+        self._preserve_current_draft()
         copied = self.history.copy_to_new_draft(bundle)
         self.draft.text = copied.get("text") or ""
         self.draft.assets = list(copied.get("assets") or [])
@@ -737,20 +1130,18 @@ class V3App:
         if bundle is None:
             return None
         intent = self._session_intent("recall_retry")
-        if self._last_attempt is not None:
+        if self._last_attempt is not None and self._last_attempt.bundle_id == bundle.get("bundle_id"):
             images_total = len(bundle.get("assets") or [])
             images_obs = sum(1 for s in self._last_attempt.steps if s.kind == "image" and s.state == "observed")
             text_sent = any(s.kind == "text" for s in self._last_attempt.steps)
             try:
-                from doubao_typeless.platform.windows.clipboard import read_focus_fp
-
-                current_fp = read_focus_fp()
+                current_fp = tuple(self._read_focus())
             except Exception:
                 current_fp = ("", "", 0)
-            same_target = bool(self._last_target_fp and current_fp == self._last_target_fp)
+            same = bool(self._last_target_fp and same_target(current_fp, self._last_target_fp))
             plan = plan_retry(
                 previous_result=self._last_attempt.result,
-                same_target=same_target,
+                same_target=same,
                 images_observed=images_obs,
                 images_total=images_total,
                 text_sent=text_sent,
@@ -772,11 +1163,42 @@ class V3App:
                         for s in self._last_attempt.steps
                         if s.kind == "image" and s.state == "observed" and s.asset_id
                     ]
+        elif user_mode is None:
+            self._recovery_needed = True
+            self._notify_ui("recovery_ask")
+            return None
+        else:
+            intent["recovery_mode"] = user_mode
         self._recovery_needed = False
         return self.deliver_and_finish(intent, bundle)
 
+    def can_confirm_image(self) -> bool:
+        attempt = self._last_attempt
+        bundle = self.bridge.last_bundle
+        return bool(attempt and bundle and attempt.bundle_id == bundle.get("bundle_id")
+                    and attempt.steps and attempt.steps[-1].kind == "image"
+                    and attempt.steps[-1].state == "unknown" and not attempt.error_code)
+
     def confirm_recovery(self, mode: str) -> dict | None:
-        return self.insert_last(user_mode=mode)
+        if mode != "confirm_continue":
+            return self.insert_last(user_mode=mode)
+        if not self.can_confirm_image():
+            return {"result": "NO_STEPS", "error_code": "NO_IMAGE_TO_CONFIRM"}
+        self._restore_external_target()
+        focus = self._read_focus()
+        if not same_target(focus, self._last_target_fp):
+            self._notify_ui("delivery_failed", error_code="TARGET_CHANGED")
+            return {"result": "NO_STEPS", "error_code": "TARGET_CHANGED"}
+        bundle = copy.deepcopy(self.bridge.last_bundle)
+        verified = []
+        for step in self._last_attempt.steps:
+            if step.kind == "image" and step.state in {"observed", "unknown"}:
+                verified.append({"asset_id": step.asset_id, "state": "observed",
+                                 "evidence": step.evidence if step.state == "observed" else "user_confirmed"})
+        intent = self._session_intent("recall_retry")
+        intent.update(recovery_mode="remaining_verified", expected_focus=tuple(focus),
+                      verified_steps=verified, skip_asset_ids=[v["asset_id"] for v in verified])
+        return self.deliver_and_finish(intent, bundle)
 
     def recall_last(self) -> None:
         from doubao_typeless.ui.recovery import plan_retry
@@ -826,8 +1248,12 @@ class V3App:
         session = granted[-1]
         meta = self._on_capture(f"region:{x},{y},{w},{h}", str(uuid.uuid4()), session)
         if isinstance(meta, dict):
-            meta["status"] = "ready"
-            meta["role"] = "screenshot"
+            meta["status"] = "editing"
+            meta["role"] = "source"
+            loop = getattr(self, "_loop", None)
+            if loop is not None:
+                asyncio.run_coroutine_threadsafe(self.bridge.send_to_session(session.session_id,
+                    {"type": "capture.result", "asset": meta}), loop)
         _log(f"[v3.capture] region {meta.get('width')}x{meta.get('height')}")
 
     def _acquire_instance_lock(self) -> None:
@@ -850,7 +1276,7 @@ class V3App:
         pair_note = self.data_dir / "pair.txt"
         pair_note.write_text(f"{url}\n{code}\n", encoding="utf-8")
         _log(f"[v3] 手机打开 {url}")
-        _log(f"[v3] 配对码 {code} （2分钟内）")
+        _log("[v3] 配对信息已在连接窗口就绪（2分钟内）")
         _log(f"[v3] 数据目录 {self.data_dir}")
         from doubao_typeless.platform.windows.hotkeys import probe_hotkey_conflicts
 
@@ -880,10 +1306,10 @@ class V3App:
         from doubao_typeless.platform.windows.hotkeys import start_hotkeys
 
         start = start_hotkeys(
-            on_insert=self.insert_current,
-            on_recall=self.recall_last,
+            on_insert=self.request_insert,
+            on_recall=self.request_recall,
             on_expand=lambda: self._notify_ui("expand"),
-            on_region=self.capture_region,
+            on_region=lambda: self._notify_ui("capture_region"),
             insert_combo=insert or "<alt>+i",
             recall_combo=recall or "<alt>+<shift>+i",
             expand_combo=expand or "<alt>+<shift>+e",
@@ -904,9 +1330,17 @@ class V3App:
                 pass
         self._hotkeys = None
 
-    async def stop(self) -> None:
+    async def stop(self) -> bool:
+        """停止下一步发键，等当前操作收尾；超时不强杀、不提前关闭数据库。"""
+        self._stopping = True
         self._stop_hotkeys()
+        stopped = await asyncio.to_thread(self._commands.close, 5.0)
+        if not stopped:
+            _log("[v3] 当前目标仍未返回，未强制结束；可稍后再退出")
+            return False
         await self.bridge.stop()
+        from doubao_typeless.platform.windows.automation_host import close_host
+        await asyncio.to_thread(close_host)
         try:
             self.db.conn.close()
         except Exception:
@@ -914,6 +1348,7 @@ class V3App:
         lock = getattr(self, "_lock", None)
         if lock:
             lock.release()
+        return True
 
 
 def main() -> None:

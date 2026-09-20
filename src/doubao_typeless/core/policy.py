@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-FocusKind = Literal["composer", "code", "terminal", "paste", "unknown", "other"]
+FocusKind = Literal["composer", "code", "terminal", "paste", "unknown", "other", "edit", "password", "readonly"]
 
 
 @dataclass(frozen=True)
@@ -38,15 +38,26 @@ OWN_WINDOW_MARKERS = (
 
 
 def is_own_window(class_name: str, title: str = "", automation_id: str = "") -> bool:
-    blob = f"{class_name} {title} {automation_id}".lower()
-    return any(token in blob for token in OWN_WINDOW_MARKERS)
+    # 标题中出现项目名不代表是本应用：Cursor打开本仓库时也有这个名字。
+    cls = class_name.casefold()
+    name = title.casefold().strip()
+    if cls == "dt-v3-hud" or name == "dt-v3-hud":
+        return True
+    native_ours = cls.startswith("qt") or cls == "tool"
+    return native_ours and (
+        name in {"当前图文", "上次结果未知", "查看图片", "当前稿还在"}
+        or name.startswith("doubaotypeless v3")
+        or name in {"doubaotypeless", "doubaotypeless 预览"}
+    )
 
 
 def may_inject(kind: FocusKind, *, wants_images: bool, remote: bool = False) -> bool:
     if kind in {"composer", "paste"}:
         return True
-    if kind in {"code", "terminal"}:
+    if kind in {"code", "terminal", "password", "readonly"}:
         return False
+    if kind == "edit":
+        return not wants_images
     if kind == "unknown" and remote:
         return False
     return not wants_images

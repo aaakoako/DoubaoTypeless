@@ -1,10 +1,11 @@
 """On-demand HUD tokens. Keep sizes exact; ping must not wake."""
 from __future__ import annotations
+from doubao_typeless.ui.theme_generated import COLORS
 
-ACCENT = "#167D71"
-SURFACE = "#FFFFFF"
-INK = "#1D2826"
-MUTED = "#63716D"
+ACCENT = COLORS["accent"]
+SURFACE = COLORS["surface"]
+INK = COLORS["ink"]
+MUTED = COLORS["muted"]
 TEXT_SIZE = (400, 88)
 IMAGE_SIZE = (400, 132)
 HUD_MAX_H = 300

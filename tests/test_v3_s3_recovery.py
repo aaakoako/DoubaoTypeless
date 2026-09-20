@@ -35,7 +35,14 @@ def test_draft_restore_keeps_bytes_and_reports_missing(tmp_path):
     assert loaded2 is not None
     assert loaded2.text == "current B"
     assert missing2 == [meta["asset_id"]]
-    assert loaded2.assets == []
+    # 缺图必须留下阻断占位，不能把用户的图文悄悄降为纯文字。
+    assert len(loaded2.assets) == 1
+    assert loaded2.assets[0]["asset_id"] == meta["asset_id"]
+    assert loaded2.assets[0]["status"] == "failed"
+    from doubao_typeless.core.bundle import freeze_bundle
+    import pytest
+    with pytest.raises(ValueError, match="IMAGE_EDITING"):
+        freeze_bundle(loaded2, bundle_id="missing-must-block")
 
 
 def test_recall_does_not_swallow_current_draft(tmp_path):

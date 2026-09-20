@@ -16,6 +16,8 @@ def snapshot(app) -> dict[str, Any]:
     return {
         "data_dir": str(Path(app.data_dir)),
         "port": int(getattr(app, "port", 0) or 0),
+        "last_insert": {k: v for k, v in getattr(app, "_last_delivery_status", {}).items()
+                        if k in {"event", "result", "error_code", "detail_code", "rotated"}},
         "sessions": len(getattr(app.auth, "sessions", {}) or {}),
         "history_count": len(getattr(app.history, "items", []) or []),
         "draft_revision": int(getattr(app.draft, "revision", 0) or 0),

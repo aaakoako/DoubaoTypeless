@@ -4,6 +4,8 @@ from __future__ import annotations
 import ctypes
 import io
 import sys
+import time
+from contextlib import contextmanager
 from typing import Callable
 
 if sys.platform == "win32":
@@ -31,14 +33,10 @@ def read_focus_fp() -> tuple[str, str, int]:
     return class_name, title, int(hwnd or 0)
 
 
-def send_paste() -> None:
-    if sys.platform != "win32":
-        return
-    user32 = ctypes.windll.user32
-    user32.keybd_event(VK_CONTROL, 0, 0, 0)
-    user32.keybd_event(VK_V, 0, 0, 0)
-    user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
-    user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+def send_paste() -> int:
+    from doubao_typeless.platform.windows.native_input import send_paste as checked_paste
+
+    return checked_paste()
 
 
 def restore_focus(class_name: str, title: str, hwnd: int = 0) -> bool:
@@ -72,29 +70,46 @@ def restore_focus(class_name: str, title: str, hwnd: int = 0) -> bool:
         return False
 
 
+@contextmanager
+def opened_clipboard():
+    deadline = time.monotonic() + 0.25
+    while True:
+        try:
+            win32clipboard.OpenClipboard()
+            break
+        except Exception:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.01)
+    try:
+        yield
+    finally:
+        win32clipboard.CloseClipboard()
+
+
+def clipboard_sequence() -> int:
+    if sys.platform != "win32":
+        return 0
+    api = ctypes.windll.user32.GetClipboardSequenceNumber
+    api.restype = ctypes.c_uint32
+    return int(api())
+
+
 def read_clipboard_text() -> str | None:
     if sys.platform != "win32":
         return None
-    win32clipboard.OpenClipboard()
-    try:
+    with opened_clipboard():
         if win32clipboard.IsClipboardFormatAvailable(win32con.CF_UNICODETEXT):
             return str(win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT))
         return None
-    except Exception:
-        return None
-    finally:
-        win32clipboard.CloseClipboard()
 
 
 def set_clipboard_text(text: str) -> None:
     if sys.platform != "win32":
         return
-    win32clipboard.OpenClipboard()
-    try:
+    with opened_clipboard():
         win32clipboard.EmptyClipboard()
         win32clipboard.SetClipboardData(win32con.CF_UNICODETEXT, text)
-    finally:
-        win32clipboard.CloseClipboard()
 
 
 def set_clipboard_png(data: bytes) -> None:
@@ -104,9 +119,6 @@ def set_clipboard_png(data: bytes) -> None:
     with io.BytesIO() as buf:
         image.save(buf, "BMP")
         dib = buf.getvalue()[14:]
-    win32clipboard.OpenClipboard()
-    try:
+    with opened_clipboard():
         win32clipboard.EmptyClipboard()
         win32clipboard.SetClipboardData(win32con.CF_DIB, dib)
-    finally:
-        win32clipboard.CloseClipboard()

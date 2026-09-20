@@ -1,0 +1,30 @@
+name: Assistant optional dependency preparation
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: |
+          mkdir -p /tmp/dt-validation/wheels
+          python -m pip download --only-binary=:all: --dest /tmp/dt-validation/wheels PySide6_Essentials==6.11.2 shiboken6==6.11.2
+          cd web
+          npm ci
+          tar -czf /tmp/dt-validation/node_modules.tar.gz node_modules
+      - run: |
+          git archive --format=tar HEAD > /tmp/dt-validation/source.tar
+          git rev-parse HEAD > /tmp/dt-validation/SOURCE_SHA.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: assistant-validation-${{ github.sha }}
+          path: /tmp/dt-validation/
+          retention-days: 7
+          if-no-files-found: error

@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
+import concurrent.futures
+import copy
 import ipaddress
 import json
 import time
@@ -98,6 +101,8 @@ class V3Bridge:
         logger: Callable[[str], None] | None = None,
         byok: Any | None = None,
         data_dir: Path | None = None,
+        phone_send=None,
+        on_send=None,
     ):
         self.port = port
         self.auth = auth
@@ -105,6 +110,7 @@ class V3Bridge:
         self.draft = draft
         self.last_bundle: dict[str, Any] | None = None
         self._on_activity = on_activity
+        self.phone_send, self._on_send = phone_send, on_send
         self._on_intent = on_intent
         self._on_capture = on_capture
         self._on_recall = on_recall
@@ -121,6 +127,7 @@ class V3Bridge:
         self._ws_auth: dict[int, Any] = {}
         self._ws_rate: dict[int, list[float]] = {}
         self.last_phone_event: dict[str, Any] | None = None
+        self._prepare_waiters: dict[str, tuple[str, asyncio.Future]] = {}
 
     @web.middleware
     async def _origin_host_gate(self, request: web.Request, handler):
@@ -141,6 +148,7 @@ class V3Bridge:
         app = web.Application(middlewares=[self._origin_host_gate], client_max_size=2 * 1024 * 1024)
         app.router.add_get("/", self._index)
         app.router.add_get("/ws", self._ws)
+        app.router.add_get("/app-icon.png", self._app_icon)
         app.router.add_get("/v3/pair", self._pair_get)
         app.router.add_post("/v3/pair", self._pair_post)
         app.router.add_get("/v3/device/secret", self._device_secret)
@@ -157,6 +165,9 @@ class V3Bridge:
         app.router.add_get("/v3/history", self._history)
         app.router.add_get("/v3/status", self._status)
         app.router.add_get("/v3/phone/event", self._phone_event)
+        app.router.add_get("/v3/send/status", self._send_status)
+        app.router.add_post("/v3/send/prepare", self._send_prepare)
+        app.router.add_post("/v3/send/commit", self._send_commit)
         app.router.add_get("/pc", self._pc)
         app.router.add_get("/v3/sessions", self._sessions)
         app.router.add_post("/v3/sessions/revoke", self._revoke)
@@ -187,6 +198,47 @@ class V3Bridge:
         dist_index = _web_dist() / "index.html"
         path = dist_index if dist_index.is_file() else STATIC / "composer.html"
         return web.FileResponse(path)
+
+    async def _app_icon(self, request: web.Request) -> web.Response:
+        path = _web_dist() / "app-icon.png"
+        if not path.is_file():
+            raise web.HTTPNotFound()
+        return web.FileResponse(path)
+
+    async def _send_status(self, request: web.Request) -> web.Response:
+        session = self._session_from(request)
+        if not self.phone_send:
+            return web.json_response({"available": False, "error_code": "PHONE_SEND_DISABLED"})
+        try:
+            return web.json_response(await asyncio.to_thread(self.phone_send.status, session))
+        except ValueError:
+            return web.json_response({"available":False,"error_code":"SEND_PERMISSION_DENIED"},status=403)
+
+    async def _send_prepare(self, request: web.Request) -> web.Response:
+        session = self._session_from(request)
+        if not self.phone_send:
+            return web.json_response({"error_code": "PHONE_SEND_DISABLED"}, status=403)
+        try:
+            # 焦点检查不阻塞WebSocket心跳与手机稿同步。
+            result = await asyncio.to_thread(self.phone_send.prepare, session)
+        except ValueError:
+            return web.json_response({"error_code": "SEND_PERMISSION_DENIED"}, status=403)
+        except Exception:
+            return web.json_response({"error_code":"SEND_TARGET_UNAVAILABLE"},status=503)
+        return web.json_response(result)
+
+    async def _send_commit(self, request: web.Request) -> web.Response:
+        session = self._session_from(request)
+        if not self.phone_send or not self._on_send:
+            return web.json_response({"error_code": "PHONE_SEND_DISABLED"}, status=403)
+        body = await request.json()
+        if not isinstance(body, dict) or set(body) - {"ticket", "delivery_id", "confirmed"}:
+            return web.json_response({"error_code": "SEND_INVALID_REQUEST"}, status=400)
+        try:
+            result = await self._call_result(self._on_send, session, body)
+        except ValueError:
+            return web.json_response({"error_code": "SEND_PERMISSION_DENIED"}, status=403)
+        return web.json_response(result or {"result": "UNKNOWN"})
 
     async def _status(self, request: web.Request) -> web.Response:
         return web.json_response(
@@ -254,13 +306,37 @@ class V3Bridge:
 
     async def publish_phone_event(self, event: dict[str, Any]) -> None:
         self.last_phone_event = event
+        if self.data_dir is not None:
+            from doubao_typeless.storage.draft_snapshot import write_json_atomic
+            write_json_atomic(self.data_dir / "phone-event.json", event)
         for ws in list(self._clients):
             if id(ws) not in self._ws_auth:
+                continue
+            bound = self._ws_auth[id(ws)]
+            if event.get("owner_device_id") and bound.device_id != event["owner_device_id"]:
                 continue
             try:
                 await ws.send_json(event)
             except Exception:
                 pass
+
+    async def prepare_phone(self, device_id: str) -> dict:
+        request_id = str(uuid.uuid4())
+        future = asyncio.get_running_loop().create_future()
+        self._prepare_waiters[request_id] = (device_id, future)
+        try:
+            sent = False
+            for ws in list(self._clients):
+                bound = self._ws_auth.get(id(ws))
+                if bound and bound.device_id == device_id and not ws.closed:
+                    await ws.send_json({"type": "draft.prepare", "request_id": request_id})
+                    sent = True
+                    break
+            if not sent:
+                raise ValueError("PHONE_OFFLINE")
+            return await asyncio.wait_for(future, timeout=6)
+        finally:
+            self._prepare_waiters.pop(request_id, None)
 
     async def revoke_session(self, session_id: str) -> bool:
         removed = self.auth.revoke(session_id)
@@ -349,7 +425,7 @@ class V3Bridge:
             return web.json_response({"status": "skipped", "reason": "no_key", "text": "probe"})
         body = await request.json()
         text = str(body.get("text") or "probe")
-        out = self.byok.polish(
+        out = await asyncio.to_thread(self.byok.polish,
             text,
             draft_id=self.draft.draft_id,
             revision=self.draft.revision,
@@ -458,7 +534,7 @@ class V3Bridge:
     async def _nonce(self, request: web.Request) -> web.Response:
         body = await request.json()
         try:
-            session = self.auth.authorize(body["session_id"], body["token"], "insert")
+            session = self.auth.authorize(str(body.get("session_id") or ""), str(body.get("token") or ""), "insert")
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=403)
         return web.json_response({"nonce": self.auth.issue_nonce(session)})
@@ -470,6 +546,17 @@ class V3Bridge:
             return self.auth.authorize(session_id, token, "sync")
         except ValueError as exc:
             raise web.HTTPUnauthorized(text=str(exc)) from exc
+
+    def _validate_ref_owners(self, data: dict, session) -> None:
+        db = getattr(self.uploads, "db", None)
+        if db is None:
+            return
+        refs = data.get("asset_refs") or []
+        for aid in refs:
+            row = db.asset_by_id(str(aid))
+            owner = str((row or {}).get("owner_session_id") or "")
+            if owner and owner not in {session.session_id, "device:" + session.device_id}:
+                raise ValueError("asset owner")
 
     async def _asset_post(self, request: web.Request) -> web.Response:
         session = self._session_from(request)
@@ -485,7 +572,7 @@ class V3Bridge:
                 meta["sha256"],
                 meta["bytes"],
                 referenced=False,
-                owner_session_id=session.session_id,
+                owner_session_id="device:" + session.device_id,
             )
         if self._on_activity and should_wake("draft.update"):
             self._on_activity(self.draft.text, max(1, len(self.draft.assets)))
@@ -504,7 +591,7 @@ class V3Bridge:
                 width=int(body.get("width") or 1),
                 height=int(body.get("height") or 1),
                 chunk_size=int(body["chunk_size"]) if body.get("chunk_size") else None,
-                owner_session_id=owner.session_id,
+                owner_session_id="device:" + owner.device_id,
                 role=str(body.get("role") or "photo"),
             )
         except ValueError as exc:
@@ -521,7 +608,7 @@ class V3Bridge:
                 request.match_info["upload_id"],
                 int(request.match_info["index"]),
                 data,
-                owner_session_id=owner.session_id,
+                owner_session_id="device:" + owner.device_id,
             )
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
@@ -532,7 +619,7 @@ class V3Bridge:
         if self.uploads is None:
             raise web.HTTPNotImplemented()
         try:
-            meta = self.uploads.complete(request.match_info["upload_id"], owner_session_id=owner.session_id)
+            meta = self.uploads.complete(request.match_info["upload_id"], owner_session_id="device:" + owner.device_id)
         except ValueError as exc:
             return web.json_response({"error": str(exc), "durable": False}, status=400)
         except OSError as exc:
@@ -544,7 +631,7 @@ class V3Bridge:
         if self.uploads is None:
             raise web.HTTPNotImplemented()
         try:
-            missing = self.uploads.missing_chunks(request.match_info["upload_id"], owner_session_id=owner.session_id)
+            missing = self.uploads.missing_chunks(request.match_info["upload_id"], owner_session_id="device:" + owner.device_id)
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
         return web.json_response({"missing": missing})
@@ -556,7 +643,7 @@ class V3Bridge:
         if db is not None:
             row = db.asset_by_id(asset_id)
             owner = str((row or {}).get("owner_session_id") or "")
-            if owner and owner != session.session_id:
+            if owner and owner not in {session.session_id, "device:" + session.device_id}:
                 raise web.HTTPForbidden(text="asset owner")
         blob = self.store.get(asset_id)
         return web.Response(
@@ -572,7 +659,17 @@ class V3Bridge:
 
     async def _phone_event(self, request: web.Request) -> web.Response:
         self._session_from(request)
-        return web.json_response(self.last_phone_event or {})
+        event = self.last_phone_event
+        if event is None and self.data_dir is not None:
+            try:
+                event = json.loads((self.data_dir / "phone-event.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                event = None
+        if event and event.get("owner_device_id"):
+            session = self._session_from(request)
+            if session.device_id != event["owner_device_id"]:
+                event = None
+        return web.json_response(event or {})
 
     async def _ws(self, request: web.Request) -> web.WebSocketResponse:
         ws = web.WebSocketResponse(max_msg_size=256 * 1024)
@@ -640,12 +737,9 @@ class V3Bridge:
             raise ValueError("stale epoch")
         if data.get("draft_id") and str(data["draft_id"]) != self.draft.draft_id:
             raise ValueError("stale draft")
-        refs = data.get("asset_refs")
-        if refs is not None:
-            assets = resolve_asset_refs(self.store, refs)
-        else:
-            assets = self.draft.assets
-            refs = [a["asset_id"] for a in assets]
+        from doubao_typeless.services.draft_assets import resolve_draft_assets
+        assets = resolve_draft_assets(self.store, data, self.draft.assets)
+        refs = [a.get("asset_id") for a in assets]
         revision = data.get("revision")
         if revision is None:
             raise ValueError("invalid revision")
@@ -658,6 +752,28 @@ class V3Bridge:
                 "assets": assets,
             },
         )
+
+    def _apply_primary(self, data: dict) -> dict:
+        if self._on_phone_draft:
+            return self._on_phone_draft(data)
+        from doubao_typeless.services.phone_primary import apply_phone_snapshot
+        from doubao_typeless.storage.draft_snapshot import save_draft, save_recovery
+        if self.data_dir is None:
+            raise ValueError("DURABLE_STORE_REQUIRED")
+        ack = apply_phone_snapshot(self.draft, data, self.store,
+                lambda draft: save_draft(self.data_dir, draft),
+                lambda draft: save_recovery(self.data_dir, draft))
+        if ack["changed"] and self._on_activity:
+            self._on_activity(self.draft.text, len(self.draft.assets))
+        return ack
+
+    async def _call_result(self, callback, *args):
+        value = callback(*args)
+        if isinstance(value, concurrent.futures.Future):
+            return await asyncio.wrap_future(value)
+        if inspect.isawaitable(value):
+            return await value
+        return value
 
     async def _handle(self, ws: web.WebSocketResponse, data: dict[str, Any], authorized: bool) -> bool:
         kind = data.get("type")
@@ -679,6 +795,10 @@ class V3Bridge:
                 {
                     "type": "session.ready",
                     "protocol": 3,
+                    "capabilities": ["phone-primary-v1", "prepare-latest-v1"],
+                    "authority": self.draft.authority,
+                    "generation": self.draft.generation,
+                    "owner_device_id": self.draft.editor_device_id,
                     "draft_id": self.draft.draft_id,
                     "epoch": self.draft.epoch,
                     "revision": self.draft.revision,
@@ -709,7 +829,34 @@ class V3Bridge:
             await ws.send_json({"type": "error", "error": "paused"})
             return True
         try:
+            if data.get("assets") is not None:
+                raise ValueError("client assets rejected")
+            data = {**data, "_source": "remote", "_device_id": live.device_id}
+            if kind in {"draft.update", "bundle.commit", "insert.intent", "editor.activity", "draft.prepared"}:
+                if not (data.get("authority") == "phone" and kind in {"draft.update", "draft.prepared"}):
+                    self._require_draft_identity(data)
+                self._validate_ref_owners(data, live)
+            if kind == "draft.prepared":
+                pending = self._prepare_waiters.get(str(data.get("request_id") or ""))
+                if not pending or pending[0] != live.device_id:
+                    return True  # 过期/不属于此手机的准备结果绝不触发插入。
+                future = pending[1]
+                try:
+                    if data.get("error"):
+                        raise ValueError("PHONE_NOT_CURRENT")
+                    self._apply_primary(data)
+                    freeze_bundle(self.draft, bundle_id="preparation-only")
+                    if not future.done():
+                        future.set_result({"revision": self.draft.revision})
+                except Exception as exc:
+                    if not future.done():
+                        future.set_exception(exc)
+                return True
             if kind == "draft.update":
+                if data.get("authority") == "phone":
+                    ack = self._apply_primary(data)
+                    await ws.send_json({"type": "draft.ack", **ack})
+                    return True
                 if self._on_phone_draft:
                     ack = self._on_phone_draft(data)
                     await ws.send_json({"type": "draft.ack", **ack})
@@ -733,64 +880,72 @@ class V3Bridge:
                 )
                 return True
             if kind == "editor.activity":
-                for asset in self.draft.assets:
-                    status = str(asset.get("status") or "ready")
-                    if status == "ready":
-                        asset["status"] = "editing"
+                # 所有素材编辑状态由带版本的draft.update维护；活动消息只唤起提示。
                 if self._on_activity and should_wake("editor.activity"):
                     self._on_activity(self.draft.text, len(self.draft.assets))
                 return True
             if kind == "bundle.commit":
-                if self._is_pc_editing():
+                if self._is_pc_editing() and self.draft.authority != "phone":
                     await ws.send_json({"type": "error", "error": "pc_editing", "message": "电脑正在改字"})
                     return True
                 self._require_draft_identity(data)
                 if "text" in data or "revision" in data:
-                    self._apply_draft_fields(data)
+                    if data.get("authority") == "phone":
+                        self._apply_primary(data)
+                    else:
+                        self._apply_draft_fields(data)
                 try:
                     bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
                 except ValueError as exc:
                     await ws.send_json({"type": "error", "error": str(exc)})
                     return True
-                self.last_bundle = bundle
+                self._prepared_bundle = bundle
                 public = {k: v for k, v in bundle.items() if k != "bytes_data"}
                 await ws.send_json({"type": "bundle.ready", "bundle": public})
                 return True
             if kind == "insert.intent":
-                if self._is_pc_editing():
+                if self._is_pc_editing() and self.draft.authority != "phone":
                     await ws.send_json({"type": "error", "error": "pc_editing", "message": "电脑正在改字"})
                     return True
-                session = self.auth.authorize(data["session_id"], data.get("token") or "", "insert")
+                if data.get("session_id") != live.session_id:
+                    raise ValueError("session mismatch")
+                session = self.auth.authorize(live.session_id, live.token, "insert")
                 self.auth.consume_nonce(session, str(data.get("nonce") or ""))
                 self._require_draft_identity(data)
                 if "text" in data or "revision" in data:
-                    self._apply_draft_fields(data)
+                    if data.get("authority") == "phone":
+                        self._apply_primary(data)
+                    else:
+                        self._apply_draft_fields(data)
                 try:
-                    if self.last_bundle is None or int(self.last_bundle.get("revision") or -1) != self.draft.revision:
-                        self.last_bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
+                    frozen = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
                 except ValueError as exc:
                     await ws.send_json({"type": "error", "error": str(exc)})
                     return True
-                frozen = dict(self.last_bundle)
                 status = {"result": "RUNNING"}
                 if self._on_intent:
-                    status = self._on_intent(data, frozen) or status
+                    status = await self._call_result(self._on_intent, data, frozen) or status
                 await ws.send_json({"type": "attempt.status", **status})
+                if status.get("phone_event"):
+                    await self.publish_phone_event(status["phone_event"])
                 return True
             if kind == "capture.request":
+                request_id = str(data.get("request_id") or "")[:128]
                 try:
-                    session = self.auth.authorize(data["session_id"], data.get("token") or "", "capture")
+                    if data.get("session_id") != live.session_id:
+                        raise ValueError("session mismatch")
+                    session = self.auth.authorize(live.session_id, live.token, "capture")
                 except ValueError:
                     await ws.send_json(
                         {
-                            "type": "capture.result",
+                            "type": "capture.result", "request_id": request_id,
                             "error": "CAPTURE_DENIED",
                             "message": "这台手机还没有截图权限，文字仍可同步",
                         }
                     )
                     return True
                 if not self._on_capture:
-                    await ws.send_json({"type": "capture.result", "error": "unavailable"})
+                    await ws.send_json({"type": "capture.result", "request_id": request_id, "error": "unavailable"})
                     return True
                 try:
                     meta = self._on_capture(
@@ -799,14 +954,16 @@ class V3Bridge:
                         session,
                     )
                 except ValueError as exc:
-                    await ws.send_json({"type": "capture.result", "error": str(exc)})
+                    await ws.send_json({"type": "capture.result", "request_id": request_id, "error": str(exc)})
                     return True
-                await ws.send_json({"type": "capture.result", "asset": meta})
+                await ws.send_json({"type": "capture.result", "request_id": request_id, "asset": meta})
                 return True
             if kind == "recall.last":
                 before = (self.draft.text, [a.get("asset_id") for a in self.draft.assets])
+                if not live.allow_insert:
+                    raise ValueError("insert not granted")
                 if self._on_recall:
-                    self._on_recall()
+                    await self._call_result(self._on_recall)
                 await ws.send_json(
                     {
                         "type": "recall.ready",
@@ -820,8 +977,16 @@ class V3Bridge:
             if kind == "byok.request":
                 await ws.send_json({"type": "error", "error": "byok stays on desktop"})
                 return True
-        except ValueError as exc:
-            await ws.send_json({"type": "error", "error": str(exc)})
+        except (ValueError, KeyError, TypeError) as exc:
+            await ws.send_json({"type": "error", "error": str(exc) if isinstance(exc, ValueError) else "invalid request",
+                                "update_id": data.get("update_id"),
+                                "mirror": {"authority":self.draft.authority,"draft_id":self.draft.draft_id,
+                                           "epoch":self.draft.epoch,"revision":self.draft.revision,
+                                           "owner_device_id":self.draft.editor_device_id}})
+            return authorized
+        except Exception as exc:
+            self._log(f"[v3.bridge] request error_type={type(exc).__name__}")
+            await ws.send_json({"type": "error", "error": "REQUEST_FAILED"})
             return authorized
         return authorized
 

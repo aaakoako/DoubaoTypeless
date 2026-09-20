@@ -1,0 +1,210 @@
+"""CI专用：实际无控制台EXE连续三次Alt+I，真实剪贴板/键盘/外部输入框。
+
+不使用投递接口替身，不代表Cursor/手机输入法通过。
+只在临时GitHub Windows runner执行，只管理本脚本创建的两个PID。
+"""
+from __future__ import annotations
+import argparse
+import asyncio
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from urllib.parse import urlparse
+import uuid
+
+TARGET = r'''
+import json, sys, tkinter as tk
+from pathlib import Path
+p=Path(sys.argv[1]); title=sys.argv[2]
+w=tk.Tk();w.title(title);w.geometry('500x220')
+e=tk.Text(w);e.pack(fill='both',expand=True);e.focus_force()
+w.after(200,lambda:(w.lift(),e.focus_force()))
+def tick():
+    q=p.with_suffix('.tmp')
+    q.write_text(json.dumps({'text':e.get('1.0','end-1c')}),encoding='utf-8')
+    q.replace(p);w.after(50,tick)
+w.after(50,tick);w.mainloop()
+'''
+
+async def message(ws, kind: str, timeout: float=8, phone: dict | None = None):
+    deadline=time.monotonic()+timeout
+    while time.monotonic()<deadline:
+        msg=await ws.receive_json(timeout=max(.05,deadline-time.monotonic()))
+        if msg.get('type')=='draft.prepare' and phone is not None:
+            await ws.send_json({**phone,'type':'draft.prepared','request_id':msg['request_id']})
+            continue
+        if msg.get('type')=='error':
+            raise RuntimeError('bridge rejected test request: '+str(msg.get('error')))
+        if msg.get('type')==kind:return msg
+    raise TimeoutError(kind)
+
+async def target_ready(target, textfile: Path, title: str) -> int:
+    """进程创建不代表Tk已经完成DLL加载和窗口映射，等待真实就绪信号。"""
+    import win32gui, win32process
+    deadline=time.monotonic()+20
+    while time.monotonic()<deadline:
+        if target.poll() is not None:
+            raise RuntimeError(f'test input process exited: {target.returncode}')
+        hwnd=win32gui.FindWindow(None,title)
+        if hwnd and win32process.GetWindowThreadProcessId(hwnd)[1]==target.pid and textfile.is_file():
+            try:
+                json.loads(textfile.read_text(encoding='utf-8'))
+                return hwnd
+            except (OSError,ValueError):
+                pass
+        await asyncio.sleep(.1)
+    raise TimeoutError('test-owned input window did not become ready')
+
+async def exercise(exe: Path, data: Path, child, target, textfile: Path, title: str, result: dict):
+    from aiohttp import ClientSession
+    import win32gui, win32con, win32process, win32clipboard
+    from pynput.keyboard import Controller, Key, KeyCode
+    result['stage']='candidate_startup'
+    note=data/'pair.txt'
+    for _ in range(300):
+        if child.poll() is not None: raise RuntimeError('candidate exited during startup')
+        if note.is_file():break
+        await asyncio.sleep(.1)
+    else:raise TimeoutError('pair note not ready')
+    address,code=note.read_text(encoding='utf-8').splitlines()[:2]
+    base='http://127.0.0.1:'+str(urlparse(address).port)
+    result['stage']='target_startup'
+    hwnd=await target_ready(target,textfile,title)
+    result['target_window_ready']=True
+    async with ClientSession() as http:
+        result['stage']='pairing'
+        async with http.post(base+'/v3/pair',json={'code':code},headers={'Origin':base}) as r:
+            if r.status!=200:raise RuntimeError('test pairing rejected')
+            creds=await r.json()
+        async with http.ws_connect(base+'/ws') as ws:
+            await ws.send_json({'type':'session.hello','session_id':creds['session_id'],'token':creds['token']})
+            state=await message(ws,'session.ready')
+            primary = result.get('phone_primary', False)
+            if primary:
+                state={'draft_id':str(uuid.uuid4()),'epoch':str(uuid.uuid4()),'revision':0,'generation':0}
+            key=Controller(); aggregate='';rounds=[]
+            result['rounds']=rounds
+            for index,text in enumerate(['第一段  保留空格\n','第二段 Image2 / Opus\n','第三段连续输入完成'],start=1):
+                result['stage']=f'round_{index}_focus'
+                if not win32gui.IsWindow(hwnd) or win32process.GetWindowThreadProcessId(hwnd)[1]!=target.pid:
+                    raise RuntimeError('test-owned input window disappeared')
+                win32gui.SetForegroundWindow(hwnd)
+                for _ in range(30):
+                    if win32gui.GetForegroundWindow()==hwnd:break
+                    await asyncio.sleep(.05)
+                else:raise RuntimeError('test target cannot receive focus')
+                result['stage']=f'round_{index}_sync'
+                phone={'protocol':3,'type':'draft.update','draft_id':state['draft_id'],
+                    'epoch':state['epoch'],'revision':state['revision']+1,'text':text,
+                    'asset_refs':[],'asset_documents':[]}
+                if primary:
+                    phone.update(authority='phone',generation=state['generation'],update_id=str(uuid.uuid4()))
+                await ws.send_json(phone)
+                ack=await message(ws,'draft.ack')
+                if not ack.get('durable'):raise RuntimeError('draft not durable')
+                result['stage']=f'round_{index}_native_insert'
+                # 实际进入全局热键监听器，再由EXE自己的队列/平台代码执行Ctrl+V。
+                # 用虚拟键I而非Unicode字符包，测试真正的Windows热键组合。
+                # 保持极短实际按下间隔，让消息循环看到完整的组合再释放。
+                key.press(Key.alt_l)
+                try:
+                    key.press(KeyCode.from_vk(0x49))
+                    await asyncio.sleep(.06)
+                    key.release(KeyCode.from_vk(0x49))
+                finally:
+                    key.release(Key.alt_l)
+                rotated=await message(ws,'draft.rotated',15,phone=phone if primary else None)
+                if not rotated.get('rotated'):raise RuntimeError('text draft not rotated')
+                archived=rotated.get('archived') or {}
+                if archived.get('source_text',archived.get('text'))!=text:raise RuntimeError('wrong archived text')
+                aggregate+=text
+                result['stage']=f'round_{index}_verify_target'
+                for _ in range(80):
+                    if child.poll() is not None:raise RuntimeError('candidate exited after insert')
+                    try:received=json.loads(textfile.read_text(encoding='utf-8')).get('text')
+                    except (OSError,ValueError):received=None
+                    if received==aggregate:break
+                    await asyncio.sleep(.05)
+                else:raise RuntimeError('external target text mismatch')
+                copied=None
+                for _ in range(20):
+                    try:
+                        win32clipboard.OpenClipboard()
+                        try:copied=win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
+                        finally:win32clipboard.CloseClipboard()
+                        break
+                    except Exception:await asyncio.sleep(.025)
+                if copied!=text:raise RuntimeError('insert-and-copy clipboard mismatch')
+                rounds.append({'round':index,'exact_text':True,'clipboard':True,
+                    'rotated':True,'process_alive':child.poll() is None})
+                if primary:
+                    assert rotated.get('phone_primary') is True
+                    state={'draft_id':phone['draft_id'],'epoch':str(uuid.uuid4()),'revision':0,
+                           'generation':phone['generation']+1}
+                    # 手机自己命名下一段，服务器只能接收镜像，不能轮换作者身份。
+                    await ws.send_json({**phone,**state,'text':'','update_id':str(uuid.uuid4())})
+                    cleared=await message(ws,'draft.ack')
+                    assert cleared.get('durable') is True
+                else:
+                    state=rotated
+            return rounds
+
+def verify(exe: Path, report: Path, *, phone_primary: bool = False) -> int:
+    if sys.platform!='win32' or os.environ.get('GITHUB_ACTIONS')!='true':
+        raise RuntimeError('Restricted to disposable Windows GitHub Actions runner')
+    exe=exe.resolve(strict=True)
+    result={'test':'frozen-three-text-inserts','passed':False,'phone_primary':phone_primary,'cursor_tested':False,
+            'phone_ime_tested':False,'executable_sha256':hashlib.sha256(exe.read_bytes()).hexdigest()}
+    with tempfile.TemporaryDirectory(prefix='dt-native-text-') as temp:
+        root=Path(temp);data=root/'data';state=root/'target.json';script=root/'target.py'
+        script.write_text(TARGET,encoding='utf-8');title='DT-Native-Input-'+uuid.uuid4().hex[:8]
+        env={**os.environ,'DT_V3_DATA_DIR':str(data),'DT_V3_PIPE':'DT-smoke-'+uuid.uuid4().hex,'PYTHONUTF8':'1'}
+        env.pop('QT_QPA_PLATFORM',None)
+        output=(root/'target-output.log').open('wb')
+        child=subprocess.Popen([str(exe),'--minimized'],env=env)
+        target=subprocess.Popen([sys.executable,str(script),str(state),title],env=env,
+                                stdout=output,stderr=subprocess.STDOUT)
+        result.update(pid=child.pid,target_pid=target.pid)
+        try:
+            asyncio.run(exercise(exe,data,child,target,state,title,result))
+            result['stage']='graceful_exit'
+            quitproc=subprocess.run([str(exe),'--quit'],env=env,timeout=15)
+            result['quit_command_exit']=quitproc.returncode
+            result['process_exit']=child.wait(timeout=15)
+            if quitproc.returncode or result['process_exit']:raise RuntimeError('not graceful exit')
+            result['passed']=True
+            result['stage']='complete'
+        except Exception as exc:
+            result.update(error_type=type(exc).__name__,error=str(exc),passed=False,
+                          candidate_exit_before_cleanup=child.poll(),target_exit_before_cleanup=target.poll())
+        finally:
+            import win32gui,win32con,win32process
+            hwnd=win32gui.FindWindow(None,title)
+            if hwnd and win32process.GetWindowThreadProcessId(hwnd)[1]==target.pid:
+                win32gui.PostMessage(hwnd,win32con.WM_CLOSE,0,0)
+                try:target.wait(timeout=5)
+                except subprocess.TimeoutExpired:pass
+            for process in (child,target):
+                if process.poll() is None:
+                    process.terminate()
+                    try:process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:process.kill();process.wait()
+                    result['test_owned_cleanup']=True
+            output.close()
+            report.parent.mkdir(parents=True,exist_ok=True)
+            logs=report.parent/(report.stem+'-logs');logs.mkdir(exist_ok=True)
+            for path in (data/'logs').glob('*.log'):
+                shutil.copyfile(path,logs/path.name)
+            shutil.copyfile(root/'target-output.log',logs/'test-target.log')
+            report.write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+    return 0 if result['passed'] else 1
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('exe',type=Path);p.add_argument('--report',required=True,type=Path);p.add_argument('--phone-primary',action='store_true')
+    args=p.parse_args();raise SystemExit(verify(args.exe,args.report,phone_primary=args.phone_primary))
