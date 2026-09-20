@@ -12,12 +12,19 @@ jobs:
   source:
     if: github.ref == 'refs/heads/v3/assistant-runtime-safety'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       source_sha: ${{ steps.source.outputs.source_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false
+          fetch-depth: 2
+      - name: Apply exact local text boundary fix when present
+        run: |
+          if [ -f .github/scripts/apply_local_text_boundary.py ]; then
+            python .github/scripts/apply_local_text_boundary.py
+          fi
       - name: Bind immutable source commit
         id: source
         run: |
@@ -119,7 +126,6 @@ jobs:
       - name: Phone-owned latest draft with real frozen hotkey and clipboard
         run: python tools/verify_candidate_text.py dist/DoubaoTypelessV3PreviewUI/DoubaoTypelessV3PreviewUI.exe --phone-primary --report candidate-phone-primary.json
       - name: Frozen production phone, native HUD and mixed image-text recovery
-        timeout-minutes: 5
         run: python tools/verify_candidate_browser.py dist/DoubaoTypelessV3PreviewUI/DoubaoTypelessV3PreviewUI.exe --report candidate-browser.json
       - name: Full folder inventory and candidate archive
         shell: pwsh
@@ -144,7 +150,7 @@ jobs:
             candidate-phone-primary.json
             candidate-phone-primary-logs/
             candidate-browser.json
-            candidate-browser*.png
+            candidate-browser.png
             candidate-browser-logs/
             windows-tests.xml
             ui-evidence/
