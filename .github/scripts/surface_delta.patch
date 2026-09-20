@@ -1,0 +1,128 @@
+diff --git a/src/doubao_typeless/ui/desktop.py b/src/doubao_typeless/ui/desktop.py
+index e04fa76..fe6c8bd 100644
+--- a/src/doubao_typeless/ui/desktop.py
++++ b/src/doubao_typeless/ui/desktop.py
+@@ -254,6 +254,7 @@ class ReviewPanel:
+ 
+         self._hide_filter = _HideRelease(w)
+         w.installEventFilter(self._hide_filter)
++        self.app.hud.bind_foreground_surface(w)
+         self.reload()
+ 
+     def _mark_editing(self) -> None:
+@@ -704,6 +705,7 @@ class ClientWindow:
+ 
+         self.tabs = tabs
+         self.widget = w
++        self.app.hud.bind_foreground_surface(w)
+         self._clipboard = QGuiApplication.clipboard()
+         self._hist_sig = None
+         self._pairing_url = ""
+@@ -1144,6 +1146,11 @@ class DesktopShell:
+             QTimer.singleShot(0, host, show_error)
+         elif event == "capture_region":
+             QTimer.singleShot(0, host, self.app.capture_region)
++        elif event == "composer_located":
++            def reveal_target():
++                self.review.widget.hide()
++                self.app.hud.operation_event("composer_located")
++            QTimer.singleShot(0, host, reveal_target)
+         elif event == "composer_pick":
+             candidates=list(_kw.get("candidates") or [])
+             QTimer.singleShot(0, host, lambda:self._pick_composer(candidates))
+@@ -1166,7 +1173,8 @@ class DesktopShell:
+         if getattr(self,"_picker_open",False):return
+         self._picker_open=True
+         try:
+-            choice=ComposerPicker(self.client.widget,candidates).exec()
++            with self.app.hud.modal_pause():
++                choice=ComposerPicker(self.client.widget,candidates).exec()
+             if choice:self.app.request_choose_composer(choice)
+         finally:self._picker_open=False
+ 
+ diff --git a/src/doubao_typeless/ui/hud.py b/src/doubao_typeless/ui/hud.py
+index f983054..991904e 100644
+--- a/src/doubao_typeless/ui/hud.py
++++ b/src/doubao_typeless/ui/hud.py
+@@ -55,6 +55,7 @@ class HudController:
+         self._content_serial = 0
+         self._operation_content_serial = 0
+         self._dispatch = None
++        self._foreground_surfaces = set()
+ 
+     def start(self) -> None:
+         try:
+@@ -266,6 +267,32 @@ class HudController:
+             return
+         self._apply_hide()
+ 
++    def bind_foreground_surface(self, widget):
++        """GUI-thread binding: one desktop action surface at a time.
++
++        Visibility, not activation, owns the lease: clicking a non-activating HUD
++        must never hit an action sitting above the expanded review/settings UI.
++        No content is discarded and hiding a surface never starts an insertion.
++        """
++        from PySide6.QtCore import QObject, QEvent
++        identity = id(widget)
++        hud = self
++        class SurfaceGate(QObject):
++            def eventFilter(self, obj, event):
++                if event.type() == QEvent.Show:
++                    hud._foreground_surfaces.add(identity)
++                    hud.dismiss()
++                elif event.type() == QEvent.Hide:
++                    hud._foreground_surfaces.discard(identity)
++                return False
++        gate = SurfaceGate(widget)
++        widget.installEventFilter(gate)
++        widget._dt_hud_surface_gate = gate
++        widget.destroyed.connect(lambda *_: hud._foreground_surfaces.discard(identity))
++        if widget.isVisible():
++            self._foreground_surfaces.add(identity)
++            self.dismiss()
++
+     @contextmanager
+     def modal_pause(self):
+         """GUI-thread scope: retain data while yielding the screen to a dialog."""
+@@ -383,7 +410,7 @@ class HudController:
+         self._thumbs.setVisible(bool(self.assets))
+ 
+     def _apply_show(self) -> None:
+-        if getattr(self, "_modal_depth", 0):
++        if getattr(self, "_modal_depth", 0) or self._foreground_surfaces:
+             # A non-activating always-on-top HUD must not cover a modal action.
+             # Incoming phone changes are retained, but no overlay is re-shown.
+             self.visible = False
+ diff --git a/tools/verify_candidate_browser.py b/tools/verify_candidate_browser.py
+index 969e20a..c8ab814 100644
+--- a/tools/verify_candidate_browser.py
++++ b/tools/verify_candidate_browser.py
+@@ -78,7 +78,13 @@ class NativeInspector:
+             if element.CurrentName==name and element.CurrentControlType==50000 and element.CurrentIsEnabled:
+                 r=element.CurrentBoundingRectangle
+                 if r.right>r.left and r.bottom>r.top:
+-                    mouse=Controller();mouse.position=((r.left+r.right)//2,(r.top+r.bottom)//2)
++                    import win32gui, win32con
++                    point=((r.left+r.right)//2,(r.top+r.bottom)//2)
++                    mouse=Controller();mouse.position=point
++                    hit=win32gui.WindowFromPoint(point)
++                    root=win32gui.GetAncestor(hit,win32con.GA_ROOT) if hit else 0
++                    if root!=hwnd:
++                        raise AssertionError(f"native button occluded: {name}; expected={hwnd}, actual={root}")
+                     mouse.click(Button.left)
+                     return True
+         return False
+@@ -360,8 +366,12 @@ const raw=WebSocket.prototype.send;WebSocket.prototype.send=function(data){
+                 await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
+                 await target.bring_to_front();await target.locator('#other').click();hotkey(expand=True)
+                 review=await until(lambda:own_window(child.pid,'当前图文'));await until(lambda:win32gui.IsWindowVisible(review))
++                await until(lambda:not win32gui.IsWindowVisible(hud()),message='HUD covers expanded review controls')
++                before_locate=await target.evaluate('window.pasteCount')
+                 assert inspector.click(review,'定位输入框'),inspector.text(review)
+                 await until(lambda:target.evaluate("document.activeElement.id==='prompt-textarea'"),message='unique composer was not focused')
++                assert await target.evaluate('window.pasteCount')==before_locate,'locating must never paste'
++                assert await phone.locator('#text').input_value()=='定位但不自动发送'
+                 assert await target.locator('#prompt-textarea').input_value()==''
+                 hotkey();await completed('定位但不自动发送')
+                 cases.append({'name':'locate_unique_composer_then_explicit_insert','passed':True})
