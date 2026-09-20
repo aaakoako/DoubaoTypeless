@@ -1,5 +1,7 @@
 """统一插入反馈文案；不把输入事件发出称为目标已接收。"""
 ERRORS = {
+    "COMPOSER_AMBIGUOUS": "当前窗口有多个对话输入框，未自动选择；请点击需要的输入框",
+    "COMPOSER_NOT_FOUND": "没有唯一可确认的对话输入框，未移动或插入；可手动点中目标",
     'PHONE_OFFLINE': '手机已离线，内容保留；连接恢复后再插入',
     'PHONE_NOT_CURRENT': '未拿到手机最新内容，未插入旧稿；请重连后重试',
     'PHONE_CHANGED_REVIEW': '手机稿已更新，电脑修改保留；请展开对比',
@@ -32,4 +34,8 @@ ERRORS = {
 
 def error_message(payload: dict) -> str:
     code = payload.get('detail_code') or payload.get('error_code') or 'DELIVERY_FAILED'
-    return ERRORS.get(code, ERRORS['DELIVERY_FAILED'])
+    message = ERRORS.get(code, ERRORS['DELIVERY_FAILED'])
+    progress = payload.get("progress") or {}
+    if progress.get("images_attempted") and progress.get("text_state") == "not_attempted":
+        message += "；图片已尝试插入，文字尚未插入且仍保留"
+    return message

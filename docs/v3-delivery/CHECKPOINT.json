@@ -5,10 +5,10 @@
   "review_sha": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
   "product_source_at_review": "70aa6b92d13f7c8a69b024c94674835083cffa37",
   "current_head": "USE_GIT_HEAD_OR_BUILD_INFO_SOURCE_SHA",
-  "working_tree": "直接源文件提交，保持同一隔离开发分支；构建身份以git HEAD和build-info为准。",
-  "last_completed_slice": "LOCAL_FAULT_REGRESSIONS_PASSED_NATIVE_CANDIDATE_PENDING",
-  "active_slice": "STABILIZE_INSERT_FEEDBACK_AND_ISOLATE_NATIVE_INSPECTION",
-  "next_action": "执行同一提交的Linux/Windows完整测试、冻结EXE双协议连续插入，以及真实Chromium中HUD/详情/手机按钮、目标切换和剪贴板占用恢复。没有原用户事故日志，不声称确诊。",
+  "working_tree": "本轮容器工作副本；GitHub本轮只提供读取动作，尚未推送。不是新候选包。",
+  "last_completed_slice": "IMPLEMENTED_SHARED_THEME_SCOPED_ATTACHMENTS_AND_RESUME_NOT_YET_NATIVE_VALIDATED",
+  "active_slice": "UNIFIED_UI_AND_MIXED_COMPOSER_INTEGRATION",
+  "next_action": "运行完整Linux/Windows测试与真实无控制台EXE：相册两张处理图加文字、附件焦点变化、未知图片明确确认后续文字、定位唯一Composer，全部通过才给新版整包。不得减少原测试或把缺设备扩大为已知代码缺陷。",
   "accepted_requirements": [
     "MASTER_PLAN 为唯一产品/执行规范",
     "独立复核 REQUEST_CHANGES 不是仅剩真机",
@@ -17,9 +17,8 @@
     "不改测试期望、不删用例、不改审计包旧源码"
   ],
   "open_defects": [
-    "原f7bb484用户崩溃尚无现场日志；本轮隔离UIA故障，不宣称历史根因已确诊。",
-    "本轮Windows包/实际浏览器结果以CI产物为准，未完成前不交付旧包或伪称通过。",
-    "真实Android豆包输入法、真实ChatGPT/Cursor附件兼容性仍需相应设备和站点。"
+    "真实Android/豆包和实际Cursor版本尚未验收；本轮泛用UIA语义定位不等于所有Agent已兼容。",
+    "本次统一样式/图文接续的全仓云端与Windows整包验证尚未执行；原崩溃历史没有用户现场日志，不宣布已精确确诊。"
   ],
   "reopened_this_round": [
     "F03",
@@ -86,12 +85,16 @@
   },
   "published": false,
   "task_complete": false,
-  "source_base": "441769324e35d49a96b97908544acfa0096d61d6",
+  "source_base": "30421e3cb306402ef2a67ca54b6e8824f9f2630d",
   "validation_this_patch": {
-    "scope": "checked native injection and existing delivery/command regressions",
-    "local": "32 passed (10 new checked-input tests + 22 existing delivery/command tests), Linux; Windows API is explicit fake in new tests",
-    "windows_runtime": "NOT_RUN",
-    "user_crash": "NOT_DIAGNOSED"
+    "scope": "进度提示/受限候选选择/业务入口专项",
+    "passed": 78,
+    "failed": 0,
+    "new_cases": 34,
+    "native_windows": "NOT_RUN",
+    "full_suite": "NOT_RUN",
+    "frontend_build": "NOT_RUN",
+    "ui": "HTML配色参考已本地渲染；非原生截图"
   },
   "previous_local_validation": {
     "pytest": {
@@ -109,11 +112,9 @@
     "browser_canvas": "Chromium内联组件真实像素/指针；没有绕过导航限制"
   },
   "local_validation": {
-    "command": "pytest stability_contract insert_stabilization assistant_delivery input_identity s1_commands phone_primary",
-    "passed": 76,
-    "skipped": 1,
-    "exit_code": 0,
-    "full_suite": "318 passed / 6 failed / 15 skipped / 3 errors; unavailable PySide6 and matching Chromium/esbuild; not a pass"
+    "targeted": "84 passed; production components, native APIs explicitly substituted",
+    "theme_and_settings": "35 passed",
+    "full_local": "375 passed / 8 failed / 16 skipped / 3 errors before QSS spacing correction; missing PySide6, browser and frontend dependencies. Two QSS compatibility failures corrected with unchanged old tests."
   },
   "last_trial": {
     "source_sha": "f7bb48497f5a1959b803516415d45e8a2901f202",

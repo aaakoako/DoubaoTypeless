@@ -68,6 +68,8 @@ def classify_element(descriptors: list[dict]) -> str:
     if any(k in context for k in ("terminal", "powershell", "cmd.exe", "consolewindowclass")):
         return "terminal"
     editable = item.get("control_type") == 50004 or item.get("value_editable")
+    editable = editable or (item.get("control_type") == 50030 and item.get("keyboard_focusable") is True
+                            and item.get("readonly") is False)
     if not editable or not item.get("enabled", True) or item.get("offscreen"):
         return "unknown"
     if any(k in context for k in ("composer", "chatinput", "promptinput", "prompt-textarea",
@@ -94,6 +96,7 @@ def describe(element) -> dict:
         "password": bool(property_value(element, "CurrentIsPassword", False)),
         "enabled": bool(property_value(element, "CurrentIsEnabled", False)),
         "offscreen": bool(property_value(element, "CurrentIsOffscreen", False)),
+        "keyboard_focusable": bool(property_value(element, "CurrentIsKeyboardFocusable", False)),
         "value_editable": editable,
         "readonly": readonly,
     }

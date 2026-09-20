@@ -38,9 +38,15 @@ def _serve(pipe) -> None:
                     result = list(focus._read_target_direct())
                 elif op == 'restore':
                     result = focus._restore_target_direct(args['saved'])
+                elif op == 'find_composer':
+                    from doubao_typeless.platform.windows.composer_locator import discover_direct
+                    result = discover_direct(int(args['hwnd']), int(args['pid']), args.get('remembered'))
+                elif op == 'resume_composer':
+                    from doubao_typeless.adapters.cursor_windows import resume_composer_direct
+                    result = resume_composer_direct(args.get("anchor"), args["expected"])
                 elif op == 'attachments':
                     from doubao_typeless.adapters.cursor_windows import _probe_uia_direct
-                    result = _probe_uia_direct()
+                    result = _probe_uia_direct(args.get("anchor"))
                 else:
                     raise ValueError('unsupported query')
                 response = {'ok': True, 'value': result}

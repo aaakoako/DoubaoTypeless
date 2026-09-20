@@ -294,7 +294,7 @@ export class SharedEditor {
         y: p.y,
         width: 1,
         height: 1,
-        stroke: this.tool === "crop" ? "#167D71" : this.color,
+        stroke: this.tool === "crop" ? "#5B5CE2" : this.color,
         fill: this.tool === "mask" ? "#111111" : undefined,
         strokeWidth: this.width,
         dash: this.tool === "crop" ? [8, 6] : undefined,
@@ -453,12 +453,12 @@ export class SharedEditor {
         y: this.source.h * 0.3,
         width: this.source.w * 0.6,
         height: this.source.h * 0.14,
-        stroke: "#167D71",
+        stroke: "#5B5CE2",
         strokeWidth: 5,
         cornerRadius: 8,
       })
     );
-    g.add(new Konva.Text({ x: this.source.w * 0.38, y: this.source.h * 0.34, text: "确认按钮", fill: "#167D71", fontSize: 32 }));
+    g.add(new Konva.Text({ x: this.source.w * 0.38, y: this.source.h * 0.34, text: "确认按钮", fill: "#5B5CE2", fontSize: 32 }));
     this.layer.add(g);
     this.ops += 1;
     this.layer.draw();

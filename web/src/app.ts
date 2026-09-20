@@ -54,7 +54,7 @@ export function boot(root: HTMLElement): void {
           <button id="boardBtn">白板</button>
         </div>
         <button class="primary" id="sendBtn" disabled>插入电脑</button>
-        <p id="transferStatus" role="status" aria-live="polite">手机主稿 · 等待同步</p><p id="sync">图在前，文字在后 · 不自动发送</p><p id="localSave" role="status" aria-live="polite"></p>
+        <p id="deliveryStatus" class="progress-detail" role="status" aria-live="polite" hidden></p><p id="transferStatus" role="status" aria-live="polite">手机主稿 · 等待同步</p><p id="sync">图在前，文字在后 · 不自动发送</p><p id="localSave" role="status" aria-live="polite"></p>
       </section>
       <section class="editor" id="editor">
         <div class="head">
@@ -72,8 +72,8 @@ export function boot(root: HTMLElement): void {
         <div class="palette">
           <button data-color="#D45243" class="swatch selected" style="background:#D45243"></button>
           <button data-color="#326AC5" class="swatch" style="background:#326AC5"></button>
-          <button data-color="#167D71" class="swatch" style="background:#167D71"></button>
-          <button data-color="#1D2826" class="swatch" style="background:#1D2826"></button>
+          <button data-color="#5B5CE2" class="swatch" style="background:#5B5CE2"></button>
+          <button data-color="#202437" class="swatch" style="background:#202437"></button>
           <button id="widthBtn">中 · 5</button>
         </div>
         <div class="palette">
@@ -211,7 +211,7 @@ export function boot(root: HTMLElement): void {
     $("charCount").textContent = `${[...state.text].length} 字`;
     $("captionHint").textContent = state.assets.map((a, i) => `${i + 1}·${a.kind}`).join(" ");
     $("connText").textContent = state.online ? "已连接电脑" : "离线也可继续写";
-    $("connDot").style.background = state.online ? "#167D71" : "#8B9390";
+    $("connDot").style.background = state.online ? "#5B5CE2" : "#858DA0";
     $("connectBtn").hidden = state.online;
     const btn = $("sendBtn") as HTMLButtonElement;
     btn.textContent = sendLabel();
@@ -334,10 +334,13 @@ export function boot(root: HTMLElement): void {
       if (msg.type === "attempt.status") {
         state.sending = false;
         const labels: Record<string, string> = {CONFIRMED:"已放入输入框",UNKNOWN:"已尝试插入，可召回重试",NO_STEPS:"未插入，请先选中电脑输入框",PARTIAL:"只完成一部分，请查看恢复选项",BUSY:"正在处理上一份内容"};
-        toast(labels[msg.result] || "插入未完成，内容保留");
+        const detail = msg.progress?.message || labels[msg.result] || "插入未完成，内容保留";
+        $("deliveryStatus").textContent=detail;$("deliveryStatus").hidden=false;
+        toast(detail);
         update();
       }
       if (msg.type === "draft.rotated") {
+        if(msg.progress?.message){$("deliveryStatus").textContent=msg.progress.message;$("deliveryStatus").hidden=false;}
         void handleReceipt(msg);
       }
       if (msg.type === "draft.restore_proposal") {

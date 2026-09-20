@@ -31,6 +31,8 @@ class DeliveryService:
         read_clipboard_text: Callable[[], str | None] | None = None,
         prepare_image: Callable[[], None] | None = None,
         is_cancelled: Callable[[], bool] | None = None,
+        resume_input: Callable | None = None,
+        progress: Callable[[dict], None] | None = None,
     ):
         self._paste = paste
         self._set_image = set_clipboard_image
@@ -45,7 +47,13 @@ class DeliveryService:
         self._read_clipboard_text = read_clipboard_text
         self._prepare_image = prepare_image
         self._is_cancelled = is_cancelled or (lambda: False)
+        self._resume_input = resume_input
+        self._progress = progress
         self.enter_count = 0
+
+    def _notify_progress(self, stage: str, index: int, total: int) -> None:
+        if self._progress:
+            self._progress({"stage":stage,"index":index,"total":total})
 
     def run(
         self,
@@ -84,6 +92,7 @@ class DeliveryService:
             return attempt
         index = len(attempt.steps)
         for asset in assets:
+            self._notify_progress("image", index+1, len(bundle.get("assets") or []))
             current = self._read_focus()
             if not same_target(current, focus):
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
@@ -110,6 +119,7 @@ class DeliveryService:
                 attempt.error_code = "SHUTTING_DOWN"
                 return attempt
             self._paste()
+            self._notify_progress("image_wait", index+1, len(bundle.get("assets") or []))
             evidence = "os_input_count"
             state = "injected"
             if self._observe_image:
@@ -127,9 +137,16 @@ class DeliveryService:
                 attempt.result = "UNKNOWN"
                 return attempt
             step.state, step.evidence = state, evidence
+            if self._resume_input:
+                restored = self._resume_input(focus)
+                if not restored:
+                    attempt.result, attempt.error_code = "PARTIAL", "TARGET_CHANGED"
+                    return attempt
+                focus = restored
             index += 1
         text = bundle.get("text") or ""
         if text:
+            self._notify_progress("text", len(assets), len(bundle.get("assets") or []))
             if not same_target(self._read_focus(), focus):
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "TARGET_CHANGED"
@@ -161,8 +178,8 @@ class DeliveryService:
             self._paste()
             if self._observe_text:
                 observed = self._observe_text()
-                state = "observed" if observed == "observed" else "unknown"
-                evidence = "target_text" if state == "observed" else "none"
+                state = "observed" if observed == "observed" else "injected"
+                evidence = "target_text" if state == "observed" else "os_input_count"
             else:
                 state, evidence = "injected", "os_input_count"
             step.state, step.evidence = state, evidence
@@ -174,6 +191,7 @@ class DeliveryService:
         except ValueError:
             if attempt.steps and all(s.state in {"injected", "observed"} for s in attempt.steps):
                 attempt.result = "UNKNOWN"
-        if attempt.result == "RUNNING":
+        if attempt.result in {"RUNNING", "PARTIAL"}:
+            # 已遍历所有计划步骤，但文字只取得系统发键证据：UNKNOWN而非整单确认。
             attempt.result = "UNKNOWN"
         return attempt

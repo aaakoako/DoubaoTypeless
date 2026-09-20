@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 from typing import Callable
+from doubao_typeless.ui.theme import style_root
+from doubao_typeless.ui.theme_generated import COLORS
 
 TOKENS = {
-    "accent": "#167D71",
-    "surface": "#FFFFFF",
-    "ink": "#1D2826",
-    "muted": "#63716D",
+    "accent": COLORS["accent"],
+    "surface": COLORS["surface"],
+    "ink": COLORS["ink"],
+    "muted": COLORS["muted"],
     "width": 400,
     "min_text_h": 88,
     "min_image_h": 132,
@@ -79,14 +81,15 @@ class HudController:
         w.setAttribute(Qt.WA_ShowWithoutActivating, True)
         w.setAttribute(Qt.WA_QuitOnClose, False)
         w.resize(*TOKENS["text_size"])
-        w.setStyleSheet(
-            f"background:{TOKENS['surface']}; color:{TOKENS['ink']}; border-radius:16px;"
-        )
+        style_root(w, hud=True)
         layout = QVBoxLayout(w)
+        layout.setContentsMargins(16,12,16,12)
+        layout.setSpacing(8)
         self._status = QLabel("手机输入中")
+        self._status.setProperty("role", "status")
+        self._status.setWordWrap(True)
         self._status.setObjectName("DTInsertStatus")
         self._status.setWordWrap(True)
-        self._status.setStyleSheet(f"color:{TOKENS['muted']}; font-size:11px;")
         self._body = QTextEdit()
         self._body.setReadOnly(True)
         self._body.setMinimumHeight(40)
@@ -103,7 +106,7 @@ class HudController:
             self._body.setFrameShape(QFrame.NoFrame)
         except Exception:
             pass
-        self._body.setStyleSheet("border:0; background:transparent; font-size:14px; color:#1D2826;")
+        self._body.setObjectName("hudBody")
         bar = QWidget()
         bar.setFixedHeight(40)
         bar.setStyleSheet("background:transparent;")
@@ -112,19 +115,17 @@ class HudController:
         row.setSpacing(8)
         expand = QPushButton("展开")
         expand.setFixedHeight(32)
-        expand.setStyleSheet("background:#E7EEEC; color:#1D2826; border:0; border-radius:9px; padding:6px 10px;")
         expand.clicked.connect(lambda: self._on_expand and self._on_expand())
         self._expand = expand
         copy = QPushButton("复制")
         copy.setFixedHeight(32)
-        copy.setStyleSheet("background:#E7EEEC; color:#1D2826; border:0; border-radius:9px; padding:6px 10px;")
         copy.clicked.connect(lambda: self._on_copy and self._on_copy())
         self._copy = copy
         btn = QPushButton("插入并复制")
         btn.setObjectName("DTInsertAction")
+        btn.setProperty("role", "primary")
         btn.setAccessibleName("插入并复制")
         btn.setFixedHeight(32)
-        btn.setStyleSheet(f"background:{TOKENS['accent']}; color:white; border:0; border-radius:9px; padding:6px 10px;")
         btn.clicked.connect(lambda: self._on_insert and self._on_insert())
         self._insert = btn
         row.addWidget(expand, 0)
@@ -220,6 +221,16 @@ class HudController:
             self._mode = "busy"
             self._operation_message = "正在确认手机最新内容…" if event == "sync_wait" else "正在插入，请勿切换输入框…"
             self._operation_content_serial = self._content_serial
+        elif event == "delivery_progress":
+            stage,index,total=payload.get("stage"),payload.get("index",0),payload.get("total",0)
+            message = (f"正在插入第 {index}/{total} 张图片…" if stage=="image" else
+                       f"图片 {index}/{total} 已发出，正在等待附件反馈…" if stage=="image_wait" else
+                       "图片已接收，正在插入文字…" if total else "正在插入文字…")
+            self._mode,self._operation_message="busy",message
+        elif event == "composer_locating":
+            self._mode, self._operation_message = "busy", "正在查找当前窗口的对话输入框…"
+        elif event == "composer_located":
+            self._mode, self._operation_message = "failed", "已定位输入框，未插入任何内容；可继续插入或恢复"
         elif event == "delivery_failed":
             self._mode = "failed"
             self._operation_message = error_message(payload)
@@ -235,7 +246,7 @@ class HudController:
                     self._operation_message = "已发出粘贴并复制；上次内容可恢复"
                 else:
                     self._mode = "failed"
-                    self._operation_message = "接收结果待确认，图文已保留；请查看目标"
+                    self._operation_message = (payload.get("progress") or {}).get("message") or "接收结果待确认，图文已保留；请查看目标"
         self.visible = self._mode != "result" or self._widget is not None
         if self._widget is not None:
             self._apply_show()
@@ -343,7 +354,7 @@ class HudController:
             status = asset.get("status", "ready")
             caption = {"editing": "编辑中", "queued": "同步中", "failed": "待重试", "dirty": "未同步"}.get(status, "已收到")
             thumb.setText(f"{i}\n{caption}")
-            thumb.setStyleSheet("background:#EEF4F2;border:1px solid #D9E6E1;border-radius:6px;font-size:10px;")
+            thumb.setStyleSheet("background:#F1F3FA;border:1px solid #DCE1EC;border-radius:6px;font-size:10px;")
             path = asset.get("path")
             if path and status == "ready":
                 reader = QImageReader(path)

@@ -1,0 +1,38 @@
+{
+  "name": "Mist Indigo",
+  "version": 1,
+  "colors": {
+    "bg": "#F6F7FB",
+    "surface": "#FFFFFF",
+    "ink": "#202437",
+    "muted": "#687087",
+    "line": "#DCE1EC",
+    "accent": "#5B5CE2",
+    "accent_hover": "#4B4BCB",
+    "accent_pressed": "#3F3FB0",
+    "soft": "#ECEEFF",
+    "hover": "#E6E9F5",
+    "pressed": "#DCE1F0",
+    "disabled": "#EEF0F6",
+    "disabled_ink": "#747D91",
+    "danger": "#B42318",
+    "danger_soft": "#FFF1F0",
+    "warning": "#925C0B",
+    "warning_soft": "#FFF5DF"
+  },
+  "metrics": {
+    "radius_control": 8,
+    "radius_card": 12,
+    "space_unit": 4,
+    "control_height": 34,
+    "touch_height": 44,
+    "text_size": 13,
+    "title_size": 20
+  },
+  "principles": [
+    "平面文字页签，无凸起阴影",
+    "每个操作区只突出一个主动作",
+    "错误/等待有文字说明，不仅靠颜色",
+    "键盘焦点可见，触控目标至少44像素"
+  ]
+}

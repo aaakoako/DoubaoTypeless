@@ -11,7 +11,9 @@ from PIL import Image, ImageDraw
 ROOT=Path(__file__).resolve().parents[1]
 
 def export(root: Path=ROOT) -> None:
-    assets=root/'assets';spec=json.loads((assets/'v3-icon.paths.json').read_text())
+    assets=root/'assets';spec=json.loads((assets/'v3-icon.paths.json').read_text(encoding='utf-8'))
+    theme=json.loads((assets/'ui-theme.json').read_text(encoding='utf-8')) if (assets/'ui-theme.json').exists() else None
+    if theme:spec['foreground']=theme['colors']['accent'];spec['background']=theme['colors']['surface']
     if spec.get('schema')!=1 or spec.get('size')!=512:raise ValueError('Unexpected icon data')
     scale=4
     image=Image.new('RGBA',(512*scale,512*scale));draw=ImageDraw.Draw(image)

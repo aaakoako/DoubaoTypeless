@@ -21,14 +21,10 @@ from doubao_typeless.ui.filelog import FileLogger
 from doubao_typeless.ui.single_instance import listen_for_commands, request_quit, request_show
 from doubao_typeless.ui.v3_startup import apply_v3_autostart
 
-TOKENS = {
-    "accent": "#167D71",
-    "surface": "#F7F6F2",
-    "card": "#FFFFFF",
-    "ink": "#1D2826",
-    "muted": "#63716D",
-    "danger": "#B42318",
-}
+from doubao_typeless.ui.theme import QSS as STYLESHEET, style_root
+from doubao_typeless.ui.theme_generated import COLORS
+TOKENS = {"accent":COLORS["accent"], "surface":COLORS["bg"], "card":COLORS["surface"],
+          "ink":COLORS["ink"], "muted":COLORS["muted"], "danger":COLORS["danger"]}
 
 RESULT_LABELS = {
     "CONFIRMED": "已插入",
@@ -45,42 +41,6 @@ def _result_label(code: object) -> str:
         return "未记录"
     return RESULT_LABELS.get(str(code), str(code))
 
-STYLESHEET = f"""
-QWidget {{ background: {TOKENS['surface']}; color: {TOKENS['ink']}; font-size: 13px; font-family: "Microsoft YaHei UI","Microsoft YaHei","Noto Sans CJK SC","Segoe UI"; }}
-QTabWidget::pane {{ border: 0; }}
-QTabBar::tab {{ background: transparent; border: 0; padding: 10px 16px; color: {TOKENS['muted']}; border-bottom: 2px solid transparent; }}
-QTabBar::tab:hover {{ color: {TOKENS['ink']}; background: #E7EEEC; }}
-QTabBar::tab:selected {{ color: {TOKENS['accent']}; font-weight: 600; border-bottom: 2px solid {TOKENS['accent']}; }}
-QTabBar::tab:focus {{ outline: 2px solid {TOKENS['accent']}; }}
-QLabel {{ background: transparent; }}
-QToolButton {{ border:0; padding:6px 4px; border-radius:6px; color:{TOKENS['muted']}; background:transparent; }}
-QToolButton:hover {{ background:#E7EEEC; }}
-QToolButton:checked {{ color:{TOKENS['accent']}; }}
-QScrollArea {{ border:0; }}
-QFrame#card {{ background: {TOKENS['card']}; border-radius: 12px; }}
-QPushButton {{ border: 0; border-radius: 9px; padding: 8px 12px; }}
-QPushButton:hover {{ background: #D8E4E1; }}
-QPushButton:pressed {{ background: #C5D6D2; }}
-QPushButton:disabled {{ color: #9AA6A3; background: #EEF1F0; }}
-QPushButton:focus {{ outline: 2px solid {TOKENS['accent']}; }}
-QPushButton#primary {{ background: {TOKENS['accent']}; color: white; }}
-QPushButton#primary:hover {{ background: #12655B; }}
-QPushButton#primary:pressed {{ background: #0E524A; }}
-QPushButton#primary:disabled {{ background: #8BB8B2; color: #F4F7F6; }}
-QPushButton#ghost {{ background: #E7EEEC; color: {TOKENS['ink']}; }}
-QPushButton#ghost:hover {{ background: #D5E0DD; }}
-QPushButton#danger {{ background: #F4E4E1; color: {TOKENS['danger']}; }}
-QPushButton#danger:hover {{ background: #EED3CE; }}
-QComboBox {{ padding: 7px 10px; border: 1px solid #D5DDDA; border-radius: 8px; background:white; }}
-QComboBox::drop-down {{ border:0; width:24px; }}
-QLineEdit, QPlainTextEdit {{ background: white; border: 1px solid #D5DDDA; border-radius: 8px; padding: 6px; }}
-QLineEdit:focus, QPlainTextEdit:focus {{ border: 1px solid {TOKENS['accent']}; }}
-QLineEdit:disabled, QPlainTextEdit:disabled {{ background: #EEF1F0; color: #9AA6A3; }}
-QListWidget::item:selected {{ background: #E3F2EF; color: {TOKENS['ink']}; }}
-QListWidget::item:hover {{ background: #F0F5F3; }}
-QLabel#muted {{ color: {TOKENS['muted']}; }}
-QLabel#error {{ color: {TOKENS['danger']}; }}
-"""
 
 
 def _repo_root() -> Path:
@@ -134,29 +94,33 @@ def app_icon():
 
 
 class RecoveryDialog:
-    def __init__(self, parent=None, *, confirm_image: bool = False):
+    def __init__(self, parent=None, *, confirm_image: bool = False, progress: dict | None = None):
         from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
         self.choice = "cancel"
         dlg = QDialog(parent)
         dlg.setWindowTitle("上次结果未知")
         dlg.setModal(True)
+        style_root(dlg)
         dlg.resize(420, 180)
         layout = QVBoxLayout(dlg)
         message = QLabel("程序不能确认刚才的图片是否已加入。请查看目标输入框，再决定继续或重贴。"
                          if confirm_image else "上次插入结果不确定。不自动重贴，也不全选删除。")
+        if progress and progress.get("message"):
+            message.setText(progress["message"] + "。\n确认图片已出现后继续，不会重贴该图。")
         message.setWordWrap(True)
         layout.addWidget(message)
         if confirm_image:
-            confirmed = QPushButton("我已看到刚才的图片，继续剩余内容")
+            caption = "图片已出现，继续文字" if progress and progress.get("images_attempted")==progress.get("images_total") and progress.get("text_state")=="not_attempted" else "我已看到刚才的图片，继续剩余内容"
+            confirmed = QPushButton(caption)
             confirmed.setObjectName("primary")
             confirmed.clicked.connect(lambda: self._pick(dlg, "confirm_continue"))
             layout.addWidget(confirmed)
         row = QHBoxLayout()
         for label, mode, name in (
-            ("完整重贴", "full", "primary"),
+            ("完整重贴", "full", "ghost"),
             ("只贴文字", "text_only", "ghost"),
-            ("取消", "cancel", "danger"),
+            ("取消", "cancel", "ghost"),
         ):
             btn = QPushButton(label)
             btn.setObjectName(name)
@@ -172,6 +136,26 @@ class RecoveryDialog:
     def exec(self) -> str:
         self._dlg.exec()
         return self.choice
+
+
+class ComposerPicker:
+    """多候选只列明确的输入框；选中后聚焦但不自动发送或投递。"""
+    def __init__(self, parent, candidates):
+        from PySide6.QtWidgets import QDialog,QLabel,QListWidget,QPushButton,QVBoxLayout,QHBoxLayout
+        self.candidate=None
+        dlg=QDialog(parent);dlg.setWindowTitle("选择对话输入框");dlg.resize(420,280);style_root(dlg)
+        layout=QVBoxLayout(dlg);layout.setContentsMargins(16,16,16,16);layout.setSpacing(12)
+        note=QLabel("当前窗口有多个对话输入框。选中后只定位，不会自动插入或发送。");note.setWordWrap(True);layout.addWidget(note)
+        choices=QListWidget()
+        for n,item in enumerate(candidates,1):choices.addItem(f"{n}. {item.get('label','对话输入框')} · {item.get('title','')[:55]}")
+        layout.addWidget(choices);row=QHBoxLayout();cancel=QPushButton("取消");cancel.clicked.connect(dlg.reject)
+        use=QPushButton("使用此输入框");use.setObjectName("primary");use.setEnabled(False)
+        choices.currentRowChanged.connect(lambda n:use.setEnabled(0<=n<len(candidates)))
+        def choose():
+            index=choices.currentRow()
+            if 0<=index<len(candidates):self.candidate=candidates[index];dlg.accept()
+        use.clicked.connect(choose);row.addWidget(cancel);row.addWidget(use);layout.addLayout(row);self.widget=dlg
+    def exec(self):self.widget.exec();return self.candidate
 
 
 class ReviewPanel:
@@ -190,8 +174,10 @@ class ReviewPanel:
         w = QWidget(parent)
         w.setWindowTitle("当前图文")
         w.resize(420, 320)
-        w.setStyleSheet(STYLESHEET)
+        style_root(w)
         layout = QVBoxLayout(w)
+        layout.setContentsMargins(16,16,16,16)
+        layout.setSpacing(8)
         self.banner = QLabel("")
         self.banner.setObjectName("error")
         self.banner.setWordWrap(True)
@@ -238,6 +224,10 @@ class ReviewPanel:
         tools_row = QHBoxLayout()
         tools_row.addWidget(terms_btn)
         tools_row.addWidget(suggest)
+        locate = QPushButton("定位输入框")
+        locate.setObjectName("ghost")
+        locate.clicked.connect(lambda: self.app.request_locate_composer())
+        tools_row.addWidget(locate)
         tools_row.addStretch(1)
         layout.addLayout(tools_row)
         row.addStretch(1)
@@ -357,6 +347,7 @@ class ReviewPanel:
 
         dlg = QDialog(self.widget)
         dlg.setWindowTitle("查看图片")
+        style_root(dlg)
         box = QVBoxLayout(dlg)
         label = QLabel()
         pix = QPixmap()
@@ -486,7 +477,7 @@ class ClientWindow:
         w = ShellWindow()
         w.setWindowTitle("DoubaoTypeless V3 · 体验版")
         w.resize(560, 600)
-        w.setStyleSheet(STYLESHEET)
+        style_root(w)
         root = QVBoxLayout(w)
         root.setContentsMargins(16, 14, 16, 14)
         root.setSpacing(12)
@@ -1096,6 +1087,7 @@ class DesktopShell:
         menu = QMenu()
         menu.addAction("打开客户端", self.client.show_window)
         menu.addAction("当前图文", self.review.show)
+        menu.addAction("定位当前窗口输入框（不插入）", app.request_locate_composer)
         menu.addAction("召回上次", app.request_recall)
         menu.addAction("截图给手机", app.capture_region)
         self._pause_action = menu.addAction("暂停连接", self.toggle_pause)
@@ -1152,6 +1144,9 @@ class DesktopShell:
             QTimer.singleShot(0, host, show_error)
         elif event == "capture_region":
             QTimer.singleShot(0, host, self.app.capture_region)
+        elif event == "composer_pick":
+            candidates=list(_kw.get("candidates") or [])
+            QTimer.singleShot(0, host, lambda:self._pick_composer(candidates))
         elif event == "recovery_ask":
             QTimer.singleShot(0, host, self._ask_recovery)
         elif event == "phone_pending":
@@ -1167,8 +1162,19 @@ class DesktopShell:
         elif event in {"hide_after_insert", "new_draft"}:
             QTimer.singleShot(0, self.review.widget, self.review.widget.hide)
 
+    def _pick_composer(self, candidates) -> None:
+        if getattr(self,"_picker_open",False):return
+        self._picker_open=True
+        try:
+            choice=ComposerPicker(self.client.widget,candidates).exec()
+            if choice:self.app.request_choose_composer(choice)
+        finally:self._picker_open=False
+
     def _ask_recovery(self) -> None:
-        mode = RecoveryDialog(self.client.widget, confirm_image=self.app.can_confirm_image()).exec()
+        from doubao_typeless.services.delivery_progress import summarize_delivery
+        previous = self.app._last_attempt
+        progress = summarize_delivery(self.app.bridge.last_bundle or {}, previous.to_dict()) if previous else None
+        mode = RecoveryDialog(self.client.widget, confirm_image=self.app.can_confirm_image(), progress=progress).exec()
         if mode != "cancel":
             self.app.request_recovery(mode)
 
@@ -1230,6 +1236,7 @@ def run_desktop(argv: list[str] | None = None) -> int:
 
     qt = QApplication.instance() or QApplication(argv)
     qt.setQuitOnLastWindowClosed(False)
+    qt.setStyleSheet(STYLESHEET)
     apply_ui_font(qt)
     if "--quit" in argv:
         return 0 if request_quit() else 1

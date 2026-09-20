@@ -22,15 +22,16 @@ import uuid
 TARGET_HTML = '''<!doctype html><meta charset="utf-8"><title>DT Browser Contract</title>
 <style>body{font:18px sans-serif;margin:35px}textarea, [contenteditable]{border:1px solid #888;width:650px;height:140px;display:block;margin:12px}[contenteditable]{white-space:pre-wrap}</style>
 <h1>Disposable native input target</h1>
-<div id="composer"><textarea id="prompt-textarea" aria-label="Message input"></textarea>
+<div id="composer" role="group" aria-label="Composer"><textarea id="prompt-textarea" aria-label="Message input"></textarea>
 <div id="editable" contenteditable="true" role="textbox" aria-label="Chat input"></div>
-<div id="attachments"></div></div><textarea id="other" aria-label="Other input"></textarea>
+<div id="attachments"></div><button id="attachment-action" aria-label="Attachment details">附件详情</button></div><textarea id="other" aria-label="Other input"></textarea>
 <script>
 window.enterEvents=0;document.addEventListener('keydown',e=>{if(e.key==='Enter')window.enterEvents++});
-window.pasteCount=0; window.pasteRecords=[]; document.addEventListener('paste',e=>{window.pasteCount++;
+window.pasteCount=0; window.pasteRecords=[]; window.imageRecords=[]; window.attachDelay=0; window.shiftImageFocus=false;window.hideImageAccessibility=false;
+window.pixelFingerprint=async function(im){const cv=document.createElement('canvas');cv.width=im.naturalWidth;cv.height=im.naturalHeight;cv.getContext('2d').drawImage(im,0,0);const rgba=cv.getContext('2d').getImageData(0,0,cv.width,cv.height).data;const rgb=new Uint8Array(cv.width*cv.height*3);for(let i=0,j=0;i<rgba.length;i+=4){rgb[j++]=rgba[i];rgb[j++]=rgba[i+1];rgb[j++]=rgba[i+2]}const digest=await crypto.subtle.digest('SHA-256',rgb);return {w:cv.width,h:cv.height,sha256:[...new Uint8Array(digest)].map(v=>v.toString(16).padStart(2,'0')).join('')}}; document.addEventListener('paste',e=>{window.pasteCount++;
  window.pasteRecords.push({target:e.target.id, text:e.clipboardData.getData('text/plain')});
  const files=[...e.clipboardData.files];
- if(files.length){e.preventDefault();for(const file of files){const im=new Image();im.alt='Attachment '+(document.images.length+1);im.width=48;im.height=48;im.src=URL.createObjectURL(file);document.getElementById('attachments').append(im)}}});
+ if(files.length){e.preventDefault();for(const file of files){const im=new Image();im.alt='Uploading attachment';im.width=48;im.height=48;if(window.hideImageAccessibility)im.setAttribute('aria-hidden','true');im.onload=()=>{setTimeout(async()=>{im.alt='Attachment ready';window.imageRecords.push(await window.pixelFingerprint(im));if(window.shiftImageFocus)document.getElementById('attachment-action').focus()},window.attachDelay)};im.src=URL.createObjectURL(file);document.getElementById('attachments').append(im)}}});
 window.dynamicTitle=null;
 </script>'''
 
@@ -287,6 +288,80 @@ const raw=WebSocket.prototype.send;WebSocket.prototype.send=function(data){
                 await phone.click('#sendBtn')
                 await completed(text)
                 cases.append({'name':'production_phone_insert_button','passed':True})
+
+
+                # 正式手机页两张图片 -> 原生HUD按钮 -> 已有附件的真实浏览器Composer。
+                # 仅网页延迟显示附件；不替换EXE观察器或投递函数。
+                result['stage']='mixed_two_images_then_text'
+                await target.locator('#prompt-textarea').fill('')
+                await target.evaluate("window.imageRecords=[];window.pasteRecords=[];window.attachDelay=300;window.shiftImageFocus=true")
+                from PIL import Image, ImageDraw
+                fixtures=[]
+                for idx in range(2):
+                    path=data.parent/f'mixed-photo-{idx}.png'
+                    im=Image.new('RGB',(96,72),(70+idx*60,90,185));ImageDraw.Draw(im).rectangle((8,8,24,24),fill='white');im.save(path)
+                    fixtures.append(path)
+                async def add_photo(path,caption):
+                    await phone.set_input_files('#file',str(path))
+                    await phone.wait_for_function("document.querySelector('#editor').classList.contains('show') && document.querySelector('#stage').dataset.ready==='1'")
+                    await phone.fill('#captionInput',caption)
+                    # 真正经过Canvas落笔、成品导出、上传，不能只构造asset_refs。
+                    box=await phone.locator('#stage').bounding_box()
+                    await phone.mouse.move(box['x']+box['width']*.3,box['y']+box['height']*.4)
+                    await phone.mouse.down();await phone.mouse.move(box['x']+box['width']*.6,box['y']+box['height']*.5,steps=4);await phone.mouse.up()
+                    await phone.click('#done')
+                    await phone.wait_for_function("!document.querySelector('#editor').classList.contains('show') && document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
+                await add_photo(fixtures[0],'第一张标注')
+                await add_photo(fixtures[1],'第二张标注')
+                text='图片和文字必须一起到达  Image2 / Opus'
+                await phone.fill('#text',text)
+                await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
+                expected_text=text+'\n\n图1：第一张标注\n图2：第二张标注'
+                expected_images=await phone.evaluate("""async()=>{const out=[];for(const im of document.querySelectorAll('.attach-card img')){await im.decode();const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;c.getContext('2d').drawImage(im,0,0);const a=c.getContext('2d').getImageData(0,0,c.width,c.height).data,r=new Uint8Array(c.width*c.height*3);for(let i=0,j=0;i<a.length;i+=4){r[j++]=a[i];r[j++]=a[i+1];r[j++]=a[i+2]}const d=await crypto.subtle.digest('SHA-256',r);out.push({w:c.width,h:c.height,sha256:[...new Uint8Array(d)].map(v=>v.toString(16).padStart(2,'0')).join('')})}return out}""")
+                await target.bring_to_front();await target.locator('#prompt-textarea').click()
+                await until(lambda:'2 张图片已更新' in hud_text(),message='mixed images not visible in native HUD')
+                assert inspector.click(hud(),'插入并复制'),hud_text()
+                await completed(expected_text)
+                assert await target.evaluate('window.imageRecords')==expected_images
+                records=await target.evaluate('window.pasteRecords')
+                assert len(records)==3 and [v['text'] for v in records]==['','',expected_text],records
+                assert [v['target'] for v in records]==['prompt-textarea']*3,records
+                assert await phone.locator('.attach-card').count()==0
+                cases.append({'name':'two_rendered_images_then_text_after_attachment_focus','passed':True,'image_pixels':expected_images})
+
+                # 不暴露附件接收证据的目标：明确询问，点击继续文字不重新贴图。
+                result['stage']='unknown_image_explicit_continue_text'
+                await target.locator('#prompt-textarea').fill('')
+                await target.evaluate("window.imageRecords=[];window.pasteRecords=[];window.shiftImageFocus=false;window.hideImageAccessibility=true")
+                await add_photo(fixtures[0],'手动确认图片')
+                text='接收未知时文字仍保留'
+                await phone.fill('#text',text);await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
+                await target.bring_to_front();await target.locator('#prompt-textarea').click();hotkey()
+                recovery=await until(lambda:own_window(child.pid,'上次结果未知'),timeout=15,message='missing image recovery dialog')
+                await until(lambda:win32gui.IsWindowVisible(recovery))
+                assert await target.locator('#prompt-textarea').input_value()==''
+                assert await phone.locator('#text').input_value()==text
+                assert inspector.click(recovery,'图片已出现，继续文字'),inspector.text(recovery)
+                expected=text+'\n\n图1：手动确认图片'
+                await completed(expected)
+                assert len(await target.evaluate('window.imageRecords'))==1
+                assert len(await target.evaluate('window.pasteRecords'))==2
+                cases.append({'name':'unknown_attachment_user_confirms_then_text_only_once','passed':True})
+                await target.evaluate('window.hideImageAccessibility=false')
+
+                # 自动定位：当前窗口只有一个明确Composer时，定位后不擅自粘贴。
+                result['stage']='locate_composer_from_review'
+                await target.locator('#prompt-textarea').fill('')
+                await target.evaluate("document.getElementById('editable').style.display='none';document.getElementById('other').focus()")
+                await phone.fill('#text','定位但不自动发送')
+                await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
+                await target.bring_to_front();await target.locator('#other').click();hotkey(expand=True)
+                review=await until(lambda:own_window(child.pid,'当前图文'));await until(lambda:win32gui.IsWindowVisible(review))
+                assert inspector.click(review,'定位输入框'),inspector.text(review)
+                await until(lambda:target.evaluate("document.activeElement.id==='prompt-textarea'"),message='unique composer was not focused')
+                assert await target.locator('#prompt-textarea').input_value()==''
+                hotkey();await completed('定位但不自动发送')
+                cases.append({'name':'locate_unique_composer_then_explicit_insert','passed':True})
 
                 assert await target.evaluate('window.enterEvents')==0
                 assert not errors,errors

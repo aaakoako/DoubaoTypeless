@@ -167,6 +167,8 @@ class V3App:
             read_clipboard_text=self._read_clipboard_text,
             prepare_image=self._prepare_image_observation,
             is_cancelled=lambda: self._stopping,
+            resume_input=self._resume_after_image,
+            progress=lambda progress:self._notify_ui("delivery_progress", **progress),
         )
 
     def _report_command_error(self, exc: BaseException) -> None:
@@ -200,6 +202,67 @@ class V3App:
                 return done
             intent = self._session_intent("insert_current")
         return self.submit_delivery(intent, bundle)
+
+    def request_locate_composer(self):
+        """用户明确点定位；只定位不投递，不改变草稿或之前的投递结果。"""
+        return self._commands.submit(self._locate_composer)
+
+    def _locate_composer(self) -> dict:
+        from doubao_typeless.platform.windows.composer_locator import locate_current
+        from doubao_typeless.platform.windows.focus import FocusSnapshot, restore_target
+        self._notify_ui("composer_locating")
+        try:
+            before = self._read_focus()
+            result = locate_current(self._saved_target)
+            if result.get("status") != "found":
+                if result.get("status") == "ambiguous":
+                    self._composer_candidates = result.get("candidates") or []
+                    self._notify_ui("composer_pick", candidates=self._composer_candidates)
+                code = "COMPOSER_AMBIGUOUS" if result.get("status") == "ambiguous" else "COMPOSER_NOT_FOUND"
+                self._notify_ui("delivery_failed", error_code=code)
+                return result
+            item = result["candidate"]
+            target = FocusSnapshot(item["class_name"], item["title"], item["hwnd"], item["pid"],
+                                   item["control_hwnd"], tuple(item["runtime_id"]), item["kind"])
+            # 查找期间用户切到其他应用时，不抢回来。自身控件点击仍允许恢复已保存窗口。
+            current = self._read_focus()
+            if (not is_own_window(*before[:2]) and not same_target(before, current)):
+                self._notify_ui("delivery_failed", error_code="TARGET_CHANGED")
+                return {"status": "changed"}
+            if (not is_own_window(*current[:2]) and len(current) >= 4
+                    and (current[2], current[3]) != (target.hwnd, target.pid)):
+                self._notify_ui("delivery_failed", error_code="TARGET_CHANGED")
+                return {"status": "changed"}
+            if not restore_target(target):
+                self._notify_ui("delivery_failed", error_code="NEEDS_TARGET")
+                return {"status": "focus_failed"}
+            self._saved_target = target
+            self._notify_ui("composer_located")
+            return {"status": "located", "reason": result["reason"]}
+        except Exception as exc:
+            self._report_command_error(exc)
+            self._notify_ui("delivery_failed", error_code="COMPOSER_NOT_FOUND")
+            return {"status": "failed"}
+
+    def request_choose_composer(self, candidate: dict):
+        return self._commands.submit(self._choose_composer, dict(candidate))
+
+    def _choose_composer(self, candidate: dict) -> dict:
+        # 候选只来自上次受限扫描；选择不触发插入、不清当前稿。
+        if candidate not in getattr(self, "_composer_candidates", []):
+            return {"status":"stale"}
+        from doubao_typeless.platform.windows.focus import FocusSnapshot,restore_target
+        target=FocusSnapshot(candidate["class_name"],candidate["title"],candidate["hwnd"],candidate["pid"],
+                             candidate["control_hwnd"],tuple(candidate["runtime_id"]),candidate["kind"])
+        before=self._read_focus()
+        if not is_own_window(*before[:2]) and (len(before)<4 or tuple(before[2:4])!=tuple(target[2:4])):
+            return {"status":"changed"}
+        if not restore_target(target) or not same_target(target,self._read_focus()):
+            self._notify_ui("delivery_failed",error_code="NEEDS_TARGET")
+            return {"status":"focus_failed"}
+        self._saved_target=target;self._composer_candidates=[]
+        self._notify_ui("composer_located")
+        return {"status":"located"}
 
     def request_recall(self):
         return self._commands.submit(self.recall_last)
@@ -240,7 +303,13 @@ class V3App:
             if self.bridge.paused:
                 raise ValueError("CONNECTION_PAUSED")
             self._restore_external_target()
-            expected = tuple(self._read_focus())
+            focus = self._read_focus()
+            kind = getattr(focus, "kind", focus[6] if len(focus)>6 else "")
+            if kind == "unknown" or is_own_window(*focus[:2]):
+                located = self._locate_composer()
+                if located.get("status") != "located": raise ValueError("COMPOSER_NOT_FOUND")
+                focus = self._read_focus()
+            expected = tuple(focus)
             loop = getattr(self, "_loop", None)
             if loop is None or not loop.is_running():
                 raise ValueError("PHONE_OFFLINE")
@@ -313,7 +382,7 @@ class V3App:
 
     def _notify_ui(self, event: str, **kwargs) -> None:
         # 状态首先进入真正的HUD，托盘提示只是补充；未知结果不能伪装成成功。
-        if event in {"sync_wait", "delivery_start", "delivery_failed", "delivery_complete"}:
+        if event in {"sync_wait", "delivery_start", "delivery_failed", "delivery_complete", "composer_locating", "composer_located", "delivery_progress"}:
             self._last_delivery_status = {"event": event, **kwargs}
             hud = getattr(self, "hud", None)
             if hud is not None:
@@ -551,6 +620,30 @@ class V3App:
         from doubao_typeless.platform.windows.clipboard import send_paste
 
         send_paste()
+        self._injected_input_stamp = self._input_stamp()
+
+    @staticmethod
+    def _input_stamp():
+        if sys.platform != "win32":return None
+        try:
+            import win32api
+            return win32api.GetLastInputInfo()
+        except Exception:return None
+
+    def _resume_after_image(self, expected):
+        current = self._read_focus()
+        if same_target(current, expected):return current
+        # 只在没有新键鼠动作、焦点仍在原附件容器时恢复。用户切走绝不抢回。
+        stamp = getattr(self, "_injected_input_stamp", None)
+        if stamp is None or self._input_stamp()!=stamp:return None
+        anchor=getattr(self, "_image_baseline", None)
+        if not anchor or not anchor.get("scope"):return None
+        from doubao_typeless.platform.windows.automation_host import host
+        from doubao_typeless.platform.windows.focus import FocusSnapshot
+        value=host().call("resume_composer", {"anchor":anchor,"expected":list(expected)})
+        if not value:return None
+        actual=FocusSnapshot(*value[:5],tuple(value[5]),value[6])
+        return actual if same_target(actual,self._read_focus()) else None
 
     def _set_image(self, data: bytes) -> None:
         from doubao_typeless.platform.windows.clipboard import set_clipboard_png
@@ -575,7 +668,7 @@ class V3App:
             return self._observer.observe_image()
         from doubao_typeless.adapters.cursor_windows import observe_image
 
-        return observe_image(getattr(self, "_image_baseline", None))
+        return observe_image(getattr(self, "_image_baseline", None), cancelled=lambda:self._stopping)
 
     def _observe_text(self) -> str:
         if self._observer is not None:
@@ -638,7 +731,15 @@ class V3App:
         steps = payload.get("steps") or []
         text_done = any(s.get("kind") == "text" and s.get("state") in {"injected", "observed", "unknown"}
                         for s in steps if isinstance(s, dict))
-        may_rotate = result == "CONFIRMED" or (not bundle.get("assets") and result in {"UNKNOWN", "PARTIAL"} and text_done)
+        planned = {a.get("asset_id") for a in bundle.get("assets") or []}
+        observed = {st.get("asset_id") for st in steps if st.get("kind")=="image" and st.get("state")=="observed"}
+        # 图片全部有接收证据 + 文字已成功发键，可归档但仍诚实保留UNKNOWN接收状态。
+        text_injected = any(st.get("kind")=="text" and st.get("state") in {"injected","observed"}
+                            and st.get("evidence") in {"os_input_count","target_text"} for st in steps)
+        complete_attempt = (bool(planned) and planned <= observed and bool(bundle.get("text"))
+                            and text_injected and not payload.get("text_only"))
+        may_rotate = result == "CONFIRMED" or (result in {"UNKNOWN","PARTIAL"} and
+                       ((not planned and text_done) or complete_attempt))
         if not may_rotate:
             return False
         with self._state_lock:
@@ -701,8 +802,12 @@ class V3App:
         # 无发键结果不覆盖用户剪贴板；未知或部分图片仍留在恢复副本中。
         if any(step.get("kind") == "text" for step in payload.get("steps") or []) and not payload.get("error_code"):
             self._keep_inserted_copy(bundle, payload)
+        from doubao_typeless.services.delivery_progress import summarize_delivery
+        payload = {**payload, "progress": summarize_delivery(bundle, payload)}
         rotated = self._maybe_start_next_draft(bundle, payload)
         event = self._phone_rotate_event(bundle, rotated, str(payload.get("result") or ""))
+        event["progress"] = payload["progress"]
+        if payload.get("error_code"): event["error_code"] = payload["error_code"]
         self.bridge.last_phone_event = event
         if publish:
             self._publish_phone_event(event)
@@ -713,8 +818,9 @@ class V3App:
         else:
             self._notify_ui("delivery_complete", result=payload.get("result"), rotated=rotated,
                             text_sent=any(s.get("kind") == "text" for s in payload.get("steps") or []),
-                            image_count=len(bundle.get("assets") or []))
-        if not payload.get("error_code") and bundle.get("assets") and payload.get("result") in {"UNKNOWN", "PARTIAL"}:
+                            image_count=len(bundle.get("assets") or []), progress=payload["progress"])
+        if (not rotated and not payload.get("error_code") and bundle.get("assets")
+                and payload.get("result") in {"UNKNOWN", "PARTIAL"}):
             # 主流程暂停而不是自动重贴。用户的明确确认才允许继续下一张。
             self._notify_ui("recovery_ask")
         return payload
@@ -799,7 +905,9 @@ class V3App:
         self._last_attempt = attempt
         self._last_attempt_bundle_id = bundle.get("bundle_id")
         _log(f"[v3.delivery] result={attempt.result} phase={phase} steps={len(attempt.steps)}")
-        return attempt.to_dict()
+        result = attempt.to_dict()
+        if intent.get("recovery_mode") == "text_only": result["text_only"] = True
+        return result
 
     def insert_current(self) -> dict | None:
         if self.draft.authority == "phone":
