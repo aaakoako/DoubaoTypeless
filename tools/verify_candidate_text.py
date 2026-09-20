@@ -61,7 +61,7 @@ async def target_ready(target, textfile: Path, title: str) -> int:
 async def exercise(exe: Path, data: Path, child, target, textfile: Path, title: str, result: dict):
     from aiohttp import ClientSession
     import win32gui, win32con, win32process, win32clipboard
-    from pynput.keyboard import Controller, Key
+    from pynput.keyboard import Controller, Key, KeyCode
     result['stage']='candidate_startup'
     note=data/'pair.txt'
     for _ in range(300):
@@ -101,7 +101,15 @@ async def exercise(exe: Path, data: Path, child, target, textfile: Path, title: 
                 if not ack.get('durable'):raise RuntimeError('draft not durable')
                 result['stage']=f'round_{index}_native_insert'
                 # 实际进入全局热键监听器，再由EXE自己的队列/平台代码执行Ctrl+V。
-                key.press(Key.alt_l); key.press('i'); key.release('i'); key.release(Key.alt_l)
+                # 用虚拟键I而非Unicode字符包，测试真正的Windows热键组合。
+                # 保持极短实际按下间隔，让消息循环看到完整的组合再释放。
+                key.press(Key.alt_l)
+                try:
+                    key.press(KeyCode.from_vk(0x49))
+                    await asyncio.sleep(.06)
+                    key.release(KeyCode.from_vk(0x49))
+                finally:
+                    key.release(Key.alt_l)
                 rotated=await message(ws,'draft.rotated',15)
                 if not rotated.get('rotated'):raise RuntimeError('text draft not rotated')
                 archived=rotated.get('archived') or {}

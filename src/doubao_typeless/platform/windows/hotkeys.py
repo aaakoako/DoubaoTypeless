@@ -2,12 +2,21 @@
 from __future__ import annotations
 
 from typing import Callable
+import sys
 
 
 from doubao_typeless.core.hotkey_gate import HotkeyGate
 
 
-def start_hotkeys(
+def start_hotkeys(**kwargs):
+    """Windows 使用真实系统注册；其他环境保留非产品的兼容测试路径。"""
+    if sys.platform == "win32":
+        from doubao_typeless.platform.windows.native_hotkeys import start_native_hotkeys
+        return start_native_hotkeys(**kwargs)
+    return _start_pynput_hotkeys(**kwargs)
+
+
+def _start_pynput_hotkeys(
     *,
     on_insert: Callable[[], None],
     on_recall: Callable[[], None],

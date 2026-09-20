@@ -73,7 +73,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install native and browser test dependencies
+      - name: Install native test dependencies
         run: |
           python -m pip install -r requirements-test.txt PySide6 pynput pywin32 playwright
           python -m playwright install chromium

@@ -268,7 +268,7 @@ def test_custom_hotkey_releases_its_actual_keys(monkeypatch):
     module.GlobalHotKeys=Global;module.Listener=Listener
     module.HotKey=types.SimpleNamespace(parse=lambda combo:combo.lower().split('+'))
     monkeypatch.setitem(sys.modules,'pynput.keyboard',module)
-    from doubao_typeless.platform.windows.hotkeys import start_hotkeys
+    from doubao_typeless.platform.windows.hotkeys import _start_pynput_hotkeys as start_hotkeys
     calls=[]
     out=start_hotkeys(on_insert=lambda:calls.append('insert'),on_recall=lambda:None,insert_combo='<ctrl>+q')
     invoke=instances[0].mapping['<ctrl>+q']
