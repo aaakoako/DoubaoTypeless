@@ -94,6 +94,8 @@ jobs:
         run: python -m PyInstaller --noconfirm packaging/v3_preview_windowed.spec
       - name: Run actual frozen startup and graceful exit
         run: python tools/verify_candidate_startup.py dist/DoubaoTypelessV3PreviewUI/DoubaoTypelessV3PreviewUI.exe --report candidate-startup.json
+      - name: Real frozen EXE three text inserts with native hotkey and clipboard
+        run: python tools/verify_candidate_text.py dist/DoubaoTypelessV3PreviewUI/DoubaoTypelessV3PreviewUI.exe --report candidate-text.json
       - name: Full folder inventory and candidate archive
         shell: pwsh
         run: |
@@ -112,6 +114,8 @@ jobs:
             candidate-files.json
             candidate-startup.json
             candidate-startup-logs/
+            candidate-text.json
+            candidate-text-logs/
             windows-tests.xml
           if-no-files-found: warn
           retention-days: 14
