@@ -306,7 +306,11 @@ class V3App:
             self._restore_external_target()
             focus = self._read_focus()
             kind = getattr(focus, "kind", focus[6] if len(focus)>6 else "")
-            if kind == "unknown" or is_own_window(*focus[:2]):
+            # A user-triggered local text insert is not restricted to AI composers.
+            # Tk/native editors may expose no UIA editable pattern. Keep their text
+            # path, but require a located composer for images or our own window.
+            # DeliveryService rechecks the final bundle and target after prepare.
+            if (kind == "unknown" and bool(self.draft.assets)) or is_own_window(*focus[:2]):
                 located = self._locate_composer()
                 if located.get("status") != "located": raise ValueError("COMPOSER_NOT_FOUND")
                 focus = self._read_focus()
