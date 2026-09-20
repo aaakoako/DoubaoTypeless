@@ -18,6 +18,8 @@ datas = [
     (str(ROOT / "LICENSE"), "."),
     (str(ROOT / "docs/release/preview-notes.md"), "docs/release"),
 ]
+if (ROOT / "build-info.json").is_file():
+    datas.append((str(ROOT / "build-info.json"), "."))
 if web_dist.is_dir():
     datas.append((str(web_dist), "web/dist"))
 if asset_dir.is_dir():
@@ -35,6 +37,9 @@ a = Analysis(
         "PySide6",
         "qrcode",
         "qrcode.image.pil",
+        "comtypes",
+        "comtypes.client",
+        "comtypes.gen.UIAutomationClient",
         "pynput.keyboard._win32",
         "pynput.mouse._win32",
     ],

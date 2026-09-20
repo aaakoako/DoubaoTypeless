@@ -55,14 +55,29 @@ def draft_content_hash(text: str, asset_refs: list[Any]) -> str:
     ).hexdigest()
 
 
+def source_assets(assets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """源稿的有序素材身份；不含文件路径、像素或投递时拼接的文字。"""
+    return [
+        {"id": str(a.get("local_id") or a.get("asset_id") or ""),
+         "asset_id": str(a.get("asset_id") or ""),
+         "render_revision": int(a.get("render_revision") or 1),
+         "status": str(a.get("status") or "ready"),
+         "caption": str(a.get("caption") or "")}
+        for a in assets
+    ]
+
+
+def source_snapshot(draft: Draft) -> dict[str, Any]:
+    return {"draft_id": draft.draft_id, "epoch": draft.epoch,
+            "revision": draft.revision, "text": draft.text,
+            "assets": source_assets(draft.assets)}
+
+
 def freeze_bundle(draft: Draft, *, bundle_id: str) -> dict[str, Any]:
     text = draft.text
     if len(text.encode("utf-8")) > TEXT_UTF8_LIMIT:
         raise ValueError("text byte limit")
     assets = copy.deepcopy(draft.assets)
-    processed = [a for a in assets if str(a.get("role") or "") not in {"screenshot", "source"}]
-    if processed and len(processed) < len(assets):
-        assets = processed
     if len(assets) > MAX_ASSETS:
         raise ValueError("more than six")
     if not text.strip() and not assets:
@@ -71,6 +86,10 @@ def freeze_bundle(draft: Draft, *, bundle_id: str) -> dict[str, Any]:
         status = str(asset.get("status") or "ready")
         if status in {"queued", "editing", "failed", "dirty"}:
             raise ValueError("IMAGE_EDITING")
+        if str(asset.get("role") or "") in {"screenshot", "source"}:
+            raise ValueError("SOURCE_NOT_RENDERED")
+        if not asset.get("asset_id"):
+            raise ValueError("IMAGE_NOT_UPLOADED")
     ids = [a["asset_id"] for a in assets]
     if len(ids) != len(set(ids)):
         raise ValueError("duplicate asset id")
@@ -82,6 +101,8 @@ def freeze_bundle(draft: Draft, *, bundle_id: str) -> dict[str, Any]:
     if captions:
         extra = "\n".join(captions)
         text = f"{text.rstrip()}\n\n{extra}" if text.strip() else extra
+    if len(text.encode("utf-8")) > TEXT_UTF8_LIMIT:
+        raise ValueError("text byte limit")
     if sum(int(a.get("bytes", 0)) for a in assets) > MAX_BUNDLE_IMAGE_BYTES:
         raise ValueError("total byte limit")
     bundle = {
@@ -94,6 +115,8 @@ def freeze_bundle(draft: Draft, *, bundle_id: str) -> dict[str, Any]:
         "text": text,
         "assets": assets,
         "auto_send": False,
+        "source_text": draft.text,
+        "source_snapshot": source_snapshot(draft),
     }
     bundle["manifest_hash"] = canonical_manifest_hash(bundle)
     return bundle

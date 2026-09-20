@@ -39,6 +39,9 @@ export class SharedEditor {
   private source = { w: 1600, h: 1000 };
   private sourceUrl = "";
   cropTemp: Crop | null = null;
+  private listeners: [string, EventListener][] = [];
+  private destroyed = false;
+  private panStart: {x:number; y:number; clientX:number; clientY:number} | null = null;
   private moving: { node: Konva.Node; x: number; y: number; px: number; py: number } | null = null;
 
   constructor(container: HTMLDivElement, width = 1600, height = 1000) {
@@ -55,10 +58,13 @@ export class SharedEditor {
     this.stage.add(this.layer);
     const el = this.stage.container();
     el.style.touchAction = "none";
-    el.addEventListener("pointerdown", (e) => this.onPointerDown(e));
-    el.addEventListener("pointermove", (e) => this.onPointerMove(e));
-    el.addEventListener("pointerup", (e) => this.onPointerUp(e));
-    el.addEventListener("pointercancel", (e) => this.onPointerUp(e, true));
+    this.listeners = [
+      ["pointerdown", (e: Event) => this.onPointerDown(e as PointerEvent)],
+      ["pointermove", (e: Event) => this.onPointerMove(e as PointerEvent)],
+      ["pointerup", (e: Event) => this.onPointerUp(e as PointerEvent)],
+      ["pointercancel", (e: Event) => this.onPointerUp(e as PointerEvent, true)],
+    ];
+    for (const [kind, fn] of this.listeners) el.addEventListener(kind, fn);
     (container as HTMLDivElement & { __dtEditor?: SharedEditor }).__dtEditor = this;
     container.dataset.ready = "0";
   }
@@ -69,22 +75,21 @@ export class SharedEditor {
     this.fit();
   }
 
-  loadImage(src: string, w: number, h: number): void {
-    this.source = { w, h };
-    this.sourceUrl = src;
-    this.crop = { x: 0, y: 0, w, h };
+  async loadImage(src: string, w: number, h: number): Promise<void> {
+    this.source = {w,h};
+    this.crop = {x:0,y:0,w,h};
     this.cropTemp = null;
-    const host = this.stage.container();
-    host.dataset.ready = "0";
-    const image = new window.Image();
-    image.onload = () => {
-      this.bg = new Konva.Image({ image, x: 0, y: 0, width: w, height: h });
-      this.imageLayer.destroyChildren();
-      this.imageLayer.add(this.bg);
-      this.fit();
-      host.dataset.ready = "1";
-    };
-    image.src = src;
+    await this.rebindSource(src);
+    if (!this.destroyed) this.fit();
+  }
+
+  destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    const el = this.stage.container();
+    for (const [kind, fn] of this.listeners) el.removeEventListener(kind, fn);
+    this.stage.destroy();
+    delete (el as HTMLDivElement & {__dtEditor?: SharedEditor}).__dtEditor;
   }
 
   addBlankBoard(w = 1600, h = 1000): void {
@@ -99,6 +104,7 @@ export class SharedEditor {
           }
         }
     this.fit();
+    this.stage.container().dataset.ready = "1";
   }
 
   private fit(): void {
@@ -220,13 +226,15 @@ export class SharedEditor {
       if (this.drawing) {
         this.drawing.destroy();
         this.drawing = null;
+        this.undoStack.pop();
       }
       return;
     }
     const p = this.world(ev);
     this.start = p;
     if (this.tool === "select") {
-      const hit = this.layer.getIntersection(p);
+      const bounds = this.stage.container().getBoundingClientRect();
+      const hit = this.layer.getIntersection({x:ev.clientX-bounds.left,y:ev.clientY-bounds.top});
       if (hit) {
         const node = hit.getParent() instanceof Konva.Group ? hit.getParent()! : hit;
         this.moving = { node, x: node.x(), y: node.y(), px: p.x, py: p.y };
@@ -235,6 +243,7 @@ export class SharedEditor {
       return;
     }
     if (this.tool === "pan") {
+      this.panStart = {x:this.stage.x(), y:this.stage.y(), clientX:ev.clientX, clientY:ev.clientY};
       return;
     }
     if (this.tool === "number") {
@@ -258,7 +267,8 @@ export class SharedEditor {
       return;
     }
     if (this.tool === "eraser") {
-      const hit = this.layer.getIntersection(p);
+      const bounds = this.stage.container().getBoundingClientRect();
+      const hit = this.layer.getIntersection({x:ev.clientX-bounds.left,y:ev.clientY-bounds.top});
       if (hit) {
         this.pushUndo();
         const parent = hit.getParent();
@@ -318,12 +328,17 @@ export class SharedEditor {
       const midX = (pts[0].x + pts[1].x) / 2;
       const midY = (pts[0].y + pts[1].y) / 2;
       this.stage.scale({ x: scale, y: scale });
-      this.stage.position({
-        x: this.pinch.x + (midX - this.pinch.midX),
-        y: this.pinch.y + (midY - this.pinch.midY),
-      });
+      const rect = this.stage.container().getBoundingClientRect();
+      const anchorX = (this.pinch.midX - rect.left - this.pinch.x) / this.pinch.scale;
+      const anchorY = (this.pinch.midY - rect.top - this.pinch.y) / this.pinch.scale;
+      this.stage.position({x:midX - rect.left - anchorX*scale,y:midY-rect.top-anchorY*scale});
       this.stage.batchDraw();
       return;
+    }
+    if (this.panStart) {
+      this.stage.position({x:this.panStart.x+ev.clientX-this.panStart.clientX,
+                           y:this.panStart.y+ev.clientY-this.panStart.clientY});
+      this.stage.batchDraw(); return;
     }
     if (this.moving) {
       const p = this.world(ev);
@@ -351,6 +366,7 @@ export class SharedEditor {
 
   private onPointerUp(ev: PointerEvent, cancel = false): void {
     this.pointers.delete(ev.pointerId);
+    this.panStart = null;
     if (this.pinch) {
       if (!this.pointers.size) this.pinch = null;
       this.drawing = null;
@@ -389,8 +405,11 @@ export class SharedEditor {
   }
 
   applyCrop(crop?: Crop): boolean {
-    const next = crop || this.cropTemp;
-    if (!next || next.w < 64 || next.h < 64) return false;
+    const raw = crop || this.cropTemp;
+    if (!raw) return false;
+    const x = Math.max(0, raw.x), y = Math.max(0, raw.y);
+    const next = {x,y,w:Math.min(this.source.w,raw.x+raw.w)-x,h:Math.min(this.source.h,raw.y+raw.h)-y};
+    if (next.w < 64 || next.h < 64) return false;
     this.pushUndo();
     this.crop = { ...next };
     this.cropTemp = null;
@@ -475,32 +494,33 @@ export class SharedEditor {
     this.layer = Konva.Node.create(snap.layer);
     this.stage.add(this.imageLayer);
     this.stage.add(this.layer);
-    this.rebindSource(snap.source?.url || "");
+    this.sourceUrl = snap.source?.url || "";
     this.fit();
-    this.stage.container().dataset.ready = "1";
+    this.stage.container().dataset.ready = this.imageLayer.find("Image").length ? "0" : "1";
   }
 
-  rebindSource(src: string): void {
+  async rebindSource(src: string): Promise<void> {
     if (!src) return;
+    const host = this.stage.container();
+    host.dataset.ready = "0";
     const image = new window.Image();
-    image.onload = () => {
-      const nodes = this.imageLayer.find("Image");
-      if (nodes.length) {
-        nodes.forEach((node) => {
-          (node as Konva.Image).image(image);
-        });
-      } else {
-        this.bg = new Konva.Image({ image, x: 0, y: 0, width: this.source.w, height: this.source.h });
-        this.imageLayer.destroyChildren();
-        this.imageLayer.add(this.bg);
-      }
-      this.imageLayer.draw();
-      this.stage.container().dataset.ready = "1";
-    };
     image.src = src;
+    await image.decode();
+    if (this.destroyed) return;
+    this.sourceUrl = src;
+    const nodes = this.imageLayer.find("Image");
+    if (nodes.length) nodes.forEach(node => (node as Konva.Image).image(image));
+    else {
+      this.bg = new Konva.Image({image, x:0,y:0,width:this.source.w,height:this.source.h});
+      this.imageLayer.destroyChildren();
+      this.imageLayer.add(this.bg);
+    }
+    this.imageLayer.draw();
+    host.dataset.ready = "1";
   }
 
   exportBlob(): Promise<Blob> {
+    if (this.destroyed || this.stage.container().dataset.ready !== "1") return Promise.reject(new Error("image not ready"));
     const grids = this.imageLayer.find(".grid");
     grids.forEach((node) => node.visible(false));
     const scale = this.stage.scaleX() || 1;

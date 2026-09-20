@@ -1,7 +1,8 @@
 import { SharedEditor, type Tool } from "./editor/canvas";
-import { applyReady, applyRotated } from "./sync.js";
+import { applyReady, applyRotated, buildDraftUpdate } from "./sync.js";
 import { looksLikeKeyScript, newId } from "./transport/protocol";
 import { uploadPng } from "./transport/upload";
+import { DraftRepository, type SavedDraft } from "./storage/drafts";
 
 type Session = {
   session_id: string;
@@ -22,6 +23,7 @@ type Asset = {
   source?: string;
   caption?: string;
   status?: AssetStatus;
+  render_revision?: number;
 };
 
 export function boot(root: HTMLElement): void {
@@ -35,6 +37,10 @@ export function boot(root: HTMLElement): void {
       <section class="composer" id="composer">
         <div class="composer-heading">这次想做什么？</div>
         <div class="attach" id="attachments"></div>
+        <div id="conflictBanner" class="conflict" hidden>
+          <b>手机和电脑有不同的草稿</b><p>两份内容都还在，请选择这次继续使用哪一份。</p>
+          <button id="useLocal">继续手机这份</button><button id="useServer">采用电脑这份</button>
+        </div>
         <textarea id="text" placeholder="点这里，用手机输入法说话…&#10;&#10;也可以圈出问题，或画个草图。" aria-label="本次图文说明"></textarea>
         <div class="writehint"><span>用你习惯的输入法，不需要 API Key</span><span id="charCount">0 字</span></div>
         <div class="writehint"><span id="captionHint"></span></div>
@@ -44,7 +50,7 @@ export function boot(root: HTMLElement): void {
           <button id="boardBtn">白板</button>
         </div>
         <button class="primary" id="sendBtn" disabled>插入电脑</button>
-        <p id="sync">图在前，文字在后 · 不自动发送</p>
+        <p id="sync">图在前，文字在后 · 不自动发送</p><p id="localSave" role="status" aria-live="polite"></p>
       </section>
       <section class="editor" id="editor">
         <div class="head">
@@ -105,11 +111,17 @@ export function boot(root: HTMLElement): void {
     uploading: false,
     editorKind: "图片标注",
     removed: [] as Asset[],
+    conflict: null as any,
+    sending: false,
   };
   let ws: WebSocket | null = null;
   let editor: SharedEditor | null = null;
   let currentId = "";
   const blobUrls: string[] = [];
+  let reconnectTimer = 0;
+  let closingForAuth = false;
+  let sheetRevision = 0;
+  let sessionReady = false;
 
   function rememberBlob(url: string): string {
     if (url.startsWith("blob:")) blobUrls.push(url);
@@ -132,65 +144,72 @@ export function boot(root: HTMLElement): void {
   }
 
   const DRAFT_KEY = "dt.v3.draft";
+  let restored = false;
+  let persistTimer = 0;
+  const repository = new DraftRepository(status => {
+    $("localSave").textContent = status === "saved" ? "草稿已保存在这台手机" :
+      status === "saving" ? "正在保存手机草稿…" : "手机存储不可用；请先发送或保留此页面，勿直接关闭";
+  });
 
-  function persistDraft() {
-    try {
-      sessionStorage.setItem(
-        DRAFT_KEY,
-        JSON.stringify({
-          text: state.text,
-          revision: state.revision,
-          draft_id: state.draft_id,
-          epoch: state.epoch,
-          assets: state.assets.map((a) => ({
-            id: a.id,
-            kind: a.kind,
-            asset_id: a.asset_id,
-            w: a.w,
-            h: a.h,
-            scene: a.scene,
-            caption: a.caption,
-            status: a.status,
-            preview: a.asset_id ? `/v3/assets/${a.asset_id}` : (a.preview || "").startsWith("blob:") ? "" : a.preview,
-            source: a.source && !a.source.startsWith("blob:") ? a.source : a.asset_id ? `/v3/assets/${a.asset_id}` : "",
-          })),
-        })
-      );
-    } catch {
-      /* quota or private mode */
-    }
+  function draftSnapshot(): SavedDraft {
+    return {schema: 1, text: state.text, revision: state.revision,
+      draft_id: state.draft_id, epoch: state.epoch, saved_at: Date.now(),
+      assets: state.assets.map(a => ({...a}))};
   }
 
-  function restoreDraft() {
-    try {
-      const saved = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "null");
-      if (!saved || typeof saved !== "object") return;
+  function persistDraft() {
+    if (!restored) return;
+    window.clearTimeout(persistTimer);
+    persistTimer = window.setTimeout(() => repository.save(draftSnapshot()), 120);
+  }
+
+  async function restoreDraft() {
+    let saved: any = null;
+    try { saved = await repository.load(); }
+    catch { $("localSave").textContent = "无法读取手机存储；已有内容不会被清除"; }
+    if (!saved) {
+      // 只迁移旧记录；成功保存之前不删除旧备份。
+      try { saved = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || "null"); } catch {}
+    }
+    if (saved && typeof saved === "object") {
       state.text = String(saved.text || "");
       state.revision = Number(saved.revision || 0);
       state.draft_id = String(saved.draft_id || "");
       state.epoch = String(saved.epoch || "");
-      state.assets = Array.isArray(saved.assets) ? saved.assets : [];
-    } catch {
-      /* ignore broken snapshot */
+      state.assets = Array.isArray(saved.assets) ? saved.assets.slice(0,6) : [];
+      for (const a of state.assets) {
+        if (!a.id || typeof a.preview !== "string") {a.id ||= newId(); a.preview = ""; a.status = "failed";}
+        if (a.status === "editing") a.status = "failed";
+      }
     }
+    restored = true;
   }
 
   function sendLabel(): string {
     if (!state.online || !state.session) return "未连接";
-    if (state.uploading) return "上传中";
+    if (state.uploading) return "图片上传中";
+    if (state.sending) return "正在插入…";
+    if (state.assets.some(a => !a.asset_id || a.status !== "ready")) return "请先完成图片";
     if (!state.text.trim() && !state.assets.length) return "插入电脑";
-    return "插入电脑";
+    return state.assets.length ? `插入 ${state.assets.length} 张图和文字` : "插入并复制";
   }
 
+  let attachmentsSignature = "";
   function update() {
-    ($("text") as HTMLTextAreaElement).value = state.text;
+    const input = $("text") as HTMLTextAreaElement;
+    if (input.value !== state.text) input.value = state.text;
     $("charCount").textContent = `${[...state.text].length} 字`;
     $("captionHint").textContent = state.assets.map((a, i) => `${i + 1}·${a.kind}`).join(" ");
     $("connText").textContent = state.online ? "已连接电脑" : "正在连接电脑";
     const btn = $("sendBtn") as HTMLButtonElement;
     btn.textContent = sendLabel();
-    btn.disabled = !state.online || !state.session || state.uploading || (!state.text.trim() && !state.assets.length);
+    btn.disabled = !state.online || !state.session || state.uploading || state.sending || !!state.conflict ||
+      state.assets.some(a => !a.asset_id || (a.status && a.status !== "ready")) || (!state.text.trim() && !state.assets.length);
+    $("conflictBanner").hidden = !state.conflict;
     persistDraft();
+    const signature = JSON.stringify(state.assets.map(a => [a.id,a.asset_id,a.status,a.render_revision,a.preview]));
+    if (signature === attachmentsSignature) return;
+    attachmentsSignature = signature;
     const strip = $("attachments");
     strip.replaceChildren();
     if (!state.assets.length) {
@@ -204,9 +223,16 @@ export function boot(root: HTMLElement): void {
       const status = a.status === "queued" ? "排队" : a.status === "editing" ? "编辑中" : a.status === "failed" ? "未传完" : "就绪";
       wrap.innerHTML = `<img alt="${i + 1} · ${a.kind}" /><label>${i + 1} · ${a.kind} · ${status}</label><button class="left">←</button><button class="right">→</button><button class="remove">删</button>`;
       const img = wrap.querySelector("img") as HTMLImageElement;
-      img.src = a.preview;
+      if (a.preview.startsWith("/v3/assets/") && state.session) {
+        void fetch(a.preview, {headers: headers()}).then(async res => {
+          if (!res.ok) return;
+          const url = URL.createObjectURL(await res.blob());
+          img.onload = img.onerror = () => URL.revokeObjectURL(url);
+          img.src = url;
+        }).catch(() => {});
+      } else img.src = a.preview;
       img.addEventListener("click", () => {
-        void openEditor(a.kind === "白板" ? "快速白板" : "图片标注", a);
+        void openEditor(a.kind === "白板" ? "快速白板" : "图片标注", a).catch(editorFailure);
       });
       wrap.querySelector(".left")!.addEventListener("click", (ev) => {
         ev.stopPropagation();
@@ -234,21 +260,32 @@ export function boot(root: HTMLElement): void {
   }
 
   function connect() {
-    ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+    if (!state.session) return;
+    window.clearTimeout(reconnectTimer);
+    if (ws && ws.readyState <= 1) return;
+    closingForAuth = false;
+    sessionReady = false;
+    const socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+    ws = socket;
     ws.onopen = () => {
-      state.online = true;
+      state.online = false;
       update();
       ws!.send(JSON.stringify({ protocol: 3, type: "session.hello", session_id: state.session?.session_id, token: state.session?.token }));
     };
     ws.onclose = () => {
+      if (ws !== socket) return;
       state.online = false;
+      sessionReady = false;
+      ws = null;
       update();
-      setTimeout(connect, 1500);
+      if (!closingForAuth && state.session) reconnectTimer = window.setTimeout(connect, 1500);
     };
     ws.onmessage = (ev) => {
       const msg = JSON.parse(ev.data);
       if (looksLikeKeyScript(msg)) return;
       if (msg.type === "session.ready") {
+        state.online = true;
+        sessionReady = true;
         void pullRememberedSecret();
         const decision = applyReady(state, msg);
         if (decision === "conflict") {
@@ -256,16 +293,27 @@ export function boot(root: HTMLElement): void {
           update();
           return;
         }
-        if (decision === "adopt" && (state.text || state.assets.length)) {
-          sendDraft();
-        }
+        if (decision === "adopt" && (state.text || state.assets.length)) sendDraft();
+        update();
+        void fetch("/v3/phone/event", {headers: headers()}).then(r => r.ok ? r.json() : null).then(event => {
+          if (event?.type === "draft.rotated") {
+            if (applyRotated(state, event) === "cleared") update();
+          }
+        }).catch(() => {});
       }
       if (msg.type === "device.remembered") {
         if (msg.device_id && msg.device_secret) storeDevice(String(msg.device_id), String(msg.device_secret));
         toast("已保存这台设备，下次可直接续接");
       }
-      if (msg.type === "draft.ack") toast("电脑已收到 · 不自动发送");
-      if (msg.type === "attempt.status") toast(`电脑：${msg.result} · 未发送Enter`);
+      if (msg.type === "draft.ack") {
+        toast(msg.error ? "草稿未同步，原文已保留" : msg.parked ? "电脑正在改字，手机稿已暂存" : msg.durable ? "电脑已收到 · 不自动发送" : "正在同步");
+      }
+      if (msg.type === "attempt.status") {
+        state.sending = false;
+        const labels: Record<string, string> = {CONFIRMED:"已放入输入框",UNKNOWN:"已尝试插入，可召回重试",NO_STEPS:"未插入，请先选中电脑输入框",PARTIAL:"只完成一部分，请查看恢复选项",BUSY:"正在处理上一份内容"};
+        toast(labels[msg.result] || "插入未完成，内容保留");
+        update();
+      }
       if (msg.type === "draft.rotated") {
         const cleared = applyRotated(state, msg) === "cleared";
         if (cleared) ($("text") as HTMLTextAreaElement).value = "";
@@ -274,14 +322,18 @@ export function boot(root: HTMLElement): void {
       }
       if (msg.type === "recall.ready") toast(msg.text_unchanged ? "已召回上次待插入，当前草稿未改" : "召回异常");
       if (msg.type === "error") {
+        state.sending = false;
+        update();
         const err = String(msg.error || "");
         if (/session revoked|session expired/i.test(err)) {
           sessionStorage.removeItem("dt.v3.session");
           state.session = null;
+          closingForAuth = true;
           ws?.close();
+          ws = null;
           void resumeRemembered().then((ok) => {
             if (!ok) showPair();
-          });
+          }).catch(() => {toast("电脑未连接，草稿仍在"); showPair();});
           return;
         }
         toast(err.includes("not granted") || err === "CAPTURE_DENIED" ? "这台手机还没有截图权限，文字仍可同步" : err);
@@ -305,6 +357,7 @@ export function boot(root: HTMLElement): void {
         a.status = "queued";
         a.source = a.preview;
         state.assets.push(a);
+        sendDraft();
         update();
         void openNextQueued();
       }
@@ -319,28 +372,16 @@ export function boot(root: HTMLElement): void {
     return state.assets.map((a) => a.asset_id as string);
   }
 
+  function documents() {
+    return state.assets.map(a => ({id: a.id, asset_id: a.asset_id || "", status: a.status || "ready",
+      render_revision: a.render_revision || 1, caption: a.caption || ""}));
+  }
+
   function sendDraft() {
-    if (!ws || ws.readyState !== 1) return;
-    let refs: string[];
-    try {
-      refs = assetRefs();
-    } catch {
-      toast("还有图片没传完，不会先发残缺文字");
-      return;
-    }
-    ws.send(
-      JSON.stringify({
-        protocol: 3,
-        type: "draft.update",
-        text: state.text,
-        revision: ++state.revision,
-        draft_id: state.draft_id,
-        epoch: state.epoch,
-        asset_refs: refs,
-        captions: state.assets.map((a) => a.caption || ""),
-        asset_status: state.assets.map((a) => a.status || "ready"),
-      })
-    );
+    const message = buildDraftUpdate(state);
+    persistDraft();
+    if (!ws || ws.readyState !== 1 || !sessionReady || state.conflict) return;
+    ws.send(JSON.stringify(message));
   }
 
   let termTimer = 0;
@@ -363,6 +404,7 @@ export function boot(root: HTMLElement): void {
   $("boardBtn").onclick = () => {
     const a: Asset = { id: "board-" + Date.now(), kind: "白板", preview: "", w: 1600, h: 1000, status: "queued" };
     state.assets.push(a);
+    sendDraft();
     update();
     void openNextQueued();
   };
@@ -376,7 +418,7 @@ export function boot(root: HTMLElement): void {
   };
   $("cropReset").onclick = () => editor?.resetCrop();
 
-  async function fileToDataUrl(file: File): Promise<string> {
+  async function fileToDataUrl(file: Blob): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result || ""));
@@ -411,6 +453,7 @@ export function boot(root: HTMLElement): void {
       state.assets.push(a);
     }
     (e.target as HTMLInputElement).value = "";
+    sendDraft();
     update();
     void openNextQueued();
   });
@@ -423,12 +466,16 @@ export function boot(root: HTMLElement): void {
     if (editorOpen()) return;
     const next = state.assets.find((a) => a.status === "queued");
     if (!next) return;
-    await openEditor(next.kind === "白板" ? "快速白板" : "图片标注", next);
+    try {
+      await openEditor(next.kind === "白板" ? "快速白板" : "图片标注", next);
+    } catch { editorFailure(); }
   }
 
   async function openEditor(title: string, asset: Asset) {
     currentId = asset.id;
     asset.status = "editing";
+    asset.render_revision = (asset.render_revision || 1) + 1;
+    sendDraft();
     state.editorKind = title;
     $("composer").style.display = "none";
     $("mobileHead").style.display = "none";
@@ -436,6 +483,7 @@ export function boot(root: HTMLElement): void {
     $("editTitle").textContent = title;
     ($("captionInput") as HTMLTextAreaElement).value = asset.caption || "";
     const host = $("stage") as HTMLDivElement;
+    editor?.destroy();
     host.replaceChildren();
     editor = new SharedEditor(host, asset.w || 1600, asset.h || 1000);
     if (asset.scene) {
@@ -444,9 +492,11 @@ export function boot(root: HTMLElement): void {
         let src = asset.source || asset.preview;
         if (src.startsWith("/v3/assets/") && state.session) {
           const res = await fetch(src, { headers: headers() });
-          if (res.ok) src = rememberBlob(URL.createObjectURL(await res.blob()));
+          if (!res.ok) throw new Error("SOURCE_READ_FAILED");
+          src = await fileToDataUrl(await res.blob());
+          asset.source = src;
         }
-        editor.rebindSource(src);
+        await editor.rebindSource(src);
       }
     } else if (title === "快速白板") {
       editor.addBlankBoard(asset.w || 1600, asset.h || 1000);
@@ -460,9 +510,10 @@ export function boot(root: HTMLElement): void {
           asset.status = "failed";
           return;
         }
-        src = rememberBlob(URL.createObjectURL(await res.blob()));
+        src = await fileToDataUrl(await res.blob());
+        asset.source = src;
       }
-      editor.loadImage(src, asset.w || 1600, asset.h || 1000);
+      await editor.loadImage(src, asset.w || 1600, asset.h || 1000);
     }
     requestAnimationFrame(() => editor?.resize());
     update();
@@ -497,16 +548,19 @@ export function boot(root: HTMLElement): void {
   $("redoBtn").onclick = () => editor?.redo();
 
   async function finishEditor() {
-    if (!editor) return;
+    if (!editor || state.uploading) return;
     if (state.editorKind === "快速白板" && editor.ops === 0) {
       toast("先画一点内容，再加入本次图文");
       return;
     }
     const blob = await editor.exportBlob();
-    const preview = rememberBlob(URL.createObjectURL(blob));
+    const preview = await fileToDataUrl(blob);
     const item = state.assets.find((a) => a.id === currentId);
     if (item) {
       item.caption = ($("captionInput") as HTMLTextAreaElement).value.trim();
+      const sceneData = JSON.parse(editor.exportScene());
+      if (sceneData.source) sceneData.source.url = item.source || "";
+      item.scene = JSON.stringify(sceneData);
       item.preview = preview;
       item.asset_id = undefined;
       if (state.session) {
@@ -517,7 +571,7 @@ export function boot(root: HTMLElement): void {
           item.w = bmp.width;
           item.h = bmp.height;
           bmp.close();
-          item.scene = editor.exportScene();
+          // scene已在导出前保留，不用临时blob地址覆写持久源。
           const meta = await uploadPng(blob, headers(), item.w || 1, item.h || 1, item.kind === "白板" ? "whiteboard" : "markup");
           item.asset_id = meta.asset_id;
         } catch {
@@ -525,9 +579,11 @@ export function boot(root: HTMLElement): void {
           item.asset_id = undefined;
           item.status = "failed";
           state.uploading = false;
+          sendDraft();
           $("editor").classList.remove("show");
           $("composer").style.display = "flex";
           $("mobileHead").style.display = "flex";
+          editor?.destroy();
           editor = null;
           update();
           void openNextQueued();
@@ -536,20 +592,57 @@ export function boot(root: HTMLElement): void {
         state.uploading = false;
         item.status = "ready";
       } else {
-        item.status = "ready";
+        item.status = "failed";
       }
     }
     $("editor").classList.remove("show");
     $("composer").style.display = "flex";
     $("mobileHead").style.display = "flex";
+    editor?.destroy();
     editor = null;
     sendDraft();
     update();
     void openNextQueued();
   }
 
+  function saveOpenEditor() {
+    if (!editor || !editorOpen()) return;
+    const item = state.assets.find(a => a.id === currentId);
+    if (!item) return;
+    try {
+      const scene = JSON.parse(editor.exportScene());
+      if (scene.source) scene.source.url = item.source || "";
+      item.scene = JSON.stringify(scene);
+      item.caption = ($("captionInput") as HTMLTextAreaElement).value;
+      repository.save(draftSnapshot());
+    } catch { $("localSave").textContent = "当前编辑尚未保存，请保留页面"; }
+  }
+  $("stage").addEventListener("pointerup", () => window.setTimeout(saveOpenEditor, 0));
+  $("captionInput").addEventListener("input", saveOpenEditor);
+  for (const id of ["undoBtn", "redoBtn", "wire", "cropApply", "cropReset"]) {
+    $(id).addEventListener("click", () => window.setTimeout(saveOpenEditor, 0));
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden" && restored) {
+      window.clearTimeout(persistTimer);
+      saveOpenEditor(); repository.save(draftSnapshot());
+    }
+  });
+
+  function editorFailure() {
+    state.uploading = false;
+    const item = state.assets.find(a => a.id === currentId);
+    if (item) {
+      try { if (editor) item.scene = editor.exportScene(); } catch {}
+      item.status = "failed";
+      sendDraft();
+    }
+    toast("图片尚未准备好，编辑保留；可重试或返回");
+    update();
+  }
+
   $("done").onclick = () => {
-    void finishEditor();
+    void finishEditor().catch(editorFailure);
   };
   $("back").onclick = () => {
     if (state.editorKind === "快速白板" && editor && editor.ops === 0) {
@@ -557,14 +650,20 @@ export function boot(root: HTMLElement): void {
       $("editor").classList.remove("show");
       $("composer").style.display = "flex";
       $("mobileHead").style.display = "flex";
+      editor?.destroy();
       editor = null;
+      sendDraft();
       update();
+      void openNextQueued();
       return;
     }
-    void finishEditor();
+    void finishEditor().catch(editorFailure);
   };
 
-  $("sendBtn").onclick = async () => {
+  $("sendBtn").onclick = () => { void sendBundle().catch(() => {
+    state.sending = false; update(); toast("连接中断，图文已保留，没有自动重试");
+  }); };
+  async function sendBundle() {
     if (!state.session || !ws || !state.online) {
       toast("未连接，草稿保留");
       return;
@@ -578,6 +677,10 @@ export function boot(root: HTMLElement): void {
       return;
     }
     sendDraft();
+    const boundRevision = state.revision;
+    const boundEpoch = state.epoch;
+    state.sending = true;
+    update();
     ws.send(
       JSON.stringify({
         protocol: 3,
@@ -589,14 +692,23 @@ export function boot(root: HTMLElement): void {
         epoch: state.epoch,
         captions: state.assets.map((a) => a.caption || ""),
         asset_status: state.assets.map((a) => a.status || "ready"),
+        asset_documents: documents(),
       })
     );
     const nonceRes = await fetch("/v3/nonce", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(state.session) });
     if (!nonceRes.ok) {
+      state.sending = false;
+      update();
       toast("请在电脑确认插入权限。拒绝后仍可同步文字。练习插入用电脑 Alt+I。");
       return;
     }
     const nonce = await nonceRes.json();
+    if (state.revision !== boundRevision || state.epoch !== boundEpoch) {
+      state.sending = false;
+      update();
+      toast("内容刚有更新，请再次点插入");
+      return;
+    }
     ws.send(
       JSON.stringify({
         protocol: 3,
@@ -613,6 +725,7 @@ export function boot(root: HTMLElement): void {
         epoch: state.epoch,
         captions: state.assets.map((a) => a.caption || ""),
         asset_status: state.assets.map((a) => a.status || "ready"),
+        asset_documents: documents(),
       })
     );
   };
@@ -680,6 +793,9 @@ export function boot(root: HTMLElement): void {
     if (!res.ok) return false;
     state.session = await res.json();
     sessionStorage.setItem("dt.v3.session", JSON.stringify(state.session));
+    const clean = new URL(location.href); clean.searchParams.delete("pair");
+    history.replaceState(null, "", clean.pathname + clean.search + clean.hash);
+    ++sheetRevision;
     $("sheet").classList.remove("show");
     connect();
     update();
@@ -687,6 +803,7 @@ export function boot(root: HTMLElement): void {
   }
 
   function showPair() {
+    ++sheetRevision;
     const sheet = $("sheet");
     const preset = pairCodeFromUrl();
     $("sheetCard").innerHTML = `<h2>连接这台电脑</h2><p>扫电脑上的二维码即可配对。备用才手输 4 位短码。手机不能自授按键或截屏。练习插入用电脑 Alt+I。召回是 Alt+Shift+I，不是跳过纠错。</p><input id="pairCode" /><button class="primary" id="pairGo">配对</button>`;
@@ -717,37 +834,52 @@ export function boot(root: HTMLElement): void {
     };
   };
   $("settingsBtn").onclick = () => {
-    void (async () => {
-      let statusText = "未读到电脑状态";
-      try {
-        const res = await fetch("/v3/status");
-        if (res.ok) {
-          const st = await res.json();
-          statusText = `协议 ${st.protocol} · 草稿 r${st.revision}`;
-        }
-      } catch {
-        statusText = "电脑未连接";
-      }
-      const grant = state.session
-        ? `插入 ${state.session.allow_insert ? "已开" : "未开"} · 截图 ${state.session.allow_capture ? "已开" : "未开"}`
-        : "尚未配对";
-      $("sheetCard").innerHTML = `<h2>简单设置</h2>
-        <p id="settingsStatus">${statusText}</p>
-        <p id="settingsGrant">${grant}</p>
-        <p>密钥只在电脑设置。手机不能改 Key。不配 Key 也能画图和投递。</p>
-        <p>插入 / 召回：Alt+I / Alt+Shift+I</p>
-        <p>最近图文：20份 · 24小时</p>
-        <p>AI 纠错：电脑 BYOK，过期结果不会盖住新稿</p>`;
-      $("sheet").classList.add("show");
-    })();
+    const version = ++sheetRevision;
+    $("sheetCard").innerHTML = `<h2>连接与设置</h2>
+      <p id="settingsStatus">正在读取电脑状态…</p><p id="settingsGrant"></p>
+      <p>密钥只存在电脑，不配 Key 也能输入、画图和投递。</p>
+      <p>拒绝截图仍可同步文字。截图和插入权限由电脑端批准。</p>
+      <p>Alt+I 插入并复制 · Alt+Shift+I 召回上次。</p>
+      <p>AI 文字辅助仅在电脑主动调用，不负责手机听写。</p>`;
+    $("sheet").classList.add("show");
+    void fetch("/v3/status", {headers:headers()}).then(async res => {
+      if (!res.ok) throw new Error("offline");
+      const st = await res.json();
+      if (sheetRevision !== version) return;
+      $("settingsStatus").textContent = `协议 ${st.protocol} · 草稿 r${st.revision}`;
+      $("settingsGrant").textContent = state.session ? "权限可在电脑的连接窗口调整" : "尚未配对";
+    }).catch(() => {
+      if (sheetRevision === version) $("settingsStatus").textContent = "电脑未连接，草稿仍保留";
+    });
   };
+
+  async function resolveConflict(useLocal: boolean) {
+    const remote = state.conflict;
+    if (!remote) return;
+    // 明确操作前保全本机稿；不把跨epoch旧稿自动伪装成服务器新稿。
+    try { repository.save(draftSnapshot()); await repository.backup(draftSnapshot()); } catch {
+      toast("无法保存恢复副本，暂不替换草稿"); return;
+    }
+    state.draft_id = remote.draft_id;
+    state.epoch = remote.epoch;
+    state.revision = remote.revision || 0;
+    state.conflict = null;
+    if (useLocal) sendDraft();
+    else {
+      state.text = remote.text || "";
+      state.assets = remote.assets || (remote.asset_refs || []).map((id: string) => ({id, asset_id:id, kind:"图片", preview:`/v3/assets/${id}`, status:"ready"}));
+    }
+    update();
+  }
+  $("useLocal").onclick = () => { void resolveConflict(true); };
+  $("useServer").onclick = () => { void resolveConflict(false); };
   $("sheet").onclick = (e) => {
     if (e.target === $("sheet")) $("sheet").classList.remove("show");
   };
   document.addEventListener("keydown", (e) => {
     if (e.key === "z" && (e.ctrlKey || e.metaKey) && state.removed.length) {
       state.assets.push(state.removed.pop()!);
-      update();
+      sendDraft(); update();
     }
   });
 
@@ -756,12 +888,15 @@ export function boot(root: HTMLElement): void {
   } catch {
     state.session = null;
   }
-  restoreDraft();
-  update();
-  if (state.session) connect();
-  else {
-    void resumeRemembered().then((ok) => {
-      if (!ok) showPair();
-    });
-  }
+  ($("text") as HTMLTextAreaElement).disabled = true;
+  void restoreDraft().then(async () => {
+    ($("text") as HTMLTextAreaElement).disabled = false;
+    update();
+    if (state.session) connect();
+    else if (!await resumeRemembered()) showPair();
+  }).catch(() => {
+    restored = true;
+    ($("text") as HTMLTextAreaElement).disabled = false;
+    toast("电脑未连接，草稿仍在"); showPair();
+  });
 }

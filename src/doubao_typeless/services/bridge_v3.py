@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
+import concurrent.futures
+import copy
 import ipaddress
 import json
 import time
@@ -349,7 +352,7 @@ class V3Bridge:
             return web.json_response({"status": "skipped", "reason": "no_key", "text": "probe"})
         body = await request.json()
         text = str(body.get("text") or "probe")
-        out = self.byok.polish(
+        out = await asyncio.to_thread(self.byok.polish,
             text,
             draft_id=self.draft.draft_id,
             revision=self.draft.revision,
@@ -458,7 +461,7 @@ class V3Bridge:
     async def _nonce(self, request: web.Request) -> web.Response:
         body = await request.json()
         try:
-            session = self.auth.authorize(body["session_id"], body["token"], "insert")
+            session = self.auth.authorize(str(body.get("session_id") or ""), str(body.get("token") or ""), "insert")
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=403)
         return web.json_response({"nonce": self.auth.issue_nonce(session)})
@@ -470,6 +473,17 @@ class V3Bridge:
             return self.auth.authorize(session_id, token, "sync")
         except ValueError as exc:
             raise web.HTTPUnauthorized(text=str(exc)) from exc
+
+    def _validate_ref_owners(self, data: dict, session) -> None:
+        db = getattr(self.uploads, "db", None)
+        if db is None:
+            return
+        refs = data.get("asset_refs") or []
+        for aid in refs:
+            row = db.asset_by_id(str(aid))
+            owner = str((row or {}).get("owner_session_id") or "")
+            if owner and owner not in {session.session_id, "device:" + session.device_id}:
+                raise ValueError("asset owner")
 
     async def _asset_post(self, request: web.Request) -> web.Response:
         session = self._session_from(request)
@@ -485,7 +499,7 @@ class V3Bridge:
                 meta["sha256"],
                 meta["bytes"],
                 referenced=False,
-                owner_session_id=session.session_id,
+                owner_session_id="device:" + session.device_id,
             )
         if self._on_activity and should_wake("draft.update"):
             self._on_activity(self.draft.text, max(1, len(self.draft.assets)))
@@ -504,7 +518,7 @@ class V3Bridge:
                 width=int(body.get("width") or 1),
                 height=int(body.get("height") or 1),
                 chunk_size=int(body["chunk_size"]) if body.get("chunk_size") else None,
-                owner_session_id=owner.session_id,
+                owner_session_id="device:" + owner.device_id,
                 role=str(body.get("role") or "photo"),
             )
         except ValueError as exc:
@@ -521,7 +535,7 @@ class V3Bridge:
                 request.match_info["upload_id"],
                 int(request.match_info["index"]),
                 data,
-                owner_session_id=owner.session_id,
+                owner_session_id="device:" + owner.device_id,
             )
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
@@ -532,7 +546,7 @@ class V3Bridge:
         if self.uploads is None:
             raise web.HTTPNotImplemented()
         try:
-            meta = self.uploads.complete(request.match_info["upload_id"], owner_session_id=owner.session_id)
+            meta = self.uploads.complete(request.match_info["upload_id"], owner_session_id="device:" + owner.device_id)
         except ValueError as exc:
             return web.json_response({"error": str(exc), "durable": False}, status=400)
         except OSError as exc:
@@ -544,7 +558,7 @@ class V3Bridge:
         if self.uploads is None:
             raise web.HTTPNotImplemented()
         try:
-            missing = self.uploads.missing_chunks(request.match_info["upload_id"], owner_session_id=owner.session_id)
+            missing = self.uploads.missing_chunks(request.match_info["upload_id"], owner_session_id="device:" + owner.device_id)
         except ValueError as exc:
             return web.json_response({"error": str(exc)}, status=400)
         return web.json_response({"missing": missing})
@@ -556,7 +570,7 @@ class V3Bridge:
         if db is not None:
             row = db.asset_by_id(asset_id)
             owner = str((row or {}).get("owner_session_id") or "")
-            if owner and owner != session.session_id:
+            if owner and owner not in {session.session_id, "device:" + session.device_id}:
                 raise web.HTTPForbidden(text="asset owner")
         blob = self.store.get(asset_id)
         return web.Response(
@@ -640,12 +654,9 @@ class V3Bridge:
             raise ValueError("stale epoch")
         if data.get("draft_id") and str(data["draft_id"]) != self.draft.draft_id:
             raise ValueError("stale draft")
-        refs = data.get("asset_refs")
-        if refs is not None:
-            assets = resolve_asset_refs(self.store, refs)
-        else:
-            assets = self.draft.assets
-            refs = [a["asset_id"] for a in assets]
+        from doubao_typeless.services.draft_assets import resolve_draft_assets
+        assets = resolve_draft_assets(self.store, data, self.draft.assets)
+        refs = [a.get("asset_id") for a in assets]
         revision = data.get("revision")
         if revision is None:
             raise ValueError("invalid revision")
@@ -658,6 +669,14 @@ class V3Bridge:
                 "assets": assets,
             },
         )
+
+    async def _call_result(self, callback, *args):
+        value = callback(*args)
+        if isinstance(value, concurrent.futures.Future):
+            return await asyncio.wrap_future(value)
+        if inspect.isawaitable(value):
+            return await value
+        return value
 
     async def _handle(self, ws: web.WebSocketResponse, data: dict[str, Any], authorized: bool) -> bool:
         kind = data.get("type")
@@ -709,6 +728,12 @@ class V3Bridge:
             await ws.send_json({"type": "error", "error": "paused"})
             return True
         try:
+            if data.get("assets") is not None:
+                raise ValueError("client assets rejected")
+            data = {**data, "_source": "remote", "_device_id": live.device_id}
+            if kind in {"draft.update", "bundle.commit", "insert.intent", "editor.activity"}:
+                self._require_draft_identity(data)
+                self._validate_ref_owners(data, live)
             if kind == "draft.update":
                 if self._on_phone_draft:
                     ack = self._on_phone_draft(data)
@@ -733,10 +758,7 @@ class V3Bridge:
                 )
                 return True
             if kind == "editor.activity":
-                for asset in self.draft.assets:
-                    status = str(asset.get("status") or "ready")
-                    if status == "ready":
-                        asset["status"] = "editing"
+                # 所有素材编辑状态由带版本的draft.update维护；活动消息只唤起提示。
                 if self._on_activity and should_wake("editor.activity"):
                     self._on_activity(self.draft.text, len(self.draft.assets))
                 return True
@@ -752,7 +774,7 @@ class V3Bridge:
                 except ValueError as exc:
                     await ws.send_json({"type": "error", "error": str(exc)})
                     return True
-                self.last_bundle = bundle
+                self._prepared_bundle = bundle
                 public = {k: v for k, v in bundle.items() if k != "bytes_data"}
                 await ws.send_json({"type": "bundle.ready", "bundle": public})
                 return True
@@ -760,26 +782,30 @@ class V3Bridge:
                 if self._is_pc_editing():
                     await ws.send_json({"type": "error", "error": "pc_editing", "message": "电脑正在改字"})
                     return True
-                session = self.auth.authorize(data["session_id"], data.get("token") or "", "insert")
+                if data.get("session_id") != live.session_id:
+                    raise ValueError("session mismatch")
+                session = self.auth.authorize(live.session_id, live.token, "insert")
                 self.auth.consume_nonce(session, str(data.get("nonce") or ""))
                 self._require_draft_identity(data)
                 if "text" in data or "revision" in data:
                     self._apply_draft_fields(data)
                 try:
-                    if self.last_bundle is None or int(self.last_bundle.get("revision") or -1) != self.draft.revision:
-                        self.last_bundle = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
+                    frozen = freeze_bundle(self.draft, bundle_id=str(uuid.uuid4()))
                 except ValueError as exc:
                     await ws.send_json({"type": "error", "error": str(exc)})
                     return True
-                frozen = dict(self.last_bundle)
                 status = {"result": "RUNNING"}
                 if self._on_intent:
-                    status = self._on_intent(data, frozen) or status
+                    status = await self._call_result(self._on_intent, data, frozen) or status
                 await ws.send_json({"type": "attempt.status", **status})
+                if status.get("phone_event"):
+                    await self.publish_phone_event(status["phone_event"])
                 return True
             if kind == "capture.request":
                 try:
-                    session = self.auth.authorize(data["session_id"], data.get("token") or "", "capture")
+                    if data.get("session_id") != live.session_id:
+                        raise ValueError("session mismatch")
+                    session = self.auth.authorize(live.session_id, live.token, "capture")
                 except ValueError:
                     await ws.send_json(
                         {
@@ -805,8 +831,10 @@ class V3Bridge:
                 return True
             if kind == "recall.last":
                 before = (self.draft.text, [a.get("asset_id") for a in self.draft.assets])
+                if not live.allow_insert:
+                    raise ValueError("insert not granted")
                 if self._on_recall:
-                    self._on_recall()
+                    await self._call_result(self._on_recall)
                 await ws.send_json(
                     {
                         "type": "recall.ready",
@@ -820,8 +848,12 @@ class V3Bridge:
             if kind == "byok.request":
                 await ws.send_json({"type": "error", "error": "byok stays on desktop"})
                 return True
-        except ValueError as exc:
-            await ws.send_json({"type": "error", "error": str(exc)})
+        except (ValueError, KeyError, TypeError) as exc:
+            await ws.send_json({"type": "error", "error": str(exc) if isinstance(exc, ValueError) else "invalid request"})
+            return authorized
+        except Exception as exc:
+            self._log(f"[v3.bridge] request error_type={type(exc).__name__}")
+            await ws.send_json({"type": "error", "error": "REQUEST_FAILED"})
             return authorized
         return authorized
 

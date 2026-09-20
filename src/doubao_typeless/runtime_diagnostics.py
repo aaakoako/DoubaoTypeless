@@ -186,3 +186,15 @@ def run_application() -> None:
         main()
 
     diagnostics.run(entry)
+
+
+def record_runtime_exception(channel: str, exc: BaseException, data_dir: Path | None = None) -> None:
+    """已捕获的业务异常也能定位；不把用户正文或异常消息写进日志。"""
+    try:
+        from doubao_typeless.runtime import v3_data_dir
+        log = FileLogger(Path(data_dir or v3_data_dir()) / "logs" / "runtime.log", also_print=False)
+        payload = {"event": "handled_exception", "channel": channel, "pid": os.getpid(),
+                   **_exception_fields(type(exc), exc, exc.__traceback__)}
+        log(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+    except Exception:
+        pass

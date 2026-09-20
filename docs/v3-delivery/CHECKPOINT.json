@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
-  "product_goal": "完整 V3 可发布候选。规范入口 docs/v3-product/MASTER_PLAN.md。",
+  "product_goal": "按现有 MASTER_PLAN 交付完整、可用的 Windows V3 体验候选；未达成前不发布。",
   "review_base": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
   "review_sha": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
   "product_source_at_review": "70aa6b92d13f7c8a69b024c94674835083cffa37",
-  "current_head": "7b258399e9a7b4a5d45851493346304e32be6545",
-  "working_tree": "clean after CHECKPOINT bind",
-  "last_completed_slice": "REVIEW_9DD3A369_R2_R5",
-  "active_slice": "A18_DEVICE_AND_INDEPENDENT_SIGN",
-  "next_action": "真机 Android+豆包 与真实 Cursor 仍只 BLOCKED_NATIVE。独立复核再看本轮源码与新窗口包哈希。不要自签 RELEASE_READY。不要 merge/tag/Release。不要 taskkill 正在运行的预览。",
+  "current_head": "USE_GIT_HEAD_OR_BUILD_INFO_SOURCE_SHA",
+  "working_tree": "代码由隔离分支构建流程生成真实提交；包内build-info绑定该提交。",
+  "last_completed_slice": "QUEUED_DELIVERY_AND_PHONE_STORAGE_AND_CONTROL_TARGETING",
+  "active_slice": "RUN_FULL_TESTS_AND_WINDOWED_CANDIDATE",
+  "next_action": "继续同一MASTER_PLAN。先完成当前源码的云端全量测试、Windows无控制台包启动与正常退出；真实Android/豆包和真实Cursor需对应环境，不能用单元测试代替。保留未知结果人工确认续贴。",
   "accepted_requirements": [
     "MASTER_PLAN 为唯一产品/执行规范",
     "独立复核 REQUEST_CHANGES 不是仅剩真机",
@@ -17,45 +17,100 @@
     "不改测试期望、不删用例、不改审计包旧源码"
   ],
   "open_defects": [
-    "A18 真机 Android+豆包 与真实 Cursor 仍缺设备",
-    "独立视觉/包哈希人类签署仍未做",
-    "本 SHA 的 GitHub Actions 尚未跑绿",
-    "本机正在运行的控制台预览未替换为新窗口包"
+    "用户历史插入闪退未确诊；命令恢复和异常取证已有，不把修复风险点当原事故已证实。",
+    "目标控件读取、恢复和附件观察已实现，但须在当前Windows候选和真实目标中验证；可靠观察不可得时显式人工确认，不自动重贴。",
+    "浏览器IndexedDB和源像素恢复已实现；浏览器清理/私密模式仍可能移除缓存，错误应显式提示。",
+    "完整Windows候选、Android/豆包手感、真实Cursor和最终视觉/性能验收尚待执行。"
   ],
-  "reopened_this_round": ["F03", "F04", "F05", "F06", "F07", "F08", "F09", "F10", "F11", "F12"],
-  "closed_this_round": ["R2-F03", "R2-F04", "R2-F05", "R2-F06", "R3-F07", "R3-F08", "R3-F09", "R3-F10", "R4-F11", "R4-F12", "R5-pack"],
-  "kept_from_r0_r1": ["GET pair 403", "POST 不能自授", "未鉴权 WS 拒写", "锁前不写 sqlite", "CI Pillow", "PASS 降级"],
+  "reopened_this_round": [
+    "F03",
+    "F04",
+    "F05",
+    "F06",
+    "F07",
+    "F08",
+    "F09",
+    "F10",
+    "F11",
+    "F12"
+  ],
+  "closed_this_round": [
+    "R2-F03",
+    "R2-F04",
+    "R2-F05",
+    "R2-F06",
+    "R3-F07",
+    "R3-F08",
+    "R3-F09",
+    "R3-F10",
+    "R4-F11",
+    "R4-F12",
+    "R5-pack"
+  ],
+  "kept_from_r0_r1": [
+    "GET pair 403",
+    "POST 不能自授",
+    "未鉴权 WS 拒写",
+    "锁前不写 sqlite",
+    "CI Pillow",
+    "PASS 降级"
+  ],
   "environment_blockers": [
     {
       "missing": "真实 Android + 豆包输入法 + 同网手机浏览器",
-      "blocks": ["真机扫码/相册/白板手感", "记住设备续接手感"],
+      "blocks": [
+        "真机扫码/相册/白板手感",
+        "记住设备续接手感"
+      ],
       "who": "设备持有者"
     },
     {
       "missing": "真实 Cursor Composer 目标",
-      "blocks": ["J7 真目标图文", "observe_image 实测"],
+      "blocks": [
+        "J7 真目标图文",
+        "observe_image 实测"
+      ],
       "who": "设备持有者；PasteTarget 不能代替"
     }
   ],
   "last_commands": [
-    {"cmd": "python -m pytest -q --tb=short", "exit_code": 0, "output": "211 passed in 7.12s"},
-    {"cmd": "npm run typecheck && npm run build", "exit_code": 0, "output": "web built index-CYtHew57.js"},
-    {"cmd": "PyInstaller packaging/v3_preview_windowed.spec --distpath G:\\AgentStorage\\Deliveries\\v3-r2r5-windowed", "exit_code": 0, "output": "windowed onedir isolated"}
+    {
+      "cmd": "npm run typecheck && npm run build",
+      "exit_code": 0,
+      "output": "index-_XCn9lqM.js"
+    },
+    {
+      "cmd": "pytest full (local)",
+      "exit_code": 1,
+      "output": "260 passed / 3 failed / 4 skipped / 8 errors; browser executable missing; download failed DNS"
+    },
+    {
+      "cmd": "pytest tests/test_v3_input_identity.py",
+      "exit_code": 0,
+      "output": "8 passed"
+    }
   ],
-  "candidate_artifact": {
-    "source_sha": "7b258399e9a7b4a5d45851493346304e32be6545",
-    "windowed_exe_sha256": "285ba4bee42fd52d74f3e4257662561cd53fbc5a255da1e49eb78c65a9a2625b",
-    "previous_windowed_exe_sha256": "5891472bb331b2e2bf15fc1057d3d62b6fe94f6ddf0c82d0754404c8288d4538",
-    "pack_path": "G:\\AgentStorage\\Deliveries\\v3-r2r5-windowed\\DoubaoTypelessV3PreviewUI\\DoubaoTypelessV3PreviewUI.exe",
-    "note": "本轮按当前源码重打无控制台候选。不是 RELEASE_READY。未覆盖正在运行的预览。"
-  },
+  "candidate_artifact": null,
   "independent_review": {
-    "status": "REQUEST_CHANGES",
-    "packet": "DoubaoTypeless_V3_Independent_Review_9dd3a369",
-    "review_sha": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
-    "batch": "R0+R1+R2+R3+R4+R5",
+    "status": "NOT_REVIEWED_THIS_LOCAL_SNAPSHOT",
     "release_ready": false
   },
   "published": false,
-  "task_complete": false
+  "task_complete": false,
+  "source_base": "e59dfce656bb25bd70607863f28eda82622feef7",
+  "local_validation": {
+    "pytest": {
+      "passed": 257,
+      "failed": 3,
+      "skipped": 4,
+      "exit_code": 1,
+      "failure_reason": "三个Page.goto(127.0.0.1)均ERR_BLOCKED_BY_ADMINISTRATOR"
+    },
+    "new_pytest_cases_passed": 27,
+    "js_receipt_cases_passed": 12,
+    "frontend_typecheck": true,
+    "frontend_build": true,
+    "qt_render": "Linux/offscreen;不是Windows截图",
+    "browser_canvas": "Chromium内联组件真实像素/指针；没有绕过导航限制"
+  }
 }

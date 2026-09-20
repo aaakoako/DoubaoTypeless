@@ -212,21 +212,15 @@ class HudController:
         if self._widget is None:
             return
         body = self.text if self.text else (f"{self.image_count} 图" if self.image_count else "")
-        keep_scroll = False
-        scroll_pos = 0
-        try:
-            bar = self._body.verticalScrollBar()
-            if bar is not None and bar.maximum() > 0 and bar.value() < max(0, bar.maximum() - 4):
-                keep_scroll = True
-                scroll_pos = bar.value()
-        except Exception:
-            keep_scroll = False
+        # 程序主动写字造成的滚动条变化，不能被误判成用户正在读前文。
+        reading = self._widget.isVisible() and self._reading()
+        old_cursor = self._body.textCursor()
+        position, anchor = old_cursor.position(), old_cursor.anchor()
+        scroll = self._body.verticalScrollBar()
+        scroll_pos = scroll.value()
+        self._body.blockSignals(True)
+        scroll.blockSignals(True)
         self._body.setPlainText(body)
-        if keep_scroll:
-            try:
-                self._body.verticalScrollBar().setValue(scroll_pos)
-            except Exception:
-                pass
         chrome = self._chrome_height()
         max_h = self._max_height()
         doc_h = self._text_height(body)
@@ -242,9 +236,31 @@ class HudController:
                 layout.activate()
         except Exception:
             pass
+        from PySide6.QtGui import QTextCursor
+        cursor = self._body.textCursor()
+        if reading:
+            cursor.setPosition(min(anchor, len(body)))
+            cursor.setPosition(min(position, len(body)), QTextCursor.KeepAnchor)
+            self._body.setTextCursor(cursor)
+            scroll.setValue(scroll_pos)
+        else:
+            cursor.movePosition(QTextCursor.End)
+            self._body.setTextCursor(cursor)
+            scroll.setValue(scroll.maximum())
+        self._body.blockSignals(False)
+        scroll.blockSignals(False)
         self._widget.show()
+        from PySide6.QtCore import QTimer
+        # 第一次show后QTextDocument可能再计算一次边距；只在仍然追尾时校正。
+        generation = getattr(self, "_render_generation", 0) + 1
+        self._render_generation = generation
+        def settle_tail():
+            if (self._widget.isVisible() and self._render_generation == generation
+                    and not reading and not self._reading()):
+                self._body.verticalScrollBar().setValue(self._body.verticalScrollBar().maximum())
+        QTimer.singleShot(0, self._widget, settle_tail)
         if self._timer:
-            if self._reading():
+            if reading:
                 self._timer.stop()
             else:
                 self._timer.start(TOKENS["idle_ms"])

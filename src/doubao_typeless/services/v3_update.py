@@ -16,7 +16,8 @@ API_LATEST = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAM
 
 
 def preview_version_label() -> str:
-    return f"{APP_VERSION} · V3 预览"
+    from doubao_typeless.build_info import build_info
+    return "V3 · 隔离体验构建 · " + build_info()["source_sha"][:8]
 
 
 def check_preview_update(*, get_json: Callable[[str], dict[str, Any]] | None = None) -> dict[str, Any]:

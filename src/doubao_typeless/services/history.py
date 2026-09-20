@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import copy
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -17,57 +19,58 @@ class HistoryService:
         self.persist = persist
         self.db = db
         self.items: list[dict[str, Any]] = []
+        self._lock = threading.RLock()
         if db is not None:
             self.items = db.list_history()
         elif persist and self.path.is_file():
             raw = json.loads(self.path.read_text(encoding="utf-8"))
             self.items = list(raw.get("items") or [])
+        self.gc()
 
     def record(self, bundle: dict[str, Any], *, attempt_result: str) -> None:
-        entry = {
-            "recorded_at": time.time(),
-            "attempt_result": attempt_result,
-            "bundle": {
-                "bundle_id": bundle["bundle_id"],
-                "draft_id": bundle.get("draft_id"),
-                "epoch": bundle.get("epoch"),
-                "revision": bundle.get("revision"),
-                "manifest_hash": bundle.get("manifest_hash"),
-                "text": bundle.get("text", ""),
-                "assets": list(bundle.get("assets") or []),
-            },
-        }
-        self.items.append(entry)
-        self.gc()
-        if self.db is not None:
-            self.db.record_bundle(bundle, attempt_result=attempt_result)
-            return
-        self._flush()
+        with self._lock:
+            safe = copy.deepcopy(bundle)
+            safe["assets"] = [{k: v for k, v in a.items() if k != "bytes_data"}
+                              for a in safe.get("assets", [])]
+            previous = list(self.items)
+            try:
+                entry = {"recorded_at": time.time(), "attempt_result": attempt_result, "bundle": safe}
+                self.items = [i for i in self.items if i["bundle"]["bundle_id"] != bundle["bundle_id"]] + [entry]
+                if self.db is not None:
+                    self.db.record_bundle(safe, attempt_result=attempt_result)
+                self.gc(protected_ids={bundle["bundle_id"]})
+                if self.db is None:
+                    self._flush()
+            except Exception:
+                self.items = previous
+                raise
 
     def last_bundle(self) -> dict[str, Any] | None:
         if not self.items:
             return None
-        return self.items[-1]["bundle"]
+        return copy.deepcopy(self.items[-1]["bundle"])
 
     def copy_to_new_draft(self, bundle: dict[str, Any]) -> dict[str, Any]:
         return {
-            "text": bundle.get("text", ""),
-            "assets": list(bundle.get("assets") or []),
+            "text": bundle.get("source_text", bundle.get("text", "")),
+            "assets": copy.deepcopy(bundle.get("assets") or []),
             "source_bundle_id": bundle.get("bundle_id"),
             "action": "copy_to_new_draft",
         }
 
     def replay_bundle(self, bundle: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "bundle_id": bundle["bundle_id"],
-            "action": "replay_bundle",
-            "text": bundle.get("text", ""),
-            "assets": list(bundle.get("assets") or []),
-        }
+        out = copy.deepcopy(bundle)
+        out["action"] = "replay_bundle"
+        return out
 
     def delete(self, bundle_id: str) -> None:
-        self.items = [i for i in self.items if i["bundle"]["bundle_id"] != bundle_id]
-        self._flush()
+        with self._lock:
+            keep = [i for i in self.items if i["bundle"]["bundle_id"] != bundle_id]
+            if self.db is not None:
+                self.db.retain_history({i["bundle"]["bundle_id"] for i in keep})
+            self.items = keep
+            if self.db is None:
+                self._flush()
 
     def gc(self, *, now: float | None = None, protected_ids: set[str] | None = None) -> None:
         now = time.time() if now is None else now
@@ -89,6 +92,8 @@ class HistoryService:
             kept.append(item)
             total += size
         kept.reverse()
+        if self.db is not None and len(kept) != len(self.items):
+            self.db.retain_history({i["bundle"]["bundle_id"] for i in kept})
         self.items = kept
 
     def can_accept_bytes(self, extra: int) -> bool:
@@ -110,8 +115,5 @@ class HistoryService:
     def _flush(self) -> None:
         if not self.persist:
             return
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"items": self.items}
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(self.path)
+        from doubao_typeless.storage.draft_snapshot import write_json_atomic
+        write_json_atomic(self.path, {"items": self.items})

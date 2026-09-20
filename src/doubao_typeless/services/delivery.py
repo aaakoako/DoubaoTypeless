@@ -28,6 +28,8 @@ class DeliveryService:
         is_locked: Callable[[], bool] | None = None,
         is_elevated: Callable[[], bool] | None = None,
         read_clipboard_text: Callable[[], str | None] | None = None,
+        prepare_image: Callable[[], None] | None = None,
+        is_cancelled: Callable[[], bool] | None = None,
     ):
         self._paste = paste
         self._set_image = set_clipboard_image
@@ -40,6 +42,8 @@ class DeliveryService:
         self._is_locked = is_locked or (lambda: False)
         self._is_elevated = is_elevated or (lambda: False)
         self._read_clipboard_text = read_clipboard_text
+        self._prepare_image = prepare_image
+        self._is_cancelled = is_cancelled or (lambda: False)
         self.enter_count = 0
 
     def run(
@@ -54,7 +58,7 @@ class DeliveryService:
         focus = self._read_focus()
         class_name = focus[0] if focus else ""
         control = focus[1] if len(focus) > 1 else ""
-        kind = classify_focus(class_name, control)
+        kind = getattr(focus, "kind", None) or (str(focus[6]) if len(focus) > 6 else classify_focus(class_name, control))
         assets = list(bundle.get("assets") or [])
         skip_asset_ids = skip_asset_ids or set()
         if mode == "text_only":
@@ -77,13 +81,15 @@ class DeliveryService:
             attempt.result = "NO_STEPS"
             attempt.error_code = "NEEDS_TARGET"
             return attempt
-        index = 0
+        index = len(attempt.steps)
         for asset in assets:
             current = self._read_focus()
             if current != focus:
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "TARGET_CHANGED"
                 return attempt
+            if self._prepare_image:
+                self._prepare_image()
             self._set_image(asset["bytes_data"] if "bytes_data" in asset else b"")
             if not self._wait_modifiers():
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
@@ -94,6 +100,14 @@ class DeliveryService:
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "TARGET_CHANGED"
                 return attempt
+            step = Step(index, "image", asset["asset_id"], "unknown", "none")
+            attempt.steps.append(step)
+            if self._is_cancelled():
+                # 已创建但尚未执行的当前步骤不算发出。
+                attempt.steps.pop()
+                attempt.result = "PARTIAL" if attempt.steps else "CANCELLED"
+                attempt.error_code = "SHUTTING_DOWN"
+                return attempt
             self._paste()
             evidence = "os_input_count"
             state = "injected"
@@ -103,15 +117,15 @@ class DeliveryService:
                     state, evidence = "observed", "target_attachment"
                 elif observed == "unknown":
                     state, evidence = "unknown", "none"
-                    attempt.steps.append(Step(index, "image", asset["asset_id"], state, evidence))
+                    step.state, step.evidence = state, evidence
                     attempt.result = "UNKNOWN"
                     return attempt
             else:
                 state, evidence = "unknown", "none"
-                attempt.steps.append(Step(index, "image", asset["asset_id"], state, evidence))
+                step.state, step.evidence = state, evidence
                 attempt.result = "UNKNOWN"
                 return attempt
-            attempt.steps.append(Step(index, "image", asset["asset_id"], state, evidence))
+            step.state, step.evidence = state, evidence
             index += 1
         text = bundle.get("text") or ""
         if text:
@@ -132,6 +146,17 @@ class DeliveryService:
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "TARGET_CHANGED"
                 return attempt
+            if self._read_clipboard_text is not None and not clipboard_still_ours(text, self._read_clipboard_text()):
+                attempt.result, attempt.error_code = "UNKNOWN", "CLIPBOARD_INTERFERENCE"
+                return attempt
+            step = Step(index, "text", None, "unknown", "none")
+            attempt.steps.append(step)
+            if self._is_cancelled():
+                # 已创建但尚未执行的当前步骤不算发出。
+                attempt.steps.pop()
+                attempt.result = "PARTIAL" if attempt.steps else "CANCELLED"
+                attempt.error_code = "SHUTTING_DOWN"
+                return attempt
             self._paste()
             if self._observe_text:
                 observed = self._observe_text()
@@ -139,7 +164,7 @@ class DeliveryService:
                 evidence = "target_text" if state == "observed" else "none"
             else:
                 state, evidence = "injected", "os_input_count"
-            attempt.steps.append(Step(index, "text", None, state, evidence))
+            step.state, step.evidence = state, evidence
         if self._send_key:
             # 明确禁止 Enter：接口存在也不调用 VK_RETURN
             pass

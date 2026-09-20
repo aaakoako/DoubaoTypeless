@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-FocusKind = Literal["composer", "code", "terminal", "paste", "unknown", "other"]
+FocusKind = Literal["composer", "code", "terminal", "paste", "unknown", "other", "edit", "password"]
 
 
 @dataclass(frozen=True)
@@ -45,8 +45,10 @@ def is_own_window(class_name: str, title: str = "", automation_id: str = "") -> 
 def may_inject(kind: FocusKind, *, wants_images: bool, remote: bool = False) -> bool:
     if kind in {"composer", "paste"}:
         return True
-    if kind in {"code", "terminal"}:
+    if kind in {"code", "terminal", "password"}:
         return False
+    if kind == "edit":
+        return not wants_images
     if kind == "unknown" and remote:
         return False
     return not wants_images
