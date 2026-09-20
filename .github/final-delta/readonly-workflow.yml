@@ -12,19 +12,12 @@ jobs:
   source:
     if: github.ref == 'refs/heads/v3/assistant-runtime-safety'
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     outputs:
       source_sha: ${{ steps.source.outputs.source_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Import exact reviewed source and restore read-only workflow
-        run: python .github/final-delta/import.py
+          persist-credentials: false
       - name: Bind immutable source commit
         id: source
         run: |

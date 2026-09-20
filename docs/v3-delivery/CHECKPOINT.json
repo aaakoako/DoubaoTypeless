@@ -1,60 +1,29 @@
 {
   "schema_version": 1,
-  "product_goal": "沿用 MASTER_PLAN，交付保留原版插入并复制等体验的完整 Windows V3 发布前候选。",
+  "product_goal": "沿用 MASTER_PLAN，保留原版插入并复制，完成 Windows V3 发布前体验候选。",
   "current_head": "USE_GIT_HEAD_OR_BUILD_INFO_SOURCE_SHA",
-  "working_tree": "产品固定为 6522f338d8f67f7d1f7b9fad701d0fa298a14332；本次仅绑定交付证据并恢复此前只读候选工作流，产品源码和已验证程序不变。",
-  "source_base": "30421e3cb306402ef2a67ca54b6e8824f9f2630d",
-  "last_completed_slice": "FULL_NATIVE_MIXED_AND_LOCATE_CANDIDATE_VERIFIED",
-  "active_slice": "WINDOWS_PRIVATE_TRIAL_REAL_AGENT_COMPATIBILITY",
-  "next_action": "仅使用 build-info.source_sha=6522f338d8f67f7d1f7b9fad701d0fa298a14332 的完整目录包作为本轮体验基线。后续处理真实 Android/豆包、实际 Cursor/其他 Agent 兼容与历史偶发退出；不要再把通过合成目标验证写成所有 Agent 已通过。任何新产品修改需要重新跑完整候选检查。",
+  "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
+  "active_slice": "VERIFY_EDITOR_TRANSACTIONS_THREE_IMAGES_AND_SEPARATE_SEND",
+  "next_action": "读取新产品SHA的全套测试与实际Windows EXE结果。三图重排一键插入、正文/图注、取消编辑、保存失败、正常收窗、原版文字、失败恢复、单独确认Enter/Ctrl+Enter都过才交包。任何失败修生产原因，不放宽断言，不用旧包冒充新版本。",
   "accepted_requirements": [
-    "MASTER_PLAN 是唯一产品规范，不另起方案",
-    "手机主稿和弱网本地保存继续有效；电脑改字是独立审阅副本",
-    "保留插入并复制、独立复制、正常收窗、手机下一段、图文恢复、截图/相册/白板/BYOK",
-    "桌面/HUD/手机/对话框共用雾蓝灰加蓝紫主题和组件层级，不再用绿色主色或凸起阴影",
-    "图片未知不能静默跳过正文；保留明确的继续投递与用户确认，不自动重复图、不发Enter",
-    "定位限当前或已知目标窗口，多个候选明确选择，不宣称所有Agent通用",
+    "MASTER_PLAN唯一入口，不另起方案；手机主稿/弱网保存继续有效",
+    "保留电脑改字、插入并复制、独立复制、图文召回、手机下一段、截图/相册/白板/BYOK",
+    "统一蓝紫与雾蓝灰设计语言，不引入绿色主色或凸起阴影",
+    "用户明确新增手机独立发送：电脑默认关闭授权，手机看完电脑单独确认后Enter或Ctrl+Enter",
+    "插入/同步/恢复/重连仍绝不自动发送；已发或未知发送动作不自动重试",
     "不merge、不tag、不Release、不覆盖日用数据、不强制结束用户进程"
   ],
   "implemented_this_batch": [
-    "共享设计色值和组件样式；桌面、HUD、手机、对话框与原图标同色系",
-    "具体Composer容器附件观察，图片完成后回到原输入区继续正文",
-    "完整图文进度与明确的图片确认续贴，不重复已确认图片",
-    "本机纯文字不强制寻找Composer，危险目标检查不放宽",
-    "本机控制入口先于HTTP就绪建立；退出确认先发送再处理退出",
-    "恢复/定位弹框独占操作界面；展开客户端/当前图文时HUD不遮挡、不截获点击",
-    "定位成功只聚焦，隐藏展开面板以显示目标；没有自动粘贴"
+    "编辑事务：保存成功后提交；取消恢复原图或移除未保存白板；容量错误不上传、不丢画布",
+    "手机编辑器顶部取消/撤销/重做/保存，底部工具，图注和更多折叠；多选依次编辑",
+    "旧截图回执/异步选图容量边界；进度逐图同步；结构化Composer与移除附件节点识别",
+    "浮窗操作不抢键盘焦点，图文寻找限定当前窗口，纯文字保留旧行为",
+    "独立发送绑定设备、完成图文、稿件版本、目标、权限、时限；确认一次，日志先落盘消费，发键前复验"
   ],
-  "last_commands": [
-    {"cmd":"Cloud full Linux suite at product SHA","exit_code":0,"output":"435 passed, 5 Windows-only skipped; zero failures/errors"},
-    {"cmd":"Cloud full Windows suite at product SHA","exit_code":0,"output":"440 passed; zero failures/errors/skips"},
-    {"cmd":"Actual frozen startup, legacy text, phone-primary text, production-phone/browser mixed workflow","exit_code":0,"output":"All four reports passed; normal process exit 0; nine browser cases; Enter events 0; page errors 0"},
-    {"cmd":"Independent downloaded artifact audit","exit_code":0,"output":"262 files checked by set/length/SHA-256; build-info source and EXE hashes match reports; original inner ZIP bytes preserved"}
-  ],
-  "cloud_evidence": {
-    "run_id":35515000104,
-    "trigger_sha":"d9f289d86faa3e83957c4db9b57ce0c0fe778c78",
-    "source_sha":"6522f338d8f67f7d1f7b9fad701d0fa298a14332",
-    "conclusion":"success",
-    "native_cases":["HUD button","review button","contenteditable dynamic title","wrong target rejection and retry","real clipboard lock and recovery","production phone button","two rendered images then exact text and captions","unknown image user confirmation without duplicate image","locate unique Composer without paste then explicit insertion"]
-  },
-  "candidate_artifact": {
-    "artifact_id":10606253155,
-    "source_sha":"6522f338d8f67f7d1f7b9fad701d0fa298a14332",
-    "filename":"DoubaoTypeless_V3_Unified_6522f33.zip",
-    "zip_bytes":65178965,
-    "zip_sha256":"b03746fb1dfe7624ab4f05ff6b12e908fb07f9a298f9259fed64ec21961f65cc",
-    "exe_sha256":"d45d1cc597a1d38e3da01b2b7f3e1e45954d7627f72e8c742e6204e8d9e0a0ce",
-    "files_verified":262,
-    "verified_after_download":true
-  },
-  "open_defects": [
-    "真实Android/豆包触控、实际Cursor及其他Agent版本没有在该环境验收；合成网页不代替真实产品",
-    "用户历史偶发闪退没有现场证据，不能宣称已全部确诊",
-    "浏览器原生验证保留一条0x8001010d异常记录；进程随后完成用例并退出0，不把它写成零异常",
-    "独立视觉和公开发布审批未完成"
-  ],
+  "last_commands": [{"cmd":"Local related production regressions","exit_code":0,"output":"141 passed / 1 Windows-only skip; native calls use explicit fakes. New frontend/Windows not yet validated."}],
+  "previous_cloud_evidence":{"run_id":35515000104,"source_sha":"6522f338d8f67f7d1f7b9fad701d0fa298a14332","conclusion":"previous package only"},
+  "candidate_artifact":null,
+  "open_defects":["新前端和Windows完整门槛尚未运行，不提升组件证据等级","真实Android/豆包/实际Cursor与其他Agent兼容需独立验证","历史偶发退出根因未确诊，保留异常记录","独立视觉与公开发布审批未完成"],
   "independent_review":{"status":"NOT_RELEASE_READY","release_ready":false},
-  "published":false,
-  "task_complete":false
+  "published":false,"task_complete":false
 }
