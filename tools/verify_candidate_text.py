@@ -32,10 +32,13 @@ def tick():
 w.after(50,tick);w.mainloop()
 '''
 
-async def message(ws, kind: str, timeout: float=8):
+async def message(ws, kind: str, timeout: float=8, phone: dict | None = None):
     deadline=time.monotonic()+timeout
     while time.monotonic()<deadline:
         msg=await ws.receive_json(timeout=max(.05,deadline-time.monotonic()))
+        if msg.get('type')=='draft.prepare' and phone is not None:
+            await ws.send_json({**phone,'type':'draft.prepared','request_id':msg['request_id']})
+            continue
         if msg.get('type')=='error':
             raise RuntimeError('bridge rejected test request: '+str(msg.get('error')))
         if msg.get('type')==kind:return msg
@@ -82,6 +85,9 @@ async def exercise(exe: Path, data: Path, child, target, textfile: Path, title: 
         async with http.ws_connect(base+'/ws') as ws:
             await ws.send_json({'type':'session.hello','session_id':creds['session_id'],'token':creds['token']})
             state=await message(ws,'session.ready')
+            primary = result.get('phone_primary', False)
+            if primary:
+                state={'draft_id':str(uuid.uuid4()),'epoch':str(uuid.uuid4()),'revision':0,'generation':0}
             key=Controller(); aggregate='';rounds=[]
             result['rounds']=rounds
             for index,text in enumerate(['第一段  保留空格\n','第二段 Image2 / Opus\n','第三段连续输入完成'],start=1):
@@ -94,9 +100,12 @@ async def exercise(exe: Path, data: Path, child, target, textfile: Path, title: 
                     await asyncio.sleep(.05)
                 else:raise RuntimeError('test target cannot receive focus')
                 result['stage']=f'round_{index}_sync'
-                await ws.send_json({'protocol':3,'type':'draft.update','draft_id':state['draft_id'],
+                phone={'protocol':3,'type':'draft.update','draft_id':state['draft_id'],
                     'epoch':state['epoch'],'revision':state['revision']+1,'text':text,
-                    'asset_refs':[],'asset_documents':[]})
+                    'asset_refs':[],'asset_documents':[]}
+                if primary:
+                    phone.update(authority='phone',generation=state['generation'],update_id=str(uuid.uuid4()))
+                await ws.send_json(phone)
                 ack=await message(ws,'draft.ack')
                 if not ack.get('durable'):raise RuntimeError('draft not durable')
                 result['stage']=f'round_{index}_native_insert'
@@ -110,7 +119,7 @@ async def exercise(exe: Path, data: Path, child, target, textfile: Path, title: 
                     key.release(KeyCode.from_vk(0x49))
                 finally:
                     key.release(Key.alt_l)
-                rotated=await message(ws,'draft.rotated',15)
+                rotated=await message(ws,'draft.rotated',15,phone=phone if primary else None)
                 if not rotated.get('rotated'):raise RuntimeError('text draft not rotated')
                 archived=rotated.get('archived') or {}
                 if archived.get('source_text',archived.get('text'))!=text:raise RuntimeError('wrong archived text')
@@ -134,14 +143,23 @@ async def exercise(exe: Path, data: Path, child, target, textfile: Path, title: 
                 if copied!=text:raise RuntimeError('insert-and-copy clipboard mismatch')
                 rounds.append({'round':index,'exact_text':True,'clipboard':True,
                     'rotated':True,'process_alive':child.poll() is None})
-                state=rotated
+                if primary:
+                    assert rotated.get('phone_primary') is True
+                    state={'draft_id':phone['draft_id'],'epoch':str(uuid.uuid4()),'revision':0,
+                           'generation':phone['generation']+1}
+                    # 手机自己命名下一段，服务器只能接收镜像，不能轮换作者身份。
+                    await ws.send_json({**phone,**state,'text':'','update_id':str(uuid.uuid4())})
+                    cleared=await message(ws,'draft.ack')
+                    assert cleared.get('durable') is True
+                else:
+                    state=rotated
             return rounds
 
-def verify(exe: Path, report: Path) -> int:
+def verify(exe: Path, report: Path, *, phone_primary: bool = False) -> int:
     if sys.platform!='win32' or os.environ.get('GITHUB_ACTIONS')!='true':
         raise RuntimeError('Restricted to disposable Windows GitHub Actions runner')
     exe=exe.resolve(strict=True)
-    result={'test':'frozen-three-text-inserts','passed':False,'cursor_tested':False,
+    result={'test':'frozen-three-text-inserts','passed':False,'phone_primary':phone_primary,'cursor_tested':False,
             'phone_ime_tested':False,'executable_sha256':hashlib.sha256(exe.read_bytes()).hexdigest()}
     with tempfile.TemporaryDirectory(prefix='dt-native-text-') as temp:
         root=Path(temp);data=root/'data';state=root/'target.json';script=root/'target.py'
@@ -188,5 +206,5 @@ def verify(exe: Path, report: Path) -> int:
     return 0 if result['passed'] else 1
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('exe',type=Path);p.add_argument('--report',required=True,type=Path)
-    args=p.parse_args();raise SystemExit(verify(args.exe,args.report))
+    p=argparse.ArgumentParser();p.add_argument('exe',type=Path);p.add_argument('--report',required=True,type=Path);p.add_argument('--phone-primary',action='store_true')
+    args=p.parse_args();raise SystemExit(verify(args.exe,args.report,phone_primary=args.phone_primary))

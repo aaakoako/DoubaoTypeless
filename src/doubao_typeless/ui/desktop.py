@@ -285,7 +285,7 @@ class ReviewPanel:
         self.app.review_editing = False
         self.banner.hide()
         self.editor.blockSignals(True)
-        self.editor.setPlainText(self.app.draft.text or "")
+        self.editor.setPlainText(self.app.review_text() or "")
         self.editor.blockSignals(False)
         self._refresh_images()
         self._sync_buttons()
@@ -294,7 +294,7 @@ class ReviewPanel:
         if not self._editing:
             self.reload()
             return
-        self.banner.setText("手机有更新。采用手机版或保留电脑稿，插入时冻结当前这一版。")
+        self.banner.setText("手机有更新；电脑修改仍保留。默认以手机为准，可复制电脑修改或采用手机版继续。")
         self.banner.show()
         self._sync_buttons()
 
@@ -305,12 +305,13 @@ class ReviewPanel:
     def keep_pc(self) -> None:
         self.app.keep_pc_edit()
         self.banner.hide()
+        self._sync_buttons()
 
     def copy_only(self) -> None:
         self.app.update_pc_text(self.editor.toPlainText())
         self.app.review_editing = False
         self.app._save_draft()
-        self.app.copy_text()
+        self.app.copy_text(self.editor.toPlainText())
 
     def _clear_image_row(self) -> None:
         while self.image_row.count():
@@ -404,7 +405,7 @@ class ReviewPanel:
             self.banner.show()
             return
         self.editor.blockSignals(True)
-        self.editor.setPlainText(self.app.draft.text)
+        self.editor.setPlainText(self.app.review_text())
         self.editor.blockSignals(False)
         self.banner.setText("已采用建议；继续编辑前可撤回这次改写。")
         self.banner.show()
@@ -413,7 +414,7 @@ class ReviewPanel:
     def reject_rewrite(self) -> None:
         self.app.reject_suggestion()
         self.editor.blockSignals(True)
-        self.editor.setPlainText(self.app.draft.text)
+        self.editor.setPlainText(self.app.review_text())
         self.editor.blockSignals(False)
         self.banner.setText("已取消本次建议；较新的编辑不会被覆盖。")
         self.banner.show()
@@ -437,7 +438,7 @@ class ReviewPanel:
         self.app._save_draft()
         self.widget.hide()
         self._editing = False
-        self.app.request_insert()
+        self.app.request_review_insert()
 
     def show(self) -> None:
         self.app._remember_external_target()
@@ -1139,9 +1140,16 @@ class DesktopShell:
         from PySide6.QtCore import QTimer
 
         host = self.client.widget
-        if event == "delivery_failed":
+        if event == "sync_wait":
+            QTimer.singleShot(0, host, lambda: self.app.hud._status and self.app.hud._status.setText("正在确认手机当前稿…"))
+        elif event == "restore_on_phone":
+            QTimer.singleShot(0, host, lambda: self.tray.showMessage("恢复图文", "已发到手机，请在手机确认；当前内容没有被覆盖"))
+        elif event == "delivery_failed":
             code = str(_kw.get("error_code") or "")
-            labels = {"IMAGE_EDITING": "手机图片尚未完成", "SOURCE_NOT_RENDERED": "请先在手机完成截图标注",
+            labels = {"PHONE_OFFLINE": "手机离线，未插入旧缓存；上次图文仍可召回",
+                      "PHONE_NOT_CURRENT": "手机当前稿尚未同步，未插入旧缓存",
+                      "PHONE_CHANGED_REVIEW": "手机稿已变化，电脑修改保留；请先对比或复制",
+                      "IMAGE_EDITING": "手机图片尚未完成", "SOURCE_NOT_RENDERED": "请先在手机完成截图标注",
                       "ASSET_MISSING": "有图片文件缺失，图文已保留", "NEEDS_TARGET": "请先选中支持的输入框",
                       "OWN_WINDOW": "请选中其他应用的输入框", "DELIVERY_FAILED": "插入未完成，内容已保留"}
             text = labels.get(code, "未完成插入，内容已保留；可打开当前图文查看")
@@ -1154,6 +1162,10 @@ class DesktopShell:
             QTimer.singleShot(0, host, self.review.note_phone_pending)
         elif event == "activity":
             QTimer.singleShot(0, host, self.client.refresh)
+            def refresh_visible_review():
+                if self.review.widget.isVisible() and not self.review._editing:
+                    self.review.reload()
+            QTimer.singleShot(0, self.review.widget, refresh_visible_review)
         elif event == "expand":
             QTimer.singleShot(0, host, self.review.show)
         elif event in {"hide_after_insert", "new_draft"}:

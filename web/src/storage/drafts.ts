@@ -5,7 +5,7 @@
 export type SavedDraft = {
   schema: 1; text: string; revision: number; draft_id: string; epoch: string;
   assets: Record<string, unknown>[];
-  saved_at: number;
+  saved_at: number; generation?: number; last_intent?: {signature:string;id:string}|null;
 };
 export type SaveState = "saving" | "saved" | "unavailable";
 const DATABASE = "doubao-typeless-v3-drafts";
@@ -66,7 +66,7 @@ export class DraftRepository {
   }
 
   save(value: SavedDraft): void {
-    this.pending = value; // 合并高频更新，但不把新稿写在旧事务之前。
+    this.pending = structuredClone(value); // 合并高频更新，但不把新稿写在旧事务之前。
     this.error = null;
     this.onState("saving");
     if (!this.running) void this.drain();

@@ -154,7 +154,11 @@ class UploadService:
             self._purge(session)
             raise ValueError("too many pixels")
         existing = self.db.asset(digest)
-        if existing:
+        if existing and (
+            str(existing.get("owner_session_id") or "") == str(session.get("owner") or owner_session_id or "")
+            and self.store.meta(existing["asset_id"]).get("role") == str(session.get("role") or "photo")
+            and (self.store.root / (existing["asset_id"] + ".bin")).is_file()
+        ):
             session["completed"] = {
                 "asset_id": existing["asset_id"],
                 "render_revision": 1,

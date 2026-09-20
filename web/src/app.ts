@@ -1,7 +1,7 @@
 import { SharedEditor, type Tool } from "./editor/canvas";
-import { applyReady, applyRotated, buildDraftUpdate } from "./sync.js";
+import { applyReady, applyRotated, buildDraftUpdate, buildPrimaryUpdate, rotatePrimary, DraftOutbox } from "./sync.js";
 import { looksLikeKeyScript, newId } from "./transport/protocol";
-import { uploadPng } from "./transport/upload";
+import { uploadPng, type UploadTicket } from "./transport/upload";
 import { DraftRepository, type SavedDraft } from "./storage/drafts";
 
 type Session = {
@@ -24,6 +24,9 @@ type Asset = {
   caption?: string;
   status?: AssetStatus;
   render_revision?: number;
+  pending_png?: Blob;
+  upload_ticket?: UploadTicket;
+  progress?: number;
 };
 
 export function boot(root: HTMLElement): void {
@@ -31,6 +34,7 @@ export function boot(root: HTMLElement): void {
     <div class="page">
       <header class="head" id="mobileHead">
         <div class="pc-name"><i class="dot" id="connDot"></i>Pocket Composer<small id="connText">正在连接电脑</small></div>
+        <button id="connectBtn">连接</button>
         <button id="historyBtn" aria-label="最近图文">最近</button>
         <button id="settingsBtn" aria-label="设置">设置</button>
       </header>
@@ -50,7 +54,7 @@ export function boot(root: HTMLElement): void {
           <button id="boardBtn">白板</button>
         </div>
         <button class="primary" id="sendBtn" disabled>插入电脑</button>
-        <p id="sync">图在前，文字在后 · 不自动发送</p><p id="localSave" role="status" aria-live="polite"></p>
+        <p id="transferStatus" role="status" aria-live="polite">手机主稿 · 等待同步</p><p id="sync">图在前，文字在后 · 不自动发送</p><p id="localSave" role="status" aria-live="polite"></p>
       </section>
       <section class="editor" id="editor">
         <div class="head">
@@ -103,6 +107,7 @@ export function boot(root: HTMLElement): void {
   const state = {
     text: "",
     revision: 0,
+    generation: 0,
     draft_id: "",
     epoch: "",
     assets: [] as Asset[],
@@ -113,6 +118,7 @@ export function boot(root: HTMLElement): void {
     removed: [] as Asset[],
     conflict: null as any,
     sending: false,
+    last_intent: null as {signature:string;id:string} | null,
   };
   let ws: WebSocket | null = null;
   let editor: SharedEditor | null = null;
@@ -153,8 +159,8 @@ export function boot(root: HTMLElement): void {
 
   function draftSnapshot(): SavedDraft {
     return {schema: 1, text: state.text, revision: state.revision,
-      draft_id: state.draft_id, epoch: state.epoch, saved_at: Date.now(),
-      assets: state.assets.map(a => ({...a}))};
+      draft_id: state.draft_id, epoch: state.epoch, generation: state.generation, saved_at: Date.now(),
+      assets: state.assets.map(a => ({...a})), last_intent:state.last_intent};
   }
 
   function persistDraft() {
@@ -176,19 +182,23 @@ export function boot(root: HTMLElement): void {
       state.revision = Number(saved.revision || 0);
       state.draft_id = String(saved.draft_id || "");
       state.epoch = String(saved.epoch || "");
+      state.generation = Number(saved.generation || 0);
+      state.last_intent = saved.last_intent && typeof saved.last_intent.id === "string" ? saved.last_intent : null;
       state.assets = Array.isArray(saved.assets) ? saved.assets.slice(0,6) : [];
       for (const a of state.assets) {
         if (!a.id || typeof a.preview !== "string") {a.id ||= newId(); a.preview = ""; a.status = "failed";}
         if (a.status === "editing") a.status = "failed";
       }
     }
+    state.draft_id ||= newId();
+    state.epoch ||= newId();
     restored = true;
   }
 
   function sendLabel(): string {
     if (!state.online || !state.session) return "未连接";
-    if (state.uploading) return "图片上传中";
-    if (state.sending) return "正在插入…";
+    if (state.uploading) return "图片正在同步，文字已保留";
+    if (state.sending) return "正在确认当前图文…";
     if (state.assets.some(a => !a.asset_id || a.status !== "ready")) return "请先完成图片";
     if (!state.text.trim() && !state.assets.length) return "插入电脑";
     return state.assets.length ? `插入 ${state.assets.length} 张图和文字` : "插入并复制";
@@ -200,14 +210,15 @@ export function boot(root: HTMLElement): void {
     if (input.value !== state.text) input.value = state.text;
     $("charCount").textContent = `${[...state.text].length} 字`;
     $("captionHint").textContent = state.assets.map((a, i) => `${i + 1}·${a.kind}`).join(" ");
-    $("connText").textContent = state.online ? "已连接电脑" : "正在连接电脑";
+    $("connText").textContent = state.online ? "已连接电脑" : "离线也可继续写";
+    $("connDot").style.background = state.online ? "#167D71" : "#8B9390";
+    $("connectBtn").hidden = state.online;
     const btn = $("sendBtn") as HTMLButtonElement;
     btn.textContent = sendLabel();
     btn.disabled = !state.online || !state.session || state.uploading || state.sending || !!state.conflict ||
       state.assets.some(a => !a.asset_id || (a.status && a.status !== "ready")) || (!state.text.trim() && !state.assets.length);
     $("conflictBanner").hidden = !state.conflict;
-    persistDraft();
-    const signature = JSON.stringify(state.assets.map(a => [a.id,a.asset_id,a.status,a.render_revision,a.preview]));
+    const signature = JSON.stringify(state.assets.map(a => [a.id,a.asset_id,a.status,a.render_revision,a.preview,a.progress]));
     if (signature === attachmentsSignature) return;
     attachmentsSignature = signature;
     const strip = $("attachments");
@@ -220,7 +231,8 @@ export function boot(root: HTMLElement): void {
     state.assets.forEach((a, i) => {
       const wrap = document.createElement("div");
       wrap.className = "attach-card";
-      const status = a.status === "queued" ? "排队" : a.status === "editing" ? "编辑中" : a.status === "failed" ? "未传完" : "就绪";
+      const status = a.pending_png && a.status !== "ready" ? (a.status === "failed" ? "等待重试" : `同步 ${a.progress || 0}%`) :
+        a.status === "queued" ? "待编辑" : a.status === "editing" ? "编辑中" : a.status === "failed" ? "未传完" : "电脑已收到";
       wrap.innerHTML = `<img alt="${i + 1} · ${a.kind}" /><label>${i + 1} · ${a.kind} · ${status}</label><button class="left">←</button><button class="right">→</button><button class="remove">删</button>`;
       const img = wrap.querySelector("img") as HTMLImageElement;
       if (a.preview.startsWith("/v3/assets/") && state.session) {
@@ -240,6 +252,12 @@ export function boot(root: HTMLElement): void {
       });
       wrap.querySelector(".right")!.addEventListener("click", () => move(i, 1));
       wrap.querySelector(".remove")!.addEventListener("click", () => removeAt(i));
+      if (a.pending_png && a.status === "failed") {
+        const retry = document.createElement("button"); retry.textContent = "重试上传";
+        retry.className = "retry";
+        retry.onclick = () => {a.status = "queued"; sendDraft(); update(); void uploadPending();};
+        wrap.append(retry);
+      }
       strip.append(wrap);
     });
   }
@@ -254,7 +272,9 @@ export function boot(root: HTMLElement): void {
   }
 
   function removeAt(i: number) {
-    state.removed.push(state.assets.splice(i, 1)[0]);
+    const removed = state.assets.splice(i, 1)[0];
+    uploadControllers.get(removed.id)?.abort();
+    state.removed.push(removed);
     sendDraft();
     update();
   }
@@ -275,38 +295,41 @@ export function boot(root: HTMLElement): void {
     ws.onclose = () => {
       if (ws !== socket) return;
       state.online = false;
+      state.sending = false;
       sessionReady = false;
+      outbox.disconnect();
+      for (const controller of uploadControllers.values()) controller.abort();
       ws = null;
       update();
       if (!closingForAuth && state.session) reconnectTimer = window.setTimeout(connect, 1500);
     };
     ws.onmessage = (ev) => {
-      const msg = JSON.parse(ev.data);
+      lastPong = Date.now();
+      let msg: any;
+      try {msg = JSON.parse(ev.data);} catch {return;}
       if (looksLikeKeyScript(msg)) return;
       if (msg.type === "session.ready") {
         state.online = true;
         sessionReady = true;
         void pullRememberedSecret();
-        const decision = applyReady(state, msg);
-        if (decision === "conflict") {
-          toast("电脑上已有另一份稿，当前未发出的稿还在，没有覆盖服务器");
-          update();
-          return;
+        if (!(msg.capabilities || []).includes("phone-primary-v1")) {
+          toast("电脑版本较旧，请使用这份新版客户端；手机稿已保留"); return;
         }
-        if (decision === "adopt" && (state.text || state.assets.length)) sendDraft();
+        outbox.disconnect();
+        // 先处理上次可能丢失的完成回执，再同步本地最新版本。不采纳电脑旧镜像。
+        void reconcileReceipt().finally(() => {if (ws === socket && sessionReady) {outbox.connect();publishCurrent();void uploadPending();}});
         update();
-        void fetch("/v3/phone/event", {headers: headers()}).then(r => r.ok ? r.json() : null).then(event => {
-          if (event?.type === "draft.rotated") {
-            if (applyRotated(state, event) === "cleared") update();
-          }
-        }).catch(() => {});
+      }
+      if (msg.type === "draft.prepare") {
+        void prepareForDesktop(String(msg.request_id || ""));
       }
       if (msg.type === "device.remembered") {
         if (msg.device_id && msg.device_secret) storeDevice(String(msg.device_id), String(msg.device_secret));
         toast("已保存这台设备，下次可直接续接");
       }
       if (msg.type === "draft.ack") {
-        toast(msg.error ? "草稿未同步，原文已保留" : msg.parked ? "电脑正在改字，手机稿已暂存" : msg.durable ? "电脑已收到 · 不自动发送" : "正在同步");
+        if (msg.error) outbox.reject(msg);
+        else outbox.acknowledge(msg);
       }
       if (msg.type === "attempt.status") {
         state.sending = false;
@@ -315,16 +338,24 @@ export function boot(root: HTMLElement): void {
         update();
       }
       if (msg.type === "draft.rotated") {
-        const cleared = applyRotated(state, msg) === "cleared";
-        if (cleared) ($("text") as HTMLTextAreaElement).value = "";
-        toast(cleared ? "已开始下一段" : "电脑已收窗，当前未发出的稿还在");
-        update();
+        void handleReceipt(msg);
+      }
+      if (msg.type === "draft.restore_proposal") {
+        showRestoreProposal(msg);
       }
       if (msg.type === "recall.ready") toast(msg.text_unchanged ? "已召回上次待插入，当前草稿未改" : "召回异常");
       if (msg.type === "error") {
         state.sending = false;
         update();
+        outbox.reject(msg);
         const err = String(msg.error || "");
+        if (["OTHER_PHONE_OWNER","PHONE_IDENTITY_CONFLICT","PHONE_REVISION_CONFLICT","STALE_PHONE_REVISION","STALE_PHONE_GENERATION"].includes(err)) {
+          state.conflict = msg.mirror;
+          $("conflictBanner").querySelector("b")!.textContent = err === "OTHER_PHONE_OWNER" ? "另一台手机正在编辑" : "发现另一份编辑记录";
+          $("conflictBanner").querySelector("p")!.textContent = "要改由这台手机继续吗？另一份稿会保存在电脑恢复记录中。";
+          $("useServer").hidden = true;
+          update(); return;
+        }
         if (/session revoked|session expired/i.test(err)) {
           sessionStorage.removeItem("dt.v3.session");
           state.session = null;
@@ -377,12 +408,85 @@ export function boot(root: HTMLElement): void {
       render_revision: a.render_revision || 1, caption: a.caption || ""}));
   }
 
-  function sendDraft() {
-    const message = buildDraftUpdate(state);
-    persistDraft();
-    if (!ws || ws.readyState !== 1 || !sessionReady || state.conflict) return;
-    ws.send(JSON.stringify(message));
+  let latestMessage: any = null;
+  let syncState = "offline";
+  let lastPong = Date.now();
+  let receiptChain: Promise<void> = Promise.resolve();
+  const outbox = new DraftOutbox({debounceMs:100,
+    send: (message: any) => {
+      if (!ws || ws.readyState !== WebSocket.OPEN || !sessionReady || ws.bufferedAmount > 128*1024)
+        throw new Error("BACKPRESSURE");
+      ws.send(JSON.stringify(message));
+    },
+    persist: async () => {
+      window.clearTimeout(persistTimer);
+      repository.save(draftSnapshot()); await repository.flush();
+    },
+    onState: (status: string) => {
+      syncState = status;
+      const labels: Record<string,string> = {offline:"手机已保留 · 连接恢复后继续同步",synced:"电脑已收到当前版本 · 不自动发送",
+        syncing:"正在同步最新图文…",retrying:"网络较慢，正在补发当前稿…",conflict:"同步暂停，手机稿保留；请勿同时打开两个编辑页",save_failed:"手机存储暂不可写，内容留在页面中"};
+      $("transferStatus").textContent = labels[status] || status;
+    },
+  });
+  function currentMessage() {
+    if (!latestMessage || latestMessage.epoch !== state.epoch || latestMessage.revision !== state.revision)
+      latestMessage = {...buildDraftUpdate({...state, revision:state.revision - 1}), authority:"phone",generation:state.generation,update_id:newId()};
+    return latestMessage;
   }
+  function publishCurrent() {
+    outbox.offer(currentMessage());
+  }
+  function sendDraft() {
+    latestMessage = buildPrimaryUpdate(state, newId());
+    persistDraft();
+    if (restored) publishCurrent();
+  }
+  async function handleReceiptNow(msg: any) {
+    if (!msg.phone_primary) return;
+    // 写下上一份可恢复图文，再尝试轮换；期间的新编辑会令匹配失败，不被清除。
+    const before = draftSnapshot();
+    const probe = {...state, assets:state.assets.map(a=>({...a}))};
+    if (rotatePrimary(probe, msg, newId) !== "cleared") return;
+    try {repository.save(before); await repository.backup(before);} catch {
+      toast("无法保全上次图文，当前稿未清空"); return;
+    }
+    if (rotatePrimary(state, msg, newId) !== "cleared") return;
+    state.sending = false; latestMessage = null;
+    outbox.disconnect(); if (sessionReady) outbox.connect();
+    sendDraft(); update(); toast("已开始下一段，上次图文可召回");
+  }
+  function handleReceipt(msg: any): Promise<void> {
+    receiptChain = receiptChain.then(() => handleReceiptNow(msg)).catch(() => {toast("上次回执待确认，当前稿保留");});
+    return receiptChain;
+  }
+  async function reconcileReceipt() {
+    try {
+      const res = await fetch("/v3/phone/event", {headers:headers(), signal:AbortSignal.timeout(2500)});
+      if (res.ok) await handleReceipt(await res.json());
+    } catch { /* 仅取数据，不重放插入动作。 */ }
+  }
+  async function prepareForDesktop(requestId: string) {
+    const message = currentMessage();
+    publishCurrent();
+    try {
+      await outbox.flush(message.update_id, 4500);
+      if (currentMessage().update_id !== message.update_id || state.assets.some(a=>!a.asset_id||a.status!=="ready"))
+        throw new Error("DRAFT_CHANGED");
+      if (ws?.readyState === 1) ws.send(JSON.stringify({...message,type:"draft.prepared",request_id:requestId}));
+    } catch {
+      if (ws?.readyState === 1) ws.send(JSON.stringify({...message,type:"draft.prepared",request_id:requestId,error:"PHONE_NOT_CURRENT"}));
+    }
+  }
+  window.setInterval(() => {
+    if (!ws || ws.readyState !== 1) return;
+    if (Date.now()-lastPong > 18000) {ws.close();return;}
+    ws.send(JSON.stringify({type:"ping"}));
+  },6000);
+  window.addEventListener("online", () => {connect(); void uploadPending();});
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {connect(); if(sessionReady) publishCurrent();}
+  });
 
   let termTimer = 0;
   $("text").addEventListener("input", (e) => {
@@ -391,17 +495,18 @@ export function boot(root: HTMLElement): void {
     update();
     window.clearTimeout(termTimer);
     termTimer = window.setTimeout(() => {
-      void refreshTerms();
+      void refreshTerms().catch(() => {});
     }, 400);
   });
   async function refreshTerms() {
-    if (!state.session || !state.text.trim()) return;
+    if (!state.session || !state.online || !state.text.trim() || syncState !== "synced") return;
     const res = await fetch("/v3/terms?q=" + encodeURIComponent(state.text), { headers: headers() });
     if (!res.ok) return;
     const data = await res.json();
     if (data.hints && data.hints.length) toast(String(data.hints[0].hint));
   }
   $("boardBtn").onclick = () => {
+    if (state.assets.length >= 6) {toast("一份图文最多六张图片");return;}
     const a: Asset = { id: "board-" + Date.now(), kind: "白板", preview: "", w: 1600, h: 1000, status: "queued" };
     state.assets.push(a);
     sendDraft();
@@ -410,7 +515,8 @@ export function boot(root: HTMLElement): void {
   };
   $("photoBtn").onclick = () => $("file").click();
   $("captureBtn").onclick = () => {
-    if (!state.session || !ws) return;
+    if (state.assets.length >= 6) {toast("一份图文最多六张图片");return;}
+    if (!state.session || !ws || !state.online || ws.readyState !== 1) {toast("截图需要电脑在线；相册和白板仍可使用");return;}
     ws.send(JSON.stringify({ protocol: 3, type: "capture.request", session_id: state.session.session_id, token: state.session.token, scope: "primary" }));
   };
   $("cropApply").onclick = () => {
@@ -436,8 +542,9 @@ export function boot(root: HTMLElement): void {
         toast("不支持的图片类型");
         continue;
       }
+      if (f.size > 20*1024*1024) {toast("图片超过20 MiB，请先缩小");continue;}
       const preview = await fileToDataUrl(f);
-      const a: Asset = { id: "p-" + f.name + Date.now(), kind: "图片", preview, source: preview };
+      const a: Asset = { id: "p-" + newId(), kind: "图片", preview, source: preview };
       const image = new Image();
       image.src = preview;
       try {
@@ -446,6 +553,7 @@ export function boot(root: HTMLElement): void {
         toast("图片无法解码");
         continue;
       }
+      if (image.naturalWidth*image.naturalHeight > 48_000_000) {toast("图片像素过大，请先缩小");continue;}
       a.w = image.naturalWidth || 1;
       a.h = image.naturalHeight || 1;
       a.status = "queued";
@@ -464,7 +572,7 @@ export function boot(root: HTMLElement): void {
 
   async function openNextQueued() {
     if (editorOpen()) return;
-    const next = state.assets.find((a) => a.status === "queued");
+    const next = state.assets.find((a) => a.status === "queued" && !a.pending_png);
     if (!next) return;
     try {
       await openEditor(next.kind === "白板" ? "快速白板" : "图片标注", next);
@@ -472,6 +580,8 @@ export function boot(root: HTMLElement): void {
   }
 
   async function openEditor(title: string, asset: Asset) {
+    uploadControllers.get(asset.id)?.abort();
+    asset.pending_png = undefined; asset.upload_ticket = undefined;
     currentId = asset.id;
     asset.status = "editing";
     asset.render_revision = (asset.render_revision || 1) + 1;
@@ -547,62 +657,63 @@ export function boot(root: HTMLElement): void {
   $("undoBtn").onclick = () => editor?.undo();
   $("redoBtn").onclick = () => editor?.redo();
 
-  async function finishEditor() {
-    if (!editor || state.uploading) return;
-    if (state.editorKind === "快速白板" && editor.ops === 0) {
-      toast("先画一点内容，再加入本次图文");
-      return;
-    }
-    const blob = await editor.exportBlob();
-    const preview = await fileToDataUrl(blob);
-    const item = state.assets.find((a) => a.id === currentId);
-    if (item) {
-      item.caption = ($("captionInput") as HTMLTextAreaElement).value.trim();
-      const sceneData = JSON.parse(editor.exportScene());
-      if (sceneData.source) sceneData.source.url = item.source || "";
-      item.scene = JSON.stringify(sceneData);
-      item.preview = preview;
-      item.asset_id = undefined;
-      if (state.session) {
-        state.uploading = true;
-        update();
+  const uploadControllers = new Map<string, AbortController>();
+  let uploadQueueRunning = false;
+  let uploadWakeRequested = false;
+  let finishingEditor = false;
+  async function uploadPending() {
+    if (uploadQueueRunning) {uploadWakeRequested = true; return;}
+    if (!sessionReady || !state.session) return;
+    uploadQueueRunning = true;
+    const attempted = new Set<string>();
+    try {
+      while (sessionReady && state.session) {
+        const item = state.assets.find(a=>a.pending_png && a.status!=="editing" && a.status!=="ready" && !attempted.has(`${a.id}:${a.render_revision}`));
+        if (!item) break;
+        attempted.add(`${item.id}:${item.render_revision}`);
+        const version = item.render_revision; const blob = item.pending_png!;
+        const controller = new AbortController(); uploadControllers.set(item.id,controller);
+        state.uploading = true; item.status = "queued"; update();
         try {
-          const bmp = await createImageBitmap(blob);
-          item.w = bmp.width;
-          item.h = bmp.height;
-          bmp.close();
-          // scene已在导出前保留，不用临时blob地址覆写持久源。
-          const meta = await uploadPng(blob, headers(), item.w || 1, item.h || 1, item.kind === "白板" ? "whiteboard" : "markup");
-          item.asset_id = meta.asset_id;
+          const meta = await uploadPng(blob,headers(),item.w||1,item.h||1,item.kind==="白板"?"whiteboard":"markup",{
+            signal:controller.signal,ticket:item.upload_ticket,
+            checkpoint: async ticket => {item.upload_ticket=ticket; repository.save(draftSnapshot()); await repository.flush();},
+            progress: (sent,total) => {item.progress=Math.floor(100*sent/Math.max(1,total));update();},
+          });
+          if (!controller.signal.aborted && state.assets.includes(item) && item.render_revision===version) {
+            item.asset_id=meta.asset_id; item.status="ready"; item.pending_png=undefined; item.upload_ticket=undefined;
+            item.progress=100; sendDraft();
+          }
         } catch {
-          toast("图片未同步，不会沿用原图");
-          item.asset_id = undefined;
-          item.status = "failed";
-          state.uploading = false;
-          sendDraft();
-          $("editor").classList.remove("show");
-          $("composer").style.display = "flex";
-          $("mobileHead").style.display = "flex";
-          editor?.destroy();
-          editor = null;
-          update();
-          void openNextQueued();
-          return;
-        }
-        state.uploading = false;
-        item.status = "ready";
-      } else {
-        item.status = "failed";
+          if (state.assets.includes(item) && item.render_revision===version && String(item.status)!=="editing") {
+            item.status="failed"; item.asset_id=undefined; sendDraft();
+          }
+        } finally {uploadControllers.delete(item.id); state.uploading=false; update();}
       }
+    } finally {
+      uploadQueueRunning=false;
+      if (uploadWakeRequested) {uploadWakeRequested=false; void uploadPending();}
     }
-    $("editor").classList.remove("show");
-    $("composer").style.display = "flex";
-    $("mobileHead").style.display = "flex";
-    editor?.destroy();
-    editor = null;
-    sendDraft();
-    update();
-    void openNextQueued();
+  }
+  async function finishEditor() {
+    if (!editor || finishingEditor) return;
+    if (state.editorKind === "快速白板" && editor.ops === 0) {toast("先画一点内容，再加入本次图文");return;}
+    finishingEditor = true;
+    const item = state.assets.find(a=>a.id===currentId);
+    try {
+      const blob = await editor.exportBlob();
+      if (!item) return;
+      item.caption=($("captionInput") as HTMLTextAreaElement).value.trim();
+      const sceneData=JSON.parse(editor.exportScene());
+      if(sceneData.source) sceneData.source.url=item.source||"";
+      item.scene=JSON.stringify(sceneData); item.preview=await fileToDataUrl(blob);
+      const bmp=await createImageBitmap(blob);item.w=bmp.width;item.h=bmp.height;bmp.close();
+      item.pending_png=blob; item.asset_id=undefined; item.upload_ticket=undefined;item.progress=0;item.status="queued";
+      sendDraft(); repository.save(draftSnapshot()); await repository.flush();
+      $("editor").classList.remove("show");$("composer").style.display="flex";$("mobileHead").style.display="flex";
+      editor.destroy();editor=null;
+      update(); void uploadPending(); void openNextQueued();
+    } finally {finishingEditor=false;}
   }
 
   function saveOpenEditor() {
@@ -660,6 +771,7 @@ export function boot(root: HTMLElement): void {
     void finishEditor().catch(editorFailure);
   };
 
+  $("connectBtn").onclick = () => {void resumeRemembered().then(ok=>{if(!ok)showPair();}).catch(()=>showPair());};
   $("sendBtn").onclick = () => { void sendBundle().catch(() => {
     state.sending = false; update(); toast("连接中断，图文已保留，没有自动重试");
   }); };
@@ -676,26 +788,15 @@ export function boot(root: HTMLElement): void {
       toast("还有图片没传完，不会先发残缺文字");
       return;
     }
-    sendDraft();
+    const message = currentMessage();
     const boundRevision = state.revision;
     const boundEpoch = state.epoch;
-    state.sending = true;
-    update();
-    ws.send(
-      JSON.stringify({
-        protocol: 3,
-        type: "bundle.commit",
-        text: state.text,
-        revision: state.revision,
-        asset_refs: refs,
-        draft_id: state.draft_id,
-        epoch: state.epoch,
-        captions: state.assets.map((a) => a.caption || ""),
-        asset_status: state.assets.map((a) => a.status || "ready"),
-        asset_documents: documents(),
-      })
-    );
-    const nonceRes = await fetch("/v3/nonce", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(state.session) });
+    state.sending = true; update();
+    publishCurrent();
+    try {await outbox.flush(message.update_id);} catch {
+      state.sending=false; update(); toast("当前图文仍在同步，没有插入旧版本");return;
+    }
+    const nonceRes = await fetch("/v3/nonce", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(state.session), signal:AbortSignal.timeout(6000) });
     if (!nonceRes.ok) {
       state.sending = false;
       update();
@@ -709,14 +810,23 @@ export function boot(root: HTMLElement): void {
       toast("内容刚有更新，请再次点插入");
       return;
     }
+    const signature=JSON.stringify([state.draft_id,state.epoch,state.generation,state.revision]);
+    const intentId=state.last_intent?.signature===signature ? state.last_intent.id : newId();
+    state.last_intent={signature,id:intentId};
+    repository.save(draftSnapshot());
+    try {await repository.flush();} catch {state.sending=false;update();toast("无法保存本次操作，未执行插入");return;}
+    if (!ws || ws.readyState!==1 || state.revision!==boundRevision || state.epoch!==boundEpoch) {
+      state.sending=false;update();toast("图文或连接有变化，请再次确认");return;
+    }
     ws.send(
       JSON.stringify({
+        ...message,
         protocol: 3,
         type: "insert.intent",
         session_id: state.session.session_id,
         token: state.session.token,
         nonce: nonce.nonce,
-        intent_id: newId(),
+        intent_id: intentId,
         trigger: "phone",
         text: state.text,
         revision: state.revision,
@@ -728,6 +838,11 @@ export function boot(root: HTMLElement): void {
         asset_documents: documents(),
       })
     );
+    window.setTimeout(()=>{
+      if (state.sending && state.last_intent?.id===intentId) {
+        state.sending=false;update();toast("上次结果待确认，图文保留；再次点同一稿不会重复投递，可从最近内容召回");
+      }
+    },12000);
   };
 
   function pairCodeFromUrl(): string {
@@ -774,6 +889,7 @@ export function boot(root: HTMLElement): void {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ device_id: stored.device_id, device_secret: stored.device_secret }),
+      signal:AbortSignal.timeout(6000),
     });
     if (!res.ok) return false;
     state.session = await res.json();
@@ -806,32 +922,61 @@ export function boot(root: HTMLElement): void {
     ++sheetRevision;
     const sheet = $("sheet");
     const preset = pairCodeFromUrl();
-    $("sheetCard").innerHTML = `<h2>连接这台电脑</h2><p>扫电脑上的二维码即可配对。备用才手输 4 位短码。手机不能自授按键或截屏。练习插入用电脑 Alt+I。召回是 Alt+Shift+I，不是跳过纠错。</p><input id="pairCode" /><button class="primary" id="pairGo">配对</button>`;
+    $("sheetCard").innerHTML = `<h2>连接这台电脑</h2><p>扫电脑上的二维码即可配对。备用才手输 4 位短码。手机不能自授按键或截屏。练习插入用电脑 Alt+I。召回是 Alt+Shift+I，不是跳过纠错。</p><input id="pairCode" /><button class="primary" id="pairGo">配对</button><button id="writeOffline">先写草稿</button>`;
     (document.getElementById("pairCode") as HTMLInputElement).value = preset;
     sheet.classList.add("show");
+    $("writeOffline").onclick = () => $("sheet").classList.remove("show");
     $("pairGo").onclick = async () => {
       await submitPair((document.getElementById("pairCode") as HTMLInputElement).value);
     };
     if (preset) void submitPair(preset);
   }
 
-  $("historyBtn").onclick = async () => {
-    if (!state.session) {
-      showPair();
-      return;
-    }
-    const res = await fetch("/v3/history", { headers: headers() });
-    const data = await res.json();
-    $("sheetCard").innerHTML =
-      "<h2>最近图文</h2><p>召回上次不会覆盖当前草稿。Alt+Shift+I 是召回，不是跳过纠错。</p>" +
-      (data.items || []).map((i: { asset_count: number; text_chars: number }) => `<div>${i.asset_count} 图 · ${i.text_chars} 字</div>`).join("") +
-      '<button class="primary" id="recallLast">召回上次（保留当前草稿）</button>';
-    $("sheet").classList.add("show");
-    $("recallLast").onclick = () => {
-      if (!ws || ws.readyState !== 1) return;
-      ws.send(JSON.stringify({ protocol: 3, type: "recall.last" }));
-      $("sheet").classList.remove("show");
+  function showRestoreProposal(message: any) {
+    ++sheetRevision;
+    const card=$("sheetCard");card.replaceChildren();
+    const title=document.createElement("h2");title.textContent="恢复为手机新稿？";
+    const desc=document.createElement("p");desc.textContent="当前图文会先在手机保留副本，恢复后仍由手机编辑。不会自动插入。";
+    const text=document.createElement("p");text.textContent=String(message.text||"").slice(0,160);
+    const accept=document.createElement("button");accept.className="primary";accept.textContent="保留当前，恢复图文";
+    const cancel=document.createElement("button");cancel.textContent="取消";cancel.onclick=()=>$("sheet").classList.remove("show");
+    card.append(title,desc,text,accept,cancel);$("sheet").classList.add("show");
+    accept.onclick=async()=>{
+      saveOpenEditor();const before=draftSnapshot();
+      try{repository.save(before);await repository.backup(before);}catch{toast("手机存储失败，未替换当前稿");return;}
+      for(const controller of uploadControllers.values())controller.abort();
+      state.text=String(message.text||"");
+      state.assets=message.local_snapshot ? structuredClone(message.local_snapshot.assets||[]) :
+        (message.assets||[]).map((a:any)=>({...a,id:a.id||newId(),kind:"图片",preview:`/v3/assets/${a.asset_id}`,status:"ready"}));
+      state.epoch=newId();state.generation++;state.revision=0;state.conflict=null;
+      editor?.destroy();editor=null;$("editor").classList.remove("show");$("composer").style.display="flex";$("mobileHead").style.display="flex";
+      $("sheet").classList.remove("show");latestMessage=null;outbox.disconnect();if(sessionReady)outbox.connect();sendDraft();update();void uploadPending();
     };
+  }
+
+  $("historyBtn").onclick = async () => {
+    const version=++sheetRevision;
+    const card=$("sheetCard");card.innerHTML="<h2>最近图文</h2><p>恢复为新稿不自动插入；上次完整图文仍可在电脑召回。</p>";
+    $("sheet").classList.add("show");
+    try {
+      const local=await repository.load("before-replace");
+      if(sheetRevision!==version)return;
+      if(local){
+        const preview=document.createElement("p");preview.textContent=`手机上次 · ${local.assets.length} 图 · ${local.text.slice(0,90)}`;
+        const restore=document.createElement("button");restore.textContent="恢复手机上次图文（可离线）";
+        restore.onclick=()=>showRestoreProposal({text:local.text,local_snapshot:local});card.append(preview,restore);
+      }
+    }catch{toast("无法读取手机恢复记录，当前稿不受影响");}
+    if (!state.session || !state.online) {
+      const note=document.createElement("p");note.textContent="电脑离线；本机记录仍可恢复。";card.append(note);return;
+    }
+    try{
+      const res=await fetch("/v3/history",{headers:headers(),signal:AbortSignal.timeout(6000)});
+      if(!res.ok)throw new Error("offline");const data=await res.json();if(sheetRevision!==version)return;
+      for(const item of data.items||[]){const row=document.createElement("div");row.textContent=`电脑记录 · ${item.asset_count} 图 · ${item.text_chars} 字`;card.append(row);}
+      const recall=document.createElement("button");recall.className="primary";recall.id="recallLast";recall.textContent="电脑召回上次（保留手机当前稿）";
+      recall.onclick=()=>{if(ws?.readyState===1)ws.send(JSON.stringify({protocol:3,type:"recall.last"}));$("sheet").classList.remove("show");};card.append(recall);
+    }catch{const note=document.createElement("p");note.textContent="电脑记录暂未读到，可稍后再试。";card.append(note);}
   };
   $("settingsBtn").onclick = () => {
     const version = ++sheetRevision;
@@ -856,6 +1001,17 @@ export function boot(root: HTMLElement): void {
   async function resolveConflict(useLocal: boolean) {
     const remote = state.conflict;
     if (!remote) return;
+    if (remote.authority === "phone") {
+      if (!useLocal) return;
+      try {repository.save(draftSnapshot());await repository.backup(draftSnapshot());}
+      catch {toast("当前稿尚未保全，暂不切换");return;}
+      // 只有用户明确采用手机这份时才建立新一代稿，旧稿先由服务端保全。
+      state.epoch=newId();state.generation=Math.max(state.generation,Number(remote.generation)||0)+1;state.revision=0;
+      latestMessage = buildPrimaryUpdate(state,newId());
+      latestMessage.takeover = {draft_id:remote.draft_id,epoch:remote.epoch,revision:remote.revision,owner_device_id:remote.owner_device_id};
+      state.conflict=null;outbox.disconnect();if(sessionReady)outbox.connect();
+      publishCurrent();update();return;
+    }
     // 明确操作前保全本机稿；不把跨epoch旧稿自动伪装成服务器新稿。
     try { repository.save(draftSnapshot()); await repository.backup(draftSnapshot()); } catch {
       toast("无法保存恢复副本，暂不替换草稿"); return;
@@ -891,12 +1047,13 @@ export function boot(root: HTMLElement): void {
   ($("text") as HTMLTextAreaElement).disabled = true;
   void restoreDraft().then(async () => {
     ($("text") as HTMLTextAreaElement).disabled = false;
-    update();
+    update(); persistDraft();
     if (state.session) connect();
     else if (!await resumeRemembered()) showPair();
   }).catch(() => {
     restored = true;
     ($("text") as HTMLTextAreaElement).disabled = false;
-    toast("电脑未连接，草稿仍在"); showPair();
+    update();toast("电脑未连接，草稿仍在；可先继续写");
+    if (!state.text && !state.assets.length) showPair();
   });
 }

@@ -1,3 +1,5 @@
-icon.png：窗口 title 与 iconphoto。可替换为自有 PNG（建议 256×256），替换后重启生效。
-icon.ico：Windows 任务栏/标题栏（iconbitmap）；运行 tools/gen_app_icon.py 会同时生成 png 与 ico。
-PyInstaller 打包时请用同一 .ico 作为 exe 的 --icon。
+V3 应用图标：根据本次图像生成工具产出的原创图稿制作，再统一为平面双色、透明边界和多尺寸。
+icon.png：512像素。icon.ico：16/20/24/32/40/48/64/128/256。icon.svg：可缩放的生成图稿轮廓。
+Windows构建、原生客户端及托盘共用此图标；不使用豆包官方品牌标志。
+重导出命令：python tools/export_v3_icon.py，仅依赖Pillow。
+图像工具的实际模型由服务选择，未把用户提到的image2.5作为可验证模型型号。

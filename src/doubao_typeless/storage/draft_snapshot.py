@@ -31,7 +31,7 @@ def draft_path(data_dir: Path) -> Path:
 def _payload(draft: Draft) -> dict:
     return {"draft_id": draft.draft_id, "epoch": draft.epoch,
             "revision": draft.revision, "editor_device_id": draft.editor_device_id,
-            "text": draft.text,
+            "text": draft.text, "authority": draft.authority, "generation": draft.generation,
             "asset_ids": [a.get("asset_id") for a in draft.assets if a.get("asset_id")],
             "asset_documents": [{k: v for k, v in a.items() if k not in {"bytes_data", "path"}}
                                 for a in draft.assets]}
@@ -78,6 +78,8 @@ def load_draft(data_dir: Path, store) -> tuple[Draft | None, list[str]]:
         return Draft(draft_id=str(payload["draft_id"]), epoch=str(payload["epoch"]),
                      revision=int(payload.get("revision", 0)),
                      editor_device_id=str(payload.get("editor_device_id") or "pc"),
-                     text=str(payload.get("text") or ""), assets=assets), missing
+                     text=str(payload.get("text") or ""), assets=assets,
+                     authority=str(payload.get("authority") or "legacy"),
+                     generation=int(payload.get("generation", 0))), missing
     except (ValueError, KeyError, TypeError):
         return None, []

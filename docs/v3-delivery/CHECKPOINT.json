@@ -6,9 +6,9 @@
   "product_source_at_review": "70aa6b92d13f7c8a69b024c94674835083cffa37",
   "current_head": "USE_GIT_HEAD_OR_BUILD_INFO_SOURCE_SHA",
   "working_tree": "代码由隔离分支构建流程生成真实提交；包内build-info绑定该提交。",
-  "last_completed_slice": "QUEUED_DELIVERY_AND_PHONE_STORAGE_AND_CONTROL_TARGETING",
-  "active_slice": "RUN_FULL_TESTS_AND_WINDOWED_CANDIDATE",
-  "next_action": "继续同一MASTER_PLAN。先完成当前源码的云端全量测试、Windows无控制台包启动与正常退出；真实Android/豆包和真实Cursor需对应环境，不能用单元测试代替。保留未知结果人工确认续贴。",
+  "last_completed_slice": "IMPLEMENTED_PHONE_AUTHOR_LOCAL_OUTBOX_AND_IMAGE_BACKGROUND_UPLOAD",
+  "active_slice": "PHONE_PRIMARY_NETWORK_AND_IMAGE_FEEDBACK",
+  "next_action": "对本次手机主稿修改运行完整CI、生产页面离线图文回归、无控制台EXE的旧文字入口和phone-primary入口各三次真实快捷键插入；失败修代码，不放宽断言。保留完整产品目标。",
   "accepted_requirements": [
     "MASTER_PLAN 为唯一产品/执行规范",
     "独立复核 REQUEST_CHANGES 不是仅剩真机",
@@ -17,10 +17,9 @@
     "不改测试期望、不删用例、不改审计包旧源码"
   ],
   "open_defects": [
-    "用户历史插入闪退未确诊；命令恢复和异常取证已有，不把修复风险点当原事故已证实。",
-    "目标控件读取、恢复和附件观察已实现，但须在当前Windows候选和真实目标中验证；可靠观察不可得时显式人工确认，不自动重贴。",
-    "浏览器IndexedDB和源像素恢复已实现；浏览器清理/私密模式仍可能移除缓存，错误应显式提示。",
-    "完整Windows候选、Android/豆包手感、真实Cursor和最终视觉/性能验收尚待执行。"
+    "当前手机主稿批次的完整浏览器/Windows构建尚待云端验证；不把本地专项测试当成成品通过。",
+    "真实Android/豆包弱网触控手感和真实Cursor图文仍须对应环境验证。",
+    "历史插入闪退没有原事故证据；当前新包须连续正常插入及异常恢复，不宣称历史根因已证实。"
   ],
   "reopened_this_round": [
     "F03",
@@ -75,29 +74,24 @@
   ],
   "last_commands": [
     {
+      "cmd": "pytest tests/test_v3_phone_primary.py tests/test_v3_upload_resume.py tests/test_v3_assistant_delivery.py tests/test_v3_assistant_ui.py tests/test_v3_review_c3333a5.py",
+      "exit_code": 0,
+      "output": "55 passed (Linux component/runtime; upload test uses real HTTP server + production Node upload code)"
+    },
+    {
       "cmd": "npm run typecheck && npm run build",
       "exit_code": 0,
-      "output": "index-_XCn9lqM.js"
-    },
-    {
-      "cmd": "pytest full (local)",
-      "exit_code": 1,
-      "output": "260 passed / 3 failed / 4 skipped / 8 errors; browser executable missing; download failed DNS"
-    },
-    {
-      "cmd": "pytest tests/test_v3_input_identity.py",
-      "exit_code": 0,
-      "output": "8 passed"
+      "output": "production frontend built; final filename from CI"
     }
   ],
   "candidate_artifact": null,
   "independent_review": {
-    "status": "NOT_REVIEWED_THIS_LOCAL_SNAPSHOT",
+    "status": "CURRENT_BATCH_NOT_RELEASE_READY",
     "release_ready": false
   },
   "published": false,
   "task_complete": false,
-  "source_base": "e59dfce656bb25bd70607863f28eda82622feef7",
+  "source_base": "dc517b5b221d36213a572b7f33084d34cf164891",
   "local_validation": {
     "pytest": {
       "passed": 257,

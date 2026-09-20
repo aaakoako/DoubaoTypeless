@@ -126,6 +126,14 @@ class V3App:
             if missing:
                 _log(f"[v3.draft] 快照缺图 {len(missing)}，不造假像素")
         self._save_draft = lambda: save_draft(self.data_dir, self.draft)
+        self._desktop_edit = None
+        try:
+            import json
+            raw_edit = json.loads((self.data_dir / "desktop-edit.json").read_text(encoding="utf-8"))
+            if isinstance(raw_edit, dict) and isinstance(raw_edit.get("text"), str):
+                self._desktop_edit = raw_edit
+        except (OSError, ValueError):
+            pass
         self.bridge = V3Bridge(
             port=self.port,
             auth=self.auth,
@@ -172,6 +180,8 @@ class V3App:
     def request_insert(self):
         """UI/热键非阻塞入口；总是返回Future，校验失败同样有明确结果。"""
         from concurrent.futures import Future
+        if self.draft.authority == "phone":
+            return self._commands.submit(self._insert_primary, False)
         with self._state_lock:
             if not (self.draft.text or self.draft.assets):
                 done = Future(); done.set_result({"result":"NO_STEPS", "error_code":"EMPTY_DRAFT"})
@@ -194,10 +204,68 @@ class V3App:
 
     def update_pc_text(self, text: str) -> None:
         with self._state_lock:
+            if self.draft.authority == "phone":
+                # 电脑改字是明确的编辑副本，不抢手机稿的 revision。
+                from doubao_typeless.storage.draft_snapshot import write_json_atomic
+                if self._desktop_edit is None:
+                    self._desktop_edit = {"base": source_snapshot(self.draft), "text": text}
+                else:
+                    self._desktop_edit["text"] = text
+                write_json_atomic(self.data_dir / "desktop-edit.json", self._desktop_edit)
+                return
             if self.draft.text != text:
                 self.draft.text = text
                 self.draft.revision += 1
                 self._save_draft()
+
+    def review_text(self) -> str:
+        if self._desktop_edit and (self.review_editing or self._desktop_edit["base"] == source_snapshot(self.draft)):
+            return self._desktop_edit["text"]
+        return self.draft.text
+
+    def request_review_insert(self):
+        if self.draft.authority == "phone":
+            return self._commands.submit(self._insert_primary, True)
+        return self.request_insert()
+
+    def _insert_primary(self, use_desktop_edit: bool = False) -> dict:
+        """本机快捷键先向作者确认当前稿；手机离线时不偷偷贴旧镜像。"""
+        try:
+            if self.bridge.paused:
+                raise ValueError("CONNECTION_PAUSED")
+            self._restore_external_target()
+            expected = tuple(self._read_focus())
+            loop = getattr(self, "_loop", None)
+            if loop is None or not loop.is_running():
+                raise ValueError("PHONE_OFFLINE")
+            self._notify_ui("sync_wait")
+            pending = asyncio.run_coroutine_threadsafe(
+                self.bridge.prepare_phone(self.draft.editor_device_id), loop)
+            try:
+                pending.result(timeout=7)
+            except Exception:
+                pending.cancel()
+                raise ValueError("PHONE_NOT_CURRENT") from None
+            with self._state_lock:
+                bound = source_snapshot(self.draft)
+                current = copy.deepcopy(self.draft)
+                if use_desktop_edit and self._desktop_edit is not None:
+                    if self._desktop_edit["base"] != bound:
+                        raise ValueError("PHONE_CHANGED_REVIEW")
+                    current.text = self._desktop_edit["text"]
+                bundle = freeze_bundle(current, bundle_id=str(uuid.uuid4()))
+                bundle["source_text"] = self.draft.text
+                bundle["source_snapshot"] = bound
+                from doubao_typeless.core.bundle import canonical_manifest_hash
+                bundle["manifest_hash"] = canonical_manifest_hash(bundle)
+            intent = self._session_intent("insert_current")
+            intent["expected_focus"] = expected
+            return self.deliver_and_finish(intent, bundle)
+        except ValueError as exc:
+            code = str(exc)
+            self._notify_ui("delivery_failed", error_code=code)
+            return {"result": "NO_STEPS", "error_code": code, "steps": []}
+
 
     def remember_connected(self) -> int:
         count = 0
@@ -267,6 +335,20 @@ class V3App:
             return self._apply_phone_update(data, allow_server_assets=allow_server_assets)
 
     def _apply_phone_update(self, data: dict, *, allow_server_assets: bool = False) -> dict:
+        if data.get("authority") == "phone":
+            from doubao_typeless.services.phone_primary import apply_phone_snapshot
+            from doubao_typeless.storage.draft_snapshot import save_draft, save_recovery
+            ack = apply_phone_snapshot(self.draft, data, self.store,
+                lambda draft: save_draft(self.data_dir, draft),
+                lambda draft: save_recovery(self.data_dir, draft))
+            if ack["changed"]:
+                if self._desktop_edit and self._desktop_edit["base"] != source_snapshot(self.draft):
+                    self.phone_pending = {"text": self.draft.text, "phone_primary": True}
+                    self._notify_ui("phone_pending")
+                self._on_activity(self.draft.text, len(self.draft.assets))
+            return ack
+        if self.draft.authority == "phone":
+            raise ValueError("PHONE_PRIMARY_REQUIRED")
         if self.review_editing:
             self.phone_pending = dict(data)
             self._notify_ui("phone_pending")
@@ -333,6 +415,14 @@ class V3App:
         }
 
     def accept_phone_pending(self) -> None:
+        if self.draft.authority == "phone":
+            # 手机版一直是镜像主稿，采用时只释放独立电脑编辑副本。
+            self._desktop_edit = None
+            self.phone_pending = None
+            self.review_editing = False
+            from doubao_typeless.storage.draft_snapshot import write_json_atomic
+            write_json_atomic(self.data_dir / "desktop-edit.json", {})
+            return
         # 用户明确选择采用冲突稿时才生成当前身份下的新修订；重连绝不自动这么做。
         with self._state_lock:
             pending = copy.deepcopy(self.phone_pending)
@@ -346,18 +436,35 @@ class V3App:
             self.phone_pending = None
 
     def keep_pc_edit(self) -> None:
+        if self.draft.authority == "phone" and self._desktop_edit is not None:
+            # 用户明确保留电脑文字：只改变本次编辑副本的基线，手机内容仍不被覆盖。
+            from doubao_typeless.storage.draft_snapshot import write_json_atomic
+            self._desktop_edit["base"] = source_snapshot(self.draft)
+            write_json_atomic(self.data_dir / "desktop-edit.json", self._desktop_edit)
+            self.phone_pending = None
         self.review_editing = True
         self._notify_ui("pc_kept")
 
     def _on_activity(self, text: str, image_count: int) -> None:
-        self._remember_external_target()
-        if self.review_editing:
+        # 自动浮窗不抢焦点；真正展开/插入时再记录目标，避免每个字都查询UIA。
+        if self._saved_target is None:
+            self._remember_external_target()
+        if self.review_editing and self.draft.authority != "phone":
             self.phone_pending = {"text": text, "image_count": image_count}
             self._notify_ui("phone_pending")
             return
-        self._save_draft()
         if text or image_count:
-            self.hud.show_receiving(text, image_count)
+            previews = []
+            for asset in self.draft.assets:
+                item = {"id": asset.get("local_id") or asset.get("asset_id"),
+                        "status": asset.get("status", "ready"),
+                        "render_revision": asset.get("render_revision", 1)}
+                if item["status"] == "ready" and asset.get("asset_id"):
+                    # 路径只由服务器资源存储构造；不接受手机提供的磁盘路径。
+                    item["path"] = str(self.store.root / (asset["asset_id"] + ".bin"))
+                previews.append(item)
+            self.hud.show_receiving(text, image_count, assets=previews,
+                revision=self.draft.revision, phone_primary=self.draft.authority == "phone")
         else:
             self.hud.hide()
         self._notify_ui("activity")
@@ -527,6 +634,10 @@ class V3App:
             bound = bundle.get("source_snapshot")
             if bound is None or source_snapshot(self.draft) != bound:
                 return False
+            if self.draft.authority == "phone":
+                # 仅通知已消耗这个确定快照。手机保存上次图文后自行创建下一段。
+                self._notify_ui("new_draft")
+                return True
             # 已在投递前保留快照。原子保存失败则恢复内存，不能回执清手机。
             before = copy.deepcopy(self.draft.__dict__)
             self.draft.text = ""
@@ -555,6 +666,9 @@ class V3App:
         return {
             "type": "draft.rotated", "event_id": str(uuid.uuid4()),
             "rotated": rotated, "result": result,
+            "phone_primary": bundle.get("authority") == "phone",
+            "generation": bundle.get("generation", 0),
+            "owner_device_id": bundle.get("device_id") if bundle.get("authority") == "phone" else None,
             "archived": archived if rotated else None,
             "draft_id": self.draft.draft_id, "epoch": self.draft.epoch,
             "revision": self.draft.revision, "text": self.draft.text,
@@ -668,6 +782,8 @@ class V3App:
         return attempt.to_dict()
 
     def insert_current(self) -> dict | None:
+        if self.draft.authority == "phone":
+            return self._insert_primary(False)
         if not (self.draft.text or self.draft.assets):
             return None
         blocked = self._delivery_blocked()
@@ -725,7 +841,7 @@ class V3App:
             self.draft.draft_id == bound["draft_id"]
             and self.draft.epoch == bound["epoch"]
             and self.draft.revision == bound["revision"]
-            and self.draft.text == bound["original"]
+            and self.review_text() == bound["original"]
         )
         if not live_match:
             out = {**out, "status": "stale", "reason": "draft moved after response", "text": None}
@@ -737,6 +853,14 @@ class V3App:
         last = self._last_suggestion or {}
         if not last.get("suggested"):
             return False
+        if self.draft.authority == "phone":
+            if (last.get("draft_id"), last.get("epoch"), last.get("revision"), last.get("original")) != (
+                    self.draft.draft_id, self.draft.epoch, self.draft.revision, self.review_text()):
+                return False
+            last["before_apply"] = self.review_text()
+            self.update_pc_text(str(last["suggested"]))
+            last["primary_applied"] = self.review_text()
+            return True
         if (
             last.get("draft_id") != self.draft.draft_id
             or last.get("epoch") != self.draft.epoch
@@ -753,6 +877,12 @@ class V3App:
 
     def reject_suggestion(self) -> None:
         last = self._last_suggestion or {}
+        if self.draft.authority == "phone":
+            if (last.get("draft_id"), last.get("epoch"), last.get("revision"), last.get("primary_applied")) == (
+                    self.draft.draft_id, self.draft.epoch, self.draft.revision, self.review_text()):
+                self.update_pc_text(str(last["before_apply"]))
+            self._last_suggestion = None
+            return
         if (
             last.get("before_apply") is not None
             and last.get("draft_id") == self.draft.draft_id
@@ -765,8 +895,8 @@ class V3App:
             self._save_draft()
         self._last_suggestion = None
 
-    def copy_text(self) -> str:
-        text = self.draft.text or ""
+    def copy_text(self, text: str | None = None) -> str:
+        text = self.draft.text if text is None else text or ""
         self._copied_text = text
         try:
             self._set_text(text)
@@ -781,6 +911,9 @@ class V3App:
         save_recovery(self.data_dir, self.draft)
 
     def start_new_draft(self) -> None:
+        if self.draft.authority == "phone":
+            self._offer_phone_restore({"text":"", "assets":[]})
+            return
         self._preserve_current_draft()
         self.draft.text = ""
         self.draft.assets = []
@@ -790,7 +923,24 @@ class V3App:
         self.hud.hide()
         self._notify_ui("new_draft")
 
+    def _offer_phone_restore(self, bundle: dict) -> str:
+        loop = getattr(self, "_loop", None)
+        sessions = [s for s in self.auth.sessions.values() if s.device_id == self.draft.editor_device_id]
+        if loop is None or not loop.is_running() or not sessions:
+            self._notify_ui("delivery_failed", error_code="PHONE_OFFLINE")
+            return "phone_offline"
+        from doubao_typeless.core.bundle import source_assets
+        event = {"type":"draft.restore_proposal", "text":bundle.get("source_text", bundle.get("text", "")),
+                 "assets":source_assets(bundle.get("assets") or [])}
+        for session in sessions:
+            asyncio.run_coroutine_threadsafe(self.bridge.send_to_session(session.session_id,event),loop)
+        self._notify_ui("restore_on_phone")
+        return "sent_to_phone"
+
     def restore_history(self, bundle: dict, *, replace: bool = False) -> str:
+        if self.draft.authority == "phone":
+            # 历史仍能复制/重投。恢复成手机新稿必须由手机保全当前稿并确认。
+            return self._offer_phone_restore(bundle)
         if (self.draft.text or self.draft.assets) and not replace:
             return "ask"
         self._preserve_current_draft()

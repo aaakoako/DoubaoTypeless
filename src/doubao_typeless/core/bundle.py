@@ -25,6 +25,8 @@ class Draft:
     assets: list[dict[str, Any]] = field(default_factory=list)
     acked_revision: int | None = None
     acked_hash: str | None = None
+    authority: str = "legacy"
+    generation: int = 0
 
 
 def _sorted(value: Any) -> Any:
@@ -115,6 +117,8 @@ def freeze_bundle(draft: Draft, *, bundle_id: str) -> dict[str, Any]:
         "text": text,
         "assets": assets,
         "auto_send": False,
+        "authority": draft.authority,
+        "generation": draft.generation,
         "source_text": draft.text,
         "source_snapshot": source_snapshot(draft),
     }

@@ -32,6 +32,12 @@ class HudController:
         self.visible = False
         self.text = ""
         self.image_count = 0
+        self.assets: list[dict] = []
+        self.revision = 0
+        self.phone_primary = False
+        self._thumbs = None
+        self._thumb_row = None
+        self._thumb_signature = None
         self._timer = None
         self._widget = None
         self._app = None
@@ -118,6 +124,14 @@ class HudController:
         row.addStretch(1)
         layout.addWidget(self._status, 0)
         layout.addWidget(self._body, 1)
+        thumbs = QWidget()
+        thumbs.setFixedHeight(62)
+        self._thumb_row = QHBoxLayout(thumbs)
+        self._thumb_row.setContentsMargins(0, 0, 0, 0)
+        self._thumb_row.setSpacing(5)
+        thumbs.hide()
+        self._thumbs = thumbs
+        layout.addWidget(thumbs, 0)
         layout.addWidget(bar, 0)
         self._bar = bar
         w.hide()
@@ -133,9 +147,13 @@ class HudController:
         except Exception:
             pass
 
-    def show_receiving(self, text: str, image_count: int = 0) -> None:
+    def show_receiving(self, text: str, image_count: int = 0, *, assets: list[dict] | None = None,
+                       revision: int = 0, phone_primary: bool = False) -> None:
         self.text = text
         self.image_count = image_count
+        self.assets = [dict(a) for a in (assets or [])]
+        self.revision = revision
+        self.phone_primary = phone_primary
         self.visible = True
         if self._widget is None:
             return
@@ -174,7 +192,7 @@ class HudController:
                 spacing = max(layout.spacing(), 0) * 2
         except Exception:
             pass
-        return status_h + bar_h + margins + spacing
+        return status_h + bar_h + margins + spacing + (68 if self.assets else 0)
 
     def _text_height(self, text: str) -> int:
         try:
@@ -208,10 +226,55 @@ class HudController:
             return
         self._timer.start(TOKENS["idle_ms"])
 
+    def _refresh_thumbnails(self) -> None:
+        if self._thumbs is None:
+            return
+        signature = repr(self.assets)
+        if signature == self._thumb_signature:
+            return
+        self._thumb_signature = signature
+        from PySide6.QtCore import Qt, QSize
+        from PySide6.QtGui import QImageReader, QPixmap
+        from PySide6.QtWidgets import QLabel
+        while self._thumb_row.count():
+            old = self._thumb_row.takeAt(0).widget()
+            if old is not None:
+                old.deleteLater()
+        for i, asset in enumerate(self.assets[:6], 1):
+            thumb = QLabel()
+            thumb.setFixedSize(54, 56)
+            thumb.setAlignment(Qt.AlignCenter)
+            status = asset.get("status", "ready")
+            caption = {"editing": "编辑中", "queued": "同步中", "failed": "待重试", "dirty": "未同步"}.get(status, "已收到")
+            thumb.setText(f"{i}\n{caption}")
+            thumb.setStyleSheet("background:#EEF4F2;border:1px solid #D9E6E1;border-radius:6px;font-size:10px;")
+            path = asset.get("path")
+            if path and status == "ready":
+                reader = QImageReader(path)
+                size = reader.size()
+                if size.isValid():
+                    reader.setScaledSize(size.scaled(QSize(52, 52), Qt.KeepAspectRatio))
+                    image = reader.read()
+                    if not image.isNull():
+                        thumb.setPixmap(QPixmap.fromImage(image))
+            thumb.setToolTip(f"图{i} · {caption} · 版本{asset.get('render_revision',1)}")
+            self._thumb_row.addWidget(thumb)
+        self._thumb_row.addStretch(1)
+        self._thumbs.setVisible(bool(self.assets))
+
     def _apply_show(self) -> None:
         if self._widget is None:
             return
-        body = self.text if self.text else (f"{self.image_count} 图" if self.image_count else "")
+        self._refresh_thumbnails()
+        unfinished = sum(a.get("status", "ready") != "ready" for a in self.assets)
+        ready = len(self.assets) - unfinished
+        status = f"手机稿 · r{self.revision}" if self.phone_primary else "手机输入中"
+        if self.assets:
+            status += f" · {ready}/{len(self.assets)} 张已收到" if unfinished else f" · {ready} 张图片已更新"
+        self._status.setText(status)
+        self._insert.setEnabled(not unfinished)
+        self._insert.setText("图片同步中" if unfinished else "插入并复制")
+        body = self.text if self.text else ("图片准备中，可继续在手机写说明" if unfinished else "")
         # 程序主动写字造成的滚动条变化，不能被误判成用户正在读前文。
         reading = self._widget.isVisible() and self._reading()
         old_cursor = self._body.textCursor()
