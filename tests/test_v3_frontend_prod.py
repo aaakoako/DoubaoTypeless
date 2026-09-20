@@ -101,29 +101,40 @@ def test_production_page_reconnect_keeps_local_and_does_not_overwrite(tmp_path):
                 await page.wait_for_function(
                     "() => (document.getElementById('connText')||{}).textContent && document.getElementById('connText').textContent.indexOf('已连接') >= 0"
                 )
-                await page.evaluate(
-                    """() => {
-                      sessionStorage.setItem('dt.v3.draft', JSON.stringify({
-                        text: '离线旧稿A',
-                        revision: 10,
-                        draft_id: 'D-OLD',
-                        epoch: 'E-OLD',
-                        assets: []
-                      }));
-                    }"""
-                )
+                # 用户从正式输入框离线改稿，不向已被IndexedDB替代的旧存储塞数据。
+                await page.context.set_offline(True)
+                for socket in list(bridge._clients):
+                    await socket.close()
+                await page.wait_for_function("() => document.getElementById('connText').textContent.indexOf('已连接') < 0")
+                await page.fill("#text", "离线旧稿A")
+                await page.wait_for_function("""() => new Promise(resolve => {
+                  const r=indexedDB.open('doubao-typeless-v3-drafts',1);
+                  r.onsuccess=()=>{
+                    const db=r.result;
+                    if(!db.objectStoreNames.contains('drafts')){db.close();resolve(false);return;}
+                    const tx=db.transaction('drafts','readonly');
+                    const q=tx.objectStore('drafts').get('current');
+                    tx.oncomplete=()=>{db.close();resolve(q.result?.text==='离线旧稿A');};
+                    tx.onabort=()=>{db.close();resolve(false);};
+                  };
+                  r.onerror=()=>resolve(false);
+                })""")
+                # 离线期间，电脑开始另一份草稿。重连不能替它改身份证或覆盖。
+                bridge.draft.epoch = "E-SERVER-NEW"
+                bridge.draft.revision += 1
+                bridge.draft.text = "服务器新稿"
+                await page.context.set_offline(False)
                 await page.reload()
                 await page.wait_for_function(
-                    "() => (document.getElementById('connText')||{}).textContent && document.getElementById('connText').textContent.indexOf('已连接') >= 0"
+                    "() => document.getElementById('connText').textContent.indexOf('已连接') >= 0"
                 )
-                for _ in range(20):
-                    await asyncio.sleep(0.05)
+                await page.wait_for_selector("#conflictBanner", state="visible")
                 local = await page.locator("#text").input_value()
                 await browser.close()
         finally:
             await runner.cleanup()
         assert bridge.draft.text == "服务器新稿"
-        assert bridge.draft.epoch == "E-SERVER"
+        assert bridge.draft.epoch == "E-SERVER-NEW"
         assert local == "离线旧稿A"
 
     asyncio.run(run())
