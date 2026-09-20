@@ -5,10 +5,10 @@
   "review_sha": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
   "product_source_at_review": "70aa6b92d13f7c8a69b024c94674835083cffa37",
   "current_head": "USE_GIT_HEAD_OR_BUILD_INFO_SOURCE_SHA",
-  "working_tree": "代码由隔离分支构建流程生成真实提交；包内build-info绑定该提交。",
-  "last_completed_slice": "IMPLEMENTED_PHONE_AUTHOR_LOCAL_OUTBOX_AND_IMAGE_BACKGROUND_UPLOAD",
-  "active_slice": "PHONE_PRIMARY_NETWORK_AND_IMAGE_FEEDBACK",
-  "next_action": "对本次手机主稿修改运行完整CI、生产页面离线图文回归、无控制台EXE的旧文字入口和phone-primary入口各三次真实快捷键插入；失败修代码，不放宽断言。保留完整产品目标。",
+  "working_tree": "直接源文件提交，保持同一隔离开发分支；构建身份以git HEAD和build-info为准。",
+  "last_completed_slice": "CHECKED_NATIVE_INPUT_PATCH_NOT_USER_INCIDENT_CLOSED",
+  "active_slice": "STABILIZE_REPORTED_INSERT_FAILURE_BEFORE_FURTHER_TRIALS",
+  "next_action": "停止功能扩展和面向用户的新体验包；先复现用户在f7bb484的插入无效/浮窗消失/进程退出，取得实际进程和本地日志。checked SendInput补丁验证系统拒绝/部分接收时保稿不重贴；未取得用户现场证据前不关闭崩溃、不签RELEASE_READY。下一修复只围绕同一主链路。",
   "accepted_requirements": [
     "MASTER_PLAN 为唯一产品/执行规范",
     "独立复核 REQUEST_CHANGES 不是仅剩真机",
@@ -17,9 +17,12 @@
     "不改测试期望、不删用例、不改审计包旧源码"
   ],
   "open_defects": [
-    "当前手机主稿批次的完整浏览器/Windows构建尚待云端验证；不把本地专项测试当成成品通过。",
-    "真实Android/豆包弱网触控手感和真实Cursor图文仍须对应环境验证。",
-    "历史插入闪退没有原事故证据；当前新包须连续正常插入及异常恢复，不宣称历史根因已证实。"
+    "USER_BLOCKER: 用户在f7bb484体验包报告插入无效、浮窗消失及偶发崩溃；云端321通过不足以关闭用户事故。",
+    "INSERT_STATUS: 等待手机确认仍使用6秒空闲隐藏，投递结果之前无条件收窗、失败仅托盘提示；需在同一主链路修复并验证。",
+    "NATIVE_INPUT: 原keybd_event无返回值检查；本补丁改SendInput并在拒绝/部分接收时抛可恢复错误；不等于目标输入框已经接收。",
+    "NATIVE_CRASH: 尚无用户当次runtime.log/v3.log/fault日志及WER，不能断言根因已确定或修复。",
+    "TARGET_PERMISSION: V3App._target_elevated仍为stub；未解决应用完整性与具体输入目标识别问题，不以当前补丁代替。",
+    "PHONE_IMAGE: 手机主稿、弱网及图片/白板保留，不在故障定位阶段再换协议或扩功能；真机与真实目标图文保持未验证。"
   ],
   "reopened_this_round": [
     "F03",
@@ -74,14 +77,9 @@
   ],
   "last_commands": [
     {
-      "cmd": "pytest tests/test_v3_phone_primary.py tests/test_v3_upload_resume.py tests/test_v3_assistant_delivery.py tests/test_v3_assistant_ui.py tests/test_v3_review_c3333a5.py",
+      "cmd": "PYTHONPATH=src python -m pytest -q tests/test_v3_insert_stabilization.py tests/test_v3_assistant_delivery.py tests/test_v3_s1_commands.py --tb=short",
       "exit_code": 0,
-      "output": "55 passed (Linux component/runtime; upload test uses real HTTP server + production Node upload code)"
-    },
-    {
-      "cmd": "npm run typecheck && npm run build",
-      "exit_code": 0,
-      "output": "production frontend built; final filename from CI"
+      "output": "32 passed; Windows system API is an explicit test fake in newly added tests."
     }
   ],
   "candidate_artifact": null,
@@ -91,8 +89,14 @@
   },
   "published": false,
   "task_complete": false,
-  "source_base": "dc517b5b221d36213a572b7f33084d34cf164891",
-  "local_validation": {
+  "source_base": "f7bb48497f5a1959b803516415d45e8a2901f202",
+  "validation_this_patch": {
+    "scope": "checked native injection and existing delivery/command regressions",
+    "local": "32 passed (10 new checked-input tests + 22 existing delivery/command tests), Linux; Windows API is explicit fake in new tests",
+    "windows_runtime": "NOT_RUN",
+    "user_crash": "NOT_DIAGNOSED"
+  },
+  "previous_local_validation": {
     "pytest": {
       "passed": 257,
       "failed": 3,
@@ -106,5 +110,20 @@
     "frontend_build": true,
     "qt_render": "Linux/offscreen;不是Windows截图",
     "browser_canvas": "Chromium内联组件真实像素/指针；没有绕过导航限制"
+  },
+  "local_validation": {
+    "scope": "checked native input + existing command/delivery regressions",
+    "passed": 32,
+    "failed": 0,
+    "skipped": 0,
+    "exit_code": 0,
+    "new_cases": 10,
+    "native_windows": "NOT_RUN",
+    "full_suite": "NOT_RUN"
+  },
+  "last_trial": {
+    "source_sha": "f7bb48497f5a1959b803516415d45e8a2901f202",
+    "status": "WITHDRAWN_FROM_DAILY_USE_RECOMMENDATION",
+    "reason": "用户报告插入无效、浮窗提前消失、偶发崩溃；不继续推荐替换日用版，不删除用户已有包或数据。"
   }
 }

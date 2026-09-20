@@ -33,14 +33,10 @@ def read_focus_fp() -> tuple[str, str, int]:
     return class_name, title, int(hwnd or 0)
 
 
-def send_paste() -> None:
-    if sys.platform != "win32":
-        return
-    user32 = ctypes.windll.user32
-    user32.keybd_event(VK_CONTROL, 0, 0, 0)
-    user32.keybd_event(VK_V, 0, 0, 0)
-    user32.keybd_event(VK_V, 0, KEYEVENTF_KEYUP, 0)
-    user32.keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0)
+def send_paste() -> int:
+    from doubao_typeless.platform.windows.native_input import send_paste as checked_paste
+
+    return checked_paste()
 
 
 def restore_focus(class_name: str, title: str, hwnd: int = 0) -> bool:
