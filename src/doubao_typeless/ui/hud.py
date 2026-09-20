@@ -199,7 +199,7 @@ class HudController:
             else:
                 # 支持既有嵌入式HUD：外部提供widget、尚未创建专用接收器。
                 from PySide6.QtCore import QTimer
-                slot = self._apply_content_update if kind == "show" else (self._apply_hide if kind == "hide" else lambda: self._apply_operation(**payload))
+                slot = self._apply_show if kind == "show" else (self._apply_hide if kind == "hide" else lambda: self._apply_operation(**payload))
                 QTimer.singleShot(0, self._widget, slot)
         elif kind == "show":
             self._apply_content_update()
