@@ -417,7 +417,7 @@ class V3App:
         if event == "delivery_progress":
             device = getattr(self, "_active_delivery_device", None)
             loop = getattr(self, "_loop", None)
-            if device and loop and loop.is_running():
+            if device and loop and loop.is_running() and getattr(self, "_active_delivery_primary", False):
                 progress = {"type":"delivery.progress", "stage":kwargs.get("stage"),
                             "index":kwargs.get("index"), "total":kwargs.get("total")}
                 for session in list(self.auth.sessions.values()):
@@ -886,6 +886,7 @@ class V3App:
                           bundle_id=bundle.get("bundle_id", ""), adapter_id="generic_text")
         phase = "prepare"
         self._active_delivery_device = bundle.get("device_id")
+        self._active_delivery_primary = bundle.get("authority") == "phone"
         try:
             # 保存完整副本后才允许触碰剪贴板。未准备成功不执行任何按键。
             self.history.record(bundle, attempt_result="RUNNING")
@@ -941,6 +942,7 @@ class V3App:
         finally:
             self.ledger.finish(intent_id, attempt.result)
             self._active_delivery_device = None
+            self._active_delivery_primary = False
         self._last_attempt = attempt
         self._last_attempt_bundle_id = bundle.get("bundle_id")
         _log(f"[v3.delivery] result={attempt.result} phase={phase} steps={len(attempt.steps)}")

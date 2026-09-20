@@ -115,12 +115,12 @@ def test_local_storage_failure_keeps_original_and_does_not_upload(tmp_path):
             assert count==1,uploads
             await page.locator('.attach-card img').click();await stroke(page)
             # 明确模拟浏览器容量错误；不是修改生产保存函数或放宽验证。
-            await page.evaluate("window.realPut=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(){throw new DOMException('test quota','QuotaExceededError')}")
+            await page.evaluate("() => {window.realPut=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(){throw new DOMException('test quota','QuotaExceededError')};}")
             await page.click('#done')
             await page.wait_for_function("document.querySelector('#editorStatus').textContent.includes('保存失败')")
             assert await page.locator('#editor').is_visible()
             assert len(uploads)==count
-            await page.evaluate("IDBObjectStore.prototype.put=window.realPut")
+            await page.evaluate("() => {IDBObjectStore.prototype.put=window.realPut;}")
             await page.click('#back');await page.click('#discardEditing')
             await page.wait_for_selector('#editor.show',state='hidden');await synced(page)
             assert app.draft.assets[0]['asset_id']==original
