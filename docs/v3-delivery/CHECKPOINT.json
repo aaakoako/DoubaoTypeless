@@ -1,29 +1,67 @@
 {
   "schema_version": 1,
-  "product_goal": "沿用 MASTER_PLAN，保留原版插入并复制，完成 Windows V3 发布前体验候选。",
-  "current_head": "USE_GIT_HEAD_OR_BUILD_INFO_SOURCE_SHA",
+  "product_goal": "沿用 MASTER_PLAN，保留原版插入并复制等体验，交付可实际体验的完整 Windows V3 发布前候选。",
+  "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
+  "working_tree": "本提交只绑定已验证交付和恢复只读CI；产品源码与实际包固定为 aec0ee81bcd3274000a8799df54ef57cadfab8b3，不将本次元数据HEAD冒充测试源码。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
-  "active_slice": "VERIFY_EDITOR_TRANSACTIONS_THREE_IMAGES_AND_SEPARATE_SEND",
-  "next_action": "读取新产品SHA的全套测试与实际Windows EXE结果。三图重排一键插入、正文/图注、取消编辑、保存失败、正常收窗、原版文字、失败恢复、单独确认Enter/Ctrl+Enter都过才交包。任何失败修生产原因，不放宽断言，不用旧包冒充新版本。",
+  "last_completed_slice": "VERIFIED_EDITOR_TRANSACTIONS_THREE_IMAGES_AND_EXPLICIT_SEND",
+  "active_slice": "WINDOWS_PRE_RELEASE_PRIVATE_TRIAL",
+  "next_action": "统一使用 aec0ee81bcd3274000a8799df54ef57cadfab8b3 完整目录包作为体验基线。根据真实用户/Agent兼容反馈继续，不重开产品规划。任何产品修改均重新执行全套与实际EXE门槛；不得沿用旧包哈希。",
   "accepted_requirements": [
-    "MASTER_PLAN唯一入口，不另起方案；手机主稿/弱网保存继续有效",
-    "保留电脑改字、插入并复制、独立复制、图文召回、手机下一段、截图/相册/白板/BYOK",
-    "统一蓝紫与雾蓝灰设计语言，不引入绿色主色或凸起阴影",
-    "用户明确新增手机独立发送：电脑默认关闭授权，手机看完电脑单独确认后Enter或Ctrl+Enter",
-    "插入/同步/恢复/重连仍绝不自动发送；已发或未知发送动作不自动重试",
+    "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
+    "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
+    "桌面、HUD、手机与弹框共用蓝紫/雾蓝灰设计语言，非绿色主色，无凸起导航阴影",
+    "新建白板须明确保存；取消恢复原成品或移除未保存白板；容量错误不丢画布不开始上传",
+    "按手机顺序自动逐图再正文；未取得可靠附件证据时仍明确恢复，不假确认、不重复已贴图片",
+    "用户新增独立手机发送：电脑默认关闭授权；用户检查电脑后在手机单独确认 Enter 或 Ctrl+Enter",
+    "插入/同步/重连/恢复不自动发Enter；发送票据绑定来源、图文、目标、权限、时限并至多执行一次",
     "不merge、不tag、不Release、不覆盖日用数据、不强制结束用户进程"
   ],
   "implemented_this_batch": [
-    "编辑事务：保存成功后提交；取消恢复原图或移除未保存白板；容量错误不上传、不丢画布",
-    "手机编辑器顶部取消/撤销/重做/保存，底部工具，图注和更多折叠；多选依次编辑",
-    "旧截图回执/异步选图容量边界；进度逐图同步；结构化Composer与移除附件节点识别",
-    "浮窗操作不抢键盘焦点，图文寻找限定当前窗口，纯文字保留旧行为",
-    "独立发送绑定设备、完成图文、稿件版本、目标、权限、时限；确认一次，日志先落盘消费，发键前复验"
+    "编辑事务、独立scratch恢复、原图恢复、保存失败留在画布、多选逐张编辑与过期截图回执过滤",
+    "手机画板取消/撤销/重做/保存固定顶部，常用工具底部横排，图注/更多工具折叠",
+    "受限结构化Composer识别与移除附件形式观察；浮窗动作不抢键盘焦点",
+    "手机逐图进度仅发主稿协议，保留旧协议回执顺序",
+    "独立发送的准备/确认/取消；先记已消费再执行，执行前复验，重复/重连不补发"
   ],
-  "last_commands": [{"cmd":"Local related production regressions","exit_code":0,"output":"141 passed / 1 Windows-only skip; native calls use explicit fakes. New frontend/Windows not yet validated."}],
-  "previous_cloud_evidence":{"run_id":35515000104,"source_sha":"6522f338d8f67f7d1f7b9fad701d0fa298a14332","conclusion":"previous package only"},
-  "candidate_artifact":null,
-  "open_defects":["新前端和Windows完整门槛尚未运行，不提升组件证据等级","真实Android/豆包/实际Cursor与其他Agent兼容需独立验证","历史偶发退出根因未确诊，保留异常记录","独立视觉与公开发布审批未完成"],
-  "independent_review":{"status":"NOT_RELEASE_READY","release_ready":false},
-  "published":false,"task_complete":false
+  "last_commands": [
+    {"cmd":"Full Linux pytest from fixed product SHA","exit_code":0,"output":"478 passed, 5 Windows-only skipped; 0 failed/errors. Four actual Chromium production editor transaction cases passed."},
+    {"cmd":"Full Windows pytest from fixed product SHA","exit_code":0,"output":"483 passed; 0 failed/errors/skipped"},
+    {"cmd":"Actual frozen startup, legacy three text inserts, phone-primary three text inserts, production-page/native browser scenarios","exit_code":0,"output":"Four reports passed; 13 browser cases passed. Insertion Enter events 0; two separately confirmed sending events; page errors 0; process exit 0."},
+    {"cmd":"Downloaded artifact independent audit","exit_code":0,"output":"262-file set/length/SHA-256 verified; build-info matches actual EXE reports; original inner ZIP bytes preserved"}
+  ],
+  "cloud_evidence": {
+    "run_id":35523383176,
+    "trigger_sha":"d47b239757100043f65109f45fc69e98d849cd12",
+    "source_sha":"aec0ee81bcd3274000a8799df54ef57cadfab8b3",
+    "conclusion":"success",
+    "native_browser_cases":13,
+    "three_images_one_click":true,
+    "desktop_button_tested":true,
+    "independent_enter_and_ctrl_enter_tested":true,
+    "actual_cursor_tested":false,
+    "actual_android_ime_tested":false,
+    "target_type":"independent Chromium test webpage, not production ChatGPT or Cursor"
+  },
+  "candidate_artifact": {
+    "artifact_id":10609123727,
+    "source_sha":"aec0ee81bcd3274000a8799df54ef57cadfab8b3",
+    "filename":"DoubaoTypeless_V3_Composer_aec0ee8.zip",
+    "zip_bytes":65195942,
+    "zip_sha256":"2ecec7133cf24bf890ea969d0b519d2b5f7f82ca41b6e4a1578e9f08a3106788",
+    "exe_sha256":"76c3989630dc2c82235c805c0364f8b8cd47bdba2e4ec80368c89e347feec862",
+    "outer_artifact_sha256":"61124f5acb9bb3a9f4fd6afb893de7eadf4d3952a98d110210c6c75fc3bd85ff",
+    "files_verified":262,
+    "verified_after_download":true,
+    "original_zip_preserved":true
+  },
+  "open_defects": [
+    "实际Android/豆包触控与输入法、真实Cursor/ChatGPT/其他Agent各版本和长期使用未由合成网页验证代替",
+    "历史偶发退出无用户现场证据，不能宣称已全部确诊",
+    "本次browser fault日志仍有一条0x8001010d；同PID完成13场景并正常退出0，保留记录不宣称零异常",
+    "独立视觉与公开发布审批未完成"
+  ],
+  "independent_review":{"status":"PRE_RELEASE_TRIAL_NOT_PUBLIC_RELEASE_READY","release_ready":false},
+  "published":false,
+  "task_complete":false
 }
