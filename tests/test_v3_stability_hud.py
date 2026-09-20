@@ -91,3 +91,10 @@ def test_result_timer_does_not_stop_for_old_selected_text(hud):
     hud.operation_event('delivery_start')
     hud.operation_event('delivery_complete',result='UNKNOWN',rotated=True,text_sent=True)
     assert hud._timer.isActive() and hud._timer.interval()==900
+
+
+def test_copy_during_pending_insert_is_disabled_to_avoid_manual_double_paste(hud):
+    hud.operation_event('sync_wait')
+    assert not hud._copy.isEnabled()
+    hud.operation_event('delivery_failed',error_code='PHONE_OFFLINE')
+    assert hud._copy.isEnabled()

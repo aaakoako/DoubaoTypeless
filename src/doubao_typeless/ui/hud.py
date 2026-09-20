@@ -369,6 +369,7 @@ class HudController:
             status += f" · {ready}/{len(self.assets)} 张已收到" if unfinished else f" · {ready} 张图片已更新"
         self._status.setText(self._operation_message if self._mode != "receiving" else status)
         self._insert.setEnabled(not unfinished and self._mode != "busy")
+        self._copy.setEnabled(self._mode != "busy")
         self._insert.setText("处理中…" if self._mode == "busy" else ("图片同步中" if unfinished else "插入并复制"))
         body = self.text if self.text else ("图片准备中，可继续在手机写说明" if unfinished else "")
         # 程序主动写字造成的滚动条变化，不能被误判成用户正在读前文。

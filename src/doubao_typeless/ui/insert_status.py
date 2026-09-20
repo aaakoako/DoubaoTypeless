@@ -23,6 +23,8 @@ ERRORS = {
     'DELIVERY_FAILED': '插入未完成，内容保留；可复制或重新选择目标',
     'FINALIZE_FAILED': '插入结果待确认，恢复副本已保留；请先检查目标',
     'COMMAND_FAILED': '本次操作中断，内容保留；程序仍可继续使用',
+    'DUPLICATE_INTENT': '这次请求已经处理，未重复插入；上次结果可恢复',
+    'COPY_FAILED': '剪贴板暂不可写，未复制；正文和图片仍保留',
     'BUSY': '正在处理上一次操作，没有排队重复插入',
     'SHUTTING_DOWN': '正在退出，未接受新的插入',
 }

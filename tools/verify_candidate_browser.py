@@ -20,14 +20,15 @@ from urllib.parse import urlparse
 import uuid
 
 TARGET_HTML = '''<!doctype html><meta charset="utf-8"><title>DT Browser Contract</title>
-<style>body{font:18px sans-serif;margin:35px}textarea, [contenteditable]{border:1px solid #888;width:650px;height:140px;display:block;margin:12px}</style>
+<style>body{font:18px sans-serif;margin:35px}textarea, [contenteditable]{border:1px solid #888;width:650px;height:140px;display:block;margin:12px}[contenteditable]{white-space:pre-wrap}</style>
 <h1>Disposable native input target</h1>
 <div id="composer"><textarea id="prompt-textarea" aria-label="Message input"></textarea>
 <div id="editable" contenteditable="true" role="textbox" aria-label="Chat input"></div>
 <div id="attachments"></div></div><textarea id="other" aria-label="Other input"></textarea>
 <script>
 window.enterEvents=0;document.addEventListener('keydown',e=>{if(e.key==='Enter')window.enterEvents++});
-window.pasteCount=0; document.addEventListener('paste',e=>{window.pasteCount++;
+window.pasteCount=0; window.pasteRecords=[]; document.addEventListener('paste',e=>{window.pasteCount++;
+ window.pasteRecords.push({target:e.target.id, text:e.clipboardData.getData('text/plain')});
  const files=[...e.clipboardData.files];
  if(files.length){e.preventDefault();for(const file of files){const im=new Image();im.alt='Attachment '+(document.images.length+1);im.width=48;im.height=48;im.src=URL.createObjectURL(file);document.getElementById('attachments').append(im)}}});
 window.dynamicTitle=null;
@@ -153,6 +154,8 @@ const raw=WebSocket.prototype.send;WebSocket.prototype.send=function(data){
                     await until(lambda: _matches(target,selector,expected), message='external browser exact text mismatch')
                     await until(lambda:_phone_empty(phone),message='real phone did not rotate to empty')
                     assert clipboard_text()==expected
+                    delivered=await target.evaluate('window.pasteRecords.at(-1)')
+                    assert delivered=={'target':selector[1:],'text':expected}, {'paste':delivered}
                     assert child.poll() is None
 
                 text='HUD按钮第一段  Image2 / Opus\n保留换行'
@@ -230,13 +233,30 @@ const raw=WebSocket.prototype.send;WebSocket.prototype.send=function(data){
                 result['page_errors']=errors
                 result['real_browser']=True
                 await target.screenshot(path=str(report.with_suffix('.png')))
+            except Exception:
+                # 只收集合成测试输入，保留真实DOM/剪贴板事件与可见错误，不重放插入。
+                try:
+                    result['observed']=await target.evaluate('''() => ({
+                        active:document.activeElement?.id,
+                        inputs:[...document.querySelectorAll('textarea,[contenteditable]')].map(e=>({
+                            id:e.id,value:e.value,text:e.textContent,innerText:e.innerText,html:e.innerHTML})),
+                        pastes:window.pasteRecords,enterEvents:window.enterEvents,title:document.title
+                    })''')
+                    result['phone_text']=await phone.locator('#text').input_value()
+                    result['hud_text']=hud_text()
+                    await target.screenshot(path=str(report.with_suffix('.png')))
+                except Exception as evidence_error:
+                    result['evidence_error_type']=type(evidence_error).__name__
+                raise
             finally:
                 await phone_browser.close();await browser.close()
     finally:await runner.cleanup()
 
 
 async def _matches(page,selector,expected):
-    if selector=='#editable':return await page.locator(selector).inner_text()==expected
+    # innerText 是渲染后的文本，会合并普通CSS下的连续空格。
+    # 检查DOM实际内容，同时completed另查原始paste事件文本，不放宽空格要求。
+    if selector=='#editable':return await page.locator(selector).text_content()==expected
     return await page.locator(selector).input_value()==expected
 
 

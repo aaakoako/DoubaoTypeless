@@ -156,3 +156,21 @@ def test_phone_disconnected_failure_not_lost_in_background_future(app):
 def test_runtime_entry_dispatches_frozen_process_before_loading_application():
     source=(Path(__file__).resolve().parents[1]/'tools/run_v3.py').read_text(encoding='utf-8')
     assert source.index('multiprocessing.freeze_support()') < source.rindex('    main()')
+
+
+def test_repeated_intent_never_leaves_a_permanent_waiting_hud(app):
+    calls=[]
+    platform(app,paste=lambda:calls.append('paste'))
+    bundle=prepare(app,'同一次操作')
+    app.deliver_and_finish({'intent_id':'repeat-id'},bundle)
+    second=app.deliver_and_finish({'intent_id':'repeat-id'},bundle)
+    assert second['duplicate'] and calls==['paste']
+    assert app.hud._mode!='busy'
+
+
+def test_copy_failure_preserves_current_draft_and_has_visible_feedback(app):
+    platform(app);prepare(app,'复制失败保留')
+    app._set_text=lambda _:(_ for _ in ()).throw(OSError('clipboard unavailable'))
+    app.copy_text()
+    assert app.draft.text=='复制失败保留' and app.hud._mode=='failed'
+    assert '未复制' in app.hud._operation_message

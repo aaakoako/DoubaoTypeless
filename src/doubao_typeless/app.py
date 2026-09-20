@@ -693,7 +693,10 @@ class V3App:
             asyncio.run_coroutine_threadsafe(self.bridge.publish_phone_event(event), loop)
 
     def _after_insert(self, bundle: dict, payload: dict, *, publish: bool = True) -> dict:
-        if payload.get("duplicate") or payload.get("result") == "BUSY":
+        if payload.get("duplicate"):
+            self._notify_ui("delivery_failed", error_code="DUPLICATE_INTENT")
+            return payload
+        if payload.get("result") == "BUSY":
             return payload
         # 无发键结果不覆盖用户剪贴板；未知或部分图片仍留在恢复副本中。
         if any(step.get("kind") == "text" for step in payload.get("steps") or []) and not payload.get("error_code"):
@@ -919,6 +922,7 @@ class V3App:
             self._set_text(text)
         except Exception:
             _log("[v3.copy] 只复制失败，稿未清")
+            self._notify_ui("delivery_failed", error_code="COPY_FAILED")
         return text
 
     def _preserve_current_draft(self) -> None:
