@@ -260,12 +260,13 @@ def test_production_settings_and_pc_copy(tmp_path):
                     else None,
                 )
                 await page.goto(f"http://127.0.0.1:{port}/")
+                await page.locator("#sheetCard summary").click()
                 await page.wait_for_selector("#pairCode")
                 pair_copy = await page.locator("#sheetCard").inner_text()
                 assert "二维码" in pair_copy
                 assert "短码" in pair_copy
-                assert "跳过纠错" in pair_copy
-                assert "跳过纠错" in pair_copy
+                assert "备用短码" in pair_copy
+                assert "草稿会保留" in pair_copy
                 await page.fill("#pairCode", auth.new_pairing_challenge())
                 async with page.expect_response(lambda r: r.url.endswith("/v3/pair") and r.request.method == "POST") as info:
                     await page.click("#pairGo")

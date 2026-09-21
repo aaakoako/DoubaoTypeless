@@ -27,3 +27,5 @@ body:has(.editor.show){overflow:hidden}.page:has(.editor.show){height:100dvh;min
 .submit-panel{padding:10px;background:var(--soft);border:1px solid var(--line);border-radius:var(--radius-control)}.submit-panel[hidden]{display:none}.submit-panel p{font-size:12px;margin:0 0 8px}.submit-panel button{width:100%}
 
 #editorStatus{flex:none;font-size:12px;padding:8px 12px;background:var(--soft);margin:0}#editorStatus[hidden]{display:none}
+.icon-tool{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:52px;font-size:11px;line-height:1.25}.tools .icon-tool{flex-direction:row;gap:8px;font-size:14px}.icon-tool svg{flex:none}
+.canvas-text-panel{position:absolute;top:64px;left:12px;right:12px;z-index:5;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}.canvas-text-panel[hidden]{display:none}.canvas-text-panel textarea{display:block;width:100%;font-size:16px;min-height:70px;margin:8px 0}.canvas-text-panel>div{display:flex;justify-content:flex-end;gap:8px}.editor{position:relative}.editor>.head{position:relative;z-index:6;background:var(--surface)}

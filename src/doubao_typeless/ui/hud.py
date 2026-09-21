@@ -28,16 +28,27 @@ class HudController:
         on_insert: Callable[[], None] | None = None,
         on_expand: Callable[[], None] | None = None,
         on_copy: Callable[[], None] | None = None,
+        on_recover: Callable[[], None] | None = None,
+        position: list | None = None,
+        on_position: Callable | None = None,
     ):
         self._on_insert = on_insert
         self._on_expand = on_expand
         self._on_copy = on_copy
+        self._on_recover = on_recover
+        self._on_position = on_position
+        self._saved_position = position
+        self._user_positioned = False
+        self._companions = []
+        self._drag_offset = None
+        self._recover = None
         self.visible = False
         self.text = ""
         self.image_count = 0
         self.assets: list[dict] = []
         self.revision = 0
         self.phone_primary = False
+        self.phone_online = True
         self._thumbs = None
         self._thumb_row = None
         self._thumb_signature = None
@@ -105,6 +116,27 @@ class HudController:
         self._status.setWordWrap(True)
         self._status.setObjectName("DTInsertStatus")
         self._status.setWordWrap(True)
+        self._status.setCursor(Qt.SizeAllCursor)
+        self._status.setToolTip("拖动这里移动浮窗")
+        controller = self
+        from PySide6.QtCore import QEvent
+        class DragHeader(QObject):
+            def eventFilter(inner, obj, event):
+                if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+                    controller._drag_offset = event.globalPosition().toPoint() - w.pos()
+                    return True
+                if event.type() == QEvent.MouseMove and controller._drag_offset is not None:
+                    w.move(event.globalPosition().toPoint() - controller._drag_offset)
+                    controller._user_positioned = True
+                    return True
+                if event.type() == QEvent.MouseButtonRelease and controller._drag_offset is not None:
+                    controller._drag_offset = None
+                    if controller._on_position:
+                        controller._on_position([w.x(), w.y()])
+                    return True
+                return False
+        self._drag_filter = DragHeader(w)
+        self._status.installEventFilter(self._drag_filter)
         self._body = QTextEdit()
         self._body.setReadOnly(True)
         self._body.setMinimumHeight(40)
@@ -145,6 +177,12 @@ class HudController:
         self._insert = btn
         row.addWidget(expand, 0)
         row.addWidget(copy, 0)
+        self._recover = QPushButton("恢复")
+        self._recover.setFocusPolicy(Qt.NoFocus)
+        self._recover.setToolTip("查看已插入的部分，再决定如何继续")
+        self._recover.clicked.connect(lambda: self._on_recover and self._on_recover())
+        self._recover.hide()
+        row.addWidget(self._recover, 0)
         row.addWidget(btn, 0)
         row.addStretch(1)
         dismiss = QPushButton("×")
@@ -251,6 +289,7 @@ class HudController:
             self._mode = "busy"
             self._operation_message = "正在确认手机最新内容…" if event == "sync_wait" else "正在插入，请勿切换输入框…"
             self._operation_content_serial = self._content_serial
+            if self._recover is not None: self._recover.hide()
         elif event == "delivery_progress":
             stage,index,total=payload.get("stage"),payload.get("index",0),payload.get("total",0)
             message = (f"正在插入第 {index}/{total} 张图片…" if stage=="image" else
@@ -264,6 +303,13 @@ class HudController:
         elif event == "delivery_failed":
             self._mode = "failed"
             self._operation_message = error_message(payload)
+            if payload.get("copied"):
+                self._mode = "result"
+                self._operation_message = f"{error_message(payload).split('，')[0].split('；')[0]}；已复制{payload['copied']}，可按 Ctrl+V 粘贴"
+        elif event == "recovery_available":
+            self._mode = "failed"
+            self._operation_message = (payload.get("progress") or {}).get("message") or "部分图文待确认；可点恢复继续"
+            if self._recover is not None: self._recover.show()
         elif event == "delivery_complete":
             new_content = self._content_serial > self._operation_content_serial and (self.text or self.assets)
             if new_content and not payload.get("rotated"):
@@ -288,12 +334,42 @@ class HudController:
         self._apply_show()
 
     def _idle_timeout(self) -> None:
-        if self._mode == "busy":
+        # 未完成的稿件常驻；切换应用、停止说话都不是用户收起的意图。
+        if self._mode == "result":
+            self._apply_hide()
+
+    def register_companion(self, widget):
+        """普通设置不独占HUD；默认摆放尽量避开它，用户仍能自由拖动。"""
+        import weakref
+        self._companions.append(weakref.ref(widget))
+
+    def _place(self):
+        from PySide6.QtCore import QPoint, QRect
+        from PySide6.QtGui import QGuiApplication
+        w = self._widget
+        if self._saved_position and not self._user_positioned:
+            if len(self._saved_position) == 2 and all(isinstance(v, int) for v in self._saved_position):
+                target = QPoint(*self._saved_position)
+                if any(screen.availableGeometry().contains(target) for screen in QGuiApplication.screens()):
+                    w.move(target); self._user_positioned = True
+            self._saved_position = None
+        if self._user_positioned:
             return
-        if self._mode != "result" and (self._reading() or (self._widget is not None and self._widget.underMouse())):
-            self._timer.start(TOKENS["idle_ms"])
-            return
-        self._apply_hide()
+        screen = w.screen() or QGuiApplication.primaryScreen()
+        if not screen: return
+        area = screen.availableGeometry().adjusted(16, 16, -16, -16)
+        xs = [area.right()-w.width()+1, area.left()]
+        ys = [area.bottom()-w.height()+1, area.top()]
+        candidates = [QRect(x,y,w.width(),w.height()) for y in ys for x in xs]
+        occupied=[]
+        for ref in self._companions:
+            other=ref()
+            try:
+                if other is not None and other.isVisible(): occupied.append(other.frameGeometry())
+            except RuntimeError: pass
+        def overlap(rect):
+            return sum(max(0,rect.intersected(o).width())*max(0,rect.intersected(o).height()) for o in occupied)
+        w.move(min(candidates,key=overlap).topLeft())
 
     def bind_foreground_surface(self, widget):
         """GUI-thread binding: one desktop action surface at a time.
@@ -434,7 +510,7 @@ class HudController:
     def _pause_or_resume_idle(self) -> None:
         if self._timer is None:
             return
-        if self._mode == "busy" or (self._mode != "result" and self._reading()):
+        if self._mode != "result":
             self._timer.stop()
             return
         self._timer.start(12000 if self._mode == "failed" else (900 if self._mode == "result" else TOKENS["idle_ms"]))
@@ -491,7 +567,7 @@ class HudController:
         self._refresh_thumbnails()
         unfinished = sum(a.get("status", "ready") != "ready" for a in self.assets)
         ready = len(self.assets) - unfinished
-        status = f"手机稿 · r{self.revision}" if self.phone_primary else "手机输入中"
+        status = (f"手机稿 · r{self.revision}" if self.phone_online else f"手机离线 · 电脑保留稿 r{self.revision}") if self.phone_primary else "手机输入中"
         if self.assets:
             status += f" · {ready}/{len(self.assets)} 张已收到" if unfinished else f" · {ready} 张图片已更新"
         self._status.setText(self._operation_message if self._mode != "receiving" else status)
@@ -551,6 +627,7 @@ class HudController:
         self._body.blockSignals(False)
         scroll.blockSignals(False)
         self._latest.setVisible(reading)
+        self._place()
         self._widget.show()
         self._updating = False
         from PySide6.QtCore import QTimer
@@ -565,7 +642,7 @@ class HudController:
                 self._updating = False
         QTimer.singleShot(0, self._widget, settle_tail)
         if self._timer:
-            if self._mode == "busy" or (reading and self._mode != "result"):
+            if self._mode != "result":
                 self._timer.stop()
             else:
                 self._timer.start(12000 if self._mode == "failed" else (900 if self._mode == "result" else TOKENS["idle_ms"]))

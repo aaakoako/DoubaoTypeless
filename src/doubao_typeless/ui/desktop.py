@@ -231,6 +231,10 @@ class ReviewPanel:
         tools_row.addStretch(1)
         layout.addLayout(tools_row)
         row.addStretch(1)
+        back = QPushButton("返回浮窗")
+        back.clicked.connect(self.return_to_hud)
+        self.btn_back = back
+        row.addWidget(back)
         row.addWidget(copy)
         row.addWidget(insert)
         layout.addLayout(row)
@@ -243,6 +247,7 @@ class ReviewPanel:
         apply_s.hide()
         reject_s.hide()
         self.widget = w
+        w.closeEvent = lambda event: (event.ignore(), self.return_to_hud())
         from PySide6.QtCore import QEvent, QObject
 
         class _HideRelease(QObject):
@@ -256,6 +261,11 @@ class ReviewPanel:
         w.installEventFilter(self._hide_filter)
         self.app.hud.bind_foreground_surface(w)
         self.reload()
+
+    def return_to_hud(self) -> None:
+        self.app.update_pc_text(self.editor.toPlainText())
+        self.widget.hide()
+        self.app._on_activity(self.app.review_text(), len(self.app.draft.assets))
 
     def _mark_editing(self) -> None:
         self._editing = True
@@ -493,6 +503,10 @@ class ClientWindow:
         version = QLabel(preview_version_label())
         version.setObjectName("muted")
         cl.addWidget(version)
+        self.delivery_status = QLabel("")
+        self.delivery_status.setWordWrap(True)
+        self.delivery_status.setProperty("role", "status")
+        cl.addWidget(self.delivery_status)
         card = QFrame()
         card.setObjectName("card")
         from PySide6.QtWidgets import QSizePolicy
@@ -713,7 +727,7 @@ class ClientWindow:
 
         self.tabs = tabs
         self.widget = w
-        self.app.hud.bind_foreground_surface(w)
+        self.app.hud.register_companion(w)
         self._clipboard = QGuiApplication.clipboard()
         self._hist_sig = None
         self._pairing_url = ""
@@ -831,7 +845,7 @@ class ClientWindow:
     def _tick_countdown(self) -> None:
         if not self.widget.isVisible() or self.qr.isHidden():
             return
-        self.code_label.setText(self._pair_caption())
+        self.refresh()
 
     def _toggle_remember(self) -> None:
         if not self.remember_box.isChecked():
@@ -858,7 +872,13 @@ class ClientWindow:
                 self.qr.setPixmap(pix)
         self.code_label.setText(self._pair_caption())
         sessions = self.app.auth.public_sessions()
-        sig = tuple((s["session_id"], s["allow_insert"], s["allow_capture"]) for s in sessions)
+        online = self.app.bridge.online_device_ids()
+        hud = self.app.hud
+        phone_online = self.app.draft.editor_device_id in online
+        if hud.phone_online != phone_online:
+            hud.phone_online = phone_online
+            if hud._widget is not None and hud._widget.isVisible(): hud._apply_show()
+        sig = tuple((s["session_id"], s["allow_insert"], s["allow_capture"], s["device_id"] in online) for s in sessions)
         if sig != self._session_sig:
             self._session_sig = sig
             self._clear_grant_row()
@@ -869,7 +889,7 @@ class ClientWindow:
                 self.device_box.setText("还没有手机连上。扫码后在这里批准插入和截图。")
                 self.device_name.hide()
             else:
-                self.qr.hide()
+                self.qr.show()
                 self.practice.hide()
                 self.practice_toggle.hide()
                 from doubao_typeless.storage.credentials import device_label
@@ -879,7 +899,7 @@ class ClientWindow:
                 for index, item in enumerate(sessions, start=1):
                     name = device_label(item["device_id"], nicks, index)
                     lines.append(
-                        f"{name}  插入={'开' if item['allow_insert'] else '关'}  "
+                        f"{name} · {'在线' if item['device_id'] in online else '离线，电脑保留最后收到的稿'}  插入={'开' if item['allow_insert'] else '关'}  "
                         f"截图={'开' if item['allow_capture'] else '关'}"
                     )
                     sid = item["session_id"]
@@ -1151,7 +1171,7 @@ class DesktopShell:
             from doubao_typeless.ui.insert_status import error_message
             text = error_message(_kw)
             def show_error():
-                self.client.byok_status.setText(text)
+                self.client.delivery_status.setText(text)
                 if self.review.widget.isVisible():
                     self.review.banner.setText(text)
                     self.review.banner.show()

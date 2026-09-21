@@ -89,7 +89,7 @@ class V3App:
             text="",
         )
         self.history = HistoryService(self.data_dir / "history.json", persist=True, db=self.db)
-        from doubao_typeless.storage.settings_store import load_settings
+        from doubao_typeless.storage.settings_store import load_settings, save_settings
 
         stored = load_settings(self.data_dir)
         self.byok = ByokService(
@@ -116,6 +116,9 @@ class V3App:
         self.hud = HudController(
             on_insert=self.request_insert,
             on_copy=self.copy_text,
+            on_recover=lambda: self._notify_ui("recovery_ask"),
+            position=stored.get("hud_position"),
+            on_position=lambda pos: save_settings(self.data_dir, {"hud_position": pos}),
             on_expand=lambda: self._notify_ui("expand"),
         )
         self._observer = observer_from_env()
@@ -197,7 +200,7 @@ class V3App:
         """UI/热键非阻塞入口；总是返回Future，校验失败同样有明确结果。"""
         from concurrent.futures import Future
         if self.draft.authority == "phone":
-            return self._commands.submit(self._insert_primary, False)
+            return self._commands.submit(self._insert_primary, bool(self._desktop_edit and self._desktop_edit["base"] == source_snapshot(self.draft)))
         with self._state_lock:
             if not (self.draft.text or self.draft.assets):
                 self._notify_ui("delivery_failed", error_code="EMPTY_DRAFT")
@@ -215,9 +218,9 @@ class V3App:
 
     def request_locate_composer(self):
         """用户明确点定位；只定位不投递，不改变草稿或之前的投递结果。"""
-        return self._commands.submit(self._locate_composer)
+        return self._commands.submit(self._locate_composer, True)
 
-    def _locate_composer(self) -> dict:
+    def _locate_composer(self, show_choices: bool = False) -> dict:
         from doubao_typeless.platform.windows.composer_locator import locate_current
         from doubao_typeless.platform.windows.focus import FocusSnapshot, restore_target
         self._notify_ui("composer_locating")
@@ -227,7 +230,8 @@ class V3App:
             if result.get("status") != "found":
                 if result.get("status") == "ambiguous":
                     self._composer_candidates = result.get("candidates") or []
-                    self._notify_ui("composer_pick", candidates=self._composer_candidates)
+                    if show_choices:
+                        self._notify_ui("composer_pick", candidates=self._composer_candidates)
                 code = "COMPOSER_AMBIGUOUS" if result.get("status") == "ambiguous" else "COMPOSER_NOT_FOUND"
                 self._notify_ui("delivery_failed", error_code=code)
                 return result
@@ -319,37 +323,36 @@ class V3App:
             return self._commands.submit(self._insert_primary, True)
         return self.request_insert()
 
-    def _insert_primary(self, use_desktop_edit: bool = False) -> dict:
-        """本机快捷键先向作者确认当前稿；手机离线时不偷偷贴旧镜像。"""
-        self._notify_ui("sync_wait")
+    def _copy_fallback(self, bundle: dict, payload: dict) -> dict:
+        """Explicit local Insert-and-copy still leaves a manual paste when targeting fails."""
+        if payload.get("steps") or payload.get("error_code") not in {
+            "NEEDS_TARGET", "OWN_WINDOW", "COMPOSER_NOT_FOUND", "COMPOSER_AMBIGUOUS",
+            "TARGET_CHANGED", "TARGET_ELEVATED", "TARGET_PERMISSION_UNKNOWN",
+            "TARGET_INSPECTION_TIMEOUT", "TARGET_INSPECTION_FAILED", "DELIVERY_FAILED"}:
+            return payload
         try:
-            if self.bridge.paused:
-                raise ValueError("CONNECTION_PAUSED")
-            self._restore_external_target()
-            focus = self._read_focus()
-            kind = getattr(focus, "kind", focus[6] if len(focus)>6 else "")
-            # A user-triggered local text insert is not restricted to AI composers.
-            # Tk/native editors may expose no UIA editable pattern. Keep their text
-            # path, but require a located composer for images or our own window.
-            # DeliveryService rechecks the final bundle and target after prepare.
-            if (kind in {"unknown", "edit"} and bool(self.draft.assets)) or is_own_window(*focus[:2]):
-                located = self._locate_composer()
-                if located.get("status") != "located": raise ValueError("COMPOSER_NOT_FOUND")
-                focus = self._read_focus()
-            expected = tuple(focus)
-            loop = getattr(self, "_loop", None)
-            if loop is None or not loop.is_running():
-                raise ValueError("PHONE_OFFLINE")
-            pending = asyncio.run_coroutine_threadsafe(
-                self.bridge.prepare_phone(self.draft.editor_device_id), loop)
-            try:
-                pending.result(timeout=7)
-            except ValueError:
-                pending.cancel()
-                raise
-            except Exception:
-                pending.cancel()
-                raise ValueError("PHONE_NOT_CURRENT") from None
+            self.history.record(bundle, attempt_result="NO_STEPS")
+            text = str(bundle.get("text") or "")
+            assets = bundle.get("assets") or []
+            if text:
+                self._set_text(text)
+                copied = "文字"
+            elif len(assets) == 1 and assets[0].get("asset_id"):
+                self._set_image(self.store.get(assets[0]["asset_id"]))
+                copied = "图片"
+            else:
+                return payload
+            payload = {**payload, "copied": copied}
+            self._notify_ui("delivery_failed", **payload)
+            return payload
+        except Exception as exc:
+            self._report_command_error(exc)
+            return payload
+
+    def _insert_primary(self, use_desktop_edit: bool = False) -> dict:
+        """本地点插入冻结电脑当前可见稿；手机离线不影响已收到的内容。"""
+        bundle = None
+        try:
             with self._state_lock:
                 bound = source_snapshot(self.draft)
                 current = copy.deepcopy(self.draft)
@@ -357,24 +360,33 @@ class V3App:
                     if self._desktop_edit["base"] != bound:
                         raise ValueError("PHONE_CHANGED_REVIEW")
                     current.text = self._desktop_edit["text"]
+                if not (current.text or current.assets):
+                    raise ValueError("EMPTY_DRAFT")
                 bundle = freeze_bundle(current, bundle_id=str(uuid.uuid4()))
                 bundle["source_text"] = self.draft.text
                 bundle["source_snapshot"] = bound
                 from doubao_typeless.core.bundle import canonical_manifest_hash
                 bundle["manifest_hash"] = canonical_manifest_hash(bundle)
+            # Freeze before any focus scan; edits arriving during a scan are not
+            # substituted into the user's action. Receipt binds the captured version.
+            self._restore_external_target()
+            focus = self._read_focus()
+            kind = getattr(focus, "kind", focus[6] if len(focus)>6 else "")
+            if (kind in {"unknown", "edit"} and bool(bundle.get("assets"))) or is_own_window(*focus[:2]):
+                located = self._locate_composer()
+                if located.get("status") != "located": raise ValueError("COMPOSER_NOT_FOUND")
+                focus = self._read_focus()
             intent = self._session_intent("insert_current")
-            intent["expected_focus"] = expected
+            intent["expected_focus"] = tuple(focus)
             return self.deliver_and_finish(intent, bundle)
         except ValueError as exc:
-            code = str(exc)
-            self._notify_ui("delivery_failed", error_code=code)
-            return {"result": "NO_STEPS", "error_code": code, "steps": []}
+            payload = {"result":"NO_STEPS", "error_code":str(exc), "steps":[]}
         except Exception as exc:
             self._report_command_error(exc)
-            detail = getattr(exc, "error_code", "")
-            self._notify_ui("delivery_failed", error_code="DELIVERY_FAILED", detail_code=detail)
-            return {"result": "NO_STEPS", "error_code": "DELIVERY_FAILED", "detail_code": detail, "steps": []}
-
+            payload = {"result":"NO_STEPS", "error_code":"DELIVERY_FAILED",
+                       "detail_code":getattr(exc,"error_code",""), "steps":[]}
+        self._notify_ui("delivery_failed", **payload)
+        return self._copy_fallback(bundle, payload) if bundle else payload
 
     def remember_connected(self) -> int:
         count = 0
@@ -409,7 +421,7 @@ class V3App:
 
     def _notify_ui(self, event: str, **kwargs) -> None:
         # 状态首先进入真正的HUD，托盘提示只是补充；未知结果不能伪装成成功。
-        if event in {"sync_wait", "delivery_start", "delivery_failed", "delivery_complete", "composer_locating", "composer_located", "delivery_progress"}:
+        if event in {"sync_wait", "delivery_start", "delivery_failed", "delivery_complete", "composer_locating", "composer_located", "delivery_progress", "recovery_available"}:
             self._last_delivery_status = {"event": event, **kwargs}
             hud = getattr(self, "hud", None)
             if hud is not None:
@@ -731,13 +743,8 @@ class V3App:
         return hydrated
 
     def _session_intent(self, trigger: str) -> dict:
-        intent = {"intent_id": str(uuid.uuid4()), "trigger": trigger}
-        sessions = list(self.auth.sessions.values())
-        if sessions:
-            intent["session_id"] = sessions[-1].session_id
-            intent["token"] = sessions[-1].token
-            intent["nonce"] = self.auth.issue_nonce(sessions[-1])
-        return intent
+        # Local actions do not depend on a phone credential or its expiry.
+        return {"intent_id": str(uuid.uuid4()), "trigger": trigger}
 
     def _keep_inserted_copy(self, bundle: dict, payload: dict | None = None) -> None:
         if payload and payload.get("error_code") == "CLIPBOARD_INTERFERENCE":
@@ -826,9 +833,11 @@ class V3App:
         }
 
     def _publish_phone_event(self, event: dict) -> None:
+        from doubao_typeless.storage.draft_snapshot import write_json_atomic
+        write_json_atomic(self.data_dir / "phone-event.json", event)
         self.bridge.last_phone_event = event
         loop = getattr(self, "_loop", None)
-        if loop is not None:
+        if loop is not None and loop.is_running():
             asyncio.run_coroutine_threadsafe(self.bridge.publish_phone_event(event), loop)
 
     def _after_insert(self, bundle: dict, payload: dict, *, publish: bool = True) -> dict:
@@ -837,7 +846,9 @@ class V3App:
             return payload
         if payload.get("result") == "BUSY":
             return payload
-        # 无发键结果不覆盖用户剪贴板；未知或部分图片仍留在恢复副本中。
+        if publish and payload.get("error_code") and not payload.get("steps"):
+            payload = self._copy_fallback(bundle, payload)
+        # 已发图片步骤不改剪贴板；尚未完成的图文仍留在恢复副本中。
         if any(step.get("kind") == "text" for step in payload.get("steps") or []) and not payload.get("error_code"):
             self._keep_inserted_copy(bundle, payload)
         from doubao_typeless.services.delivery_progress import summarize_delivery
@@ -862,7 +873,7 @@ class V3App:
         if (not rotated and not payload.get("error_code") and bundle.get("assets")
                 and payload.get("result") in {"UNKNOWN", "PARTIAL"}):
             # 主流程暂停而不是自动重贴。用户的明确确认才允许继续下一张。
-            self._notify_ui("recovery_ask")
+            self._notify_ui("recovery_available", progress=payload["progress"])
         return payload
 
     def deliver_and_finish(self, intent: dict, bundle: dict) -> dict:
@@ -1074,7 +1085,7 @@ class V3App:
         self._last_suggestion = None
 
     def copy_text(self, text: str | None = None) -> str:
-        text = self.draft.text if text is None else text or ""
+        text = self.review_text() if text is None else text or ""
         self._copied_text = text
         try:
             self._set_text(text)

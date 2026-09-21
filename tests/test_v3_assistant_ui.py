@@ -37,9 +37,9 @@ def test_network_thread_really_shows_widget_on_gui_loop(hud):
     assert hud._widget.width()==400
     assert hud._widget.height()<=300
     assert hud._body.verticalScrollBar().maximum()>0
-    # 初次长文应自动追尾并允许定时隐藏，不误判成用户在看前文。
+    # 初次长文自动追尾；按2026-09-22用户反馈，未完成稿不自动隐藏。
     assert hud._body.verticalScrollBar().value()==hud._body.verticalScrollBar().maximum()
-    assert hud._timer.isActive()
+    assert not hud._timer.isActive()
 
 
 def test_reading_selection_survives_append_and_pauses_idle(hud):
@@ -63,7 +63,7 @@ def test_hud_shrinks_for_next_short_draft(hud):
     old=hud._widget.height()
     hud.hide();hud.show_receiving('新段落');QTest.qWait(20)
     assert hud._widget.height()<old
-    assert hud._timer.isActive()
+    assert not hud._timer.isActive()
 
 
 def test_review_commits_edit_before_queued_insert(tmp_path):

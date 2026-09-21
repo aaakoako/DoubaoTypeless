@@ -27,6 +27,7 @@ def load_settings(data_dir: Path) -> dict[str, Any]:
         "hotkey_recall": "<alt>+<shift>+i",
         "hotkey_expand": "<alt>+<shift>+e",
         "hotkey_capture": "<alt>+<shift>+s",
+        "hud_position": None,
         "autostart": False,
         "start_minimized": False,
         "phone_send_enabled": False,
@@ -87,6 +88,7 @@ def _rewrite_without_secrets(path: Path, data: dict[str, Any]) -> None:
 
 
 ALLOWED = {
+    "hud_position",
     "byok_endpoint",
     "byok_api_key",
     "byok_model",

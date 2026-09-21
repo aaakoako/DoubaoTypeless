@@ -19,7 +19,7 @@ def surfaces(tmp_path):
     client.widget.deleteLater();review.widget.deleteLater();a.hud._widget.deleteLater()
     a._commands.close(2);a.db.conn.close();a._lock.release();QTest.qWait(10)
 
-@pytest.mark.parametrize('name',['client','review'])
+@pytest.mark.parametrize('name',['review'])
 def test_visible_surface_excludes_hud_even_when_phone_updates(surfaces,name):
     a,c,r=surfaces
     a._remember_external_target=lambda:None
@@ -50,7 +50,7 @@ def test_locate_button_does_not_call_insert_or_clear_phone(surfaces):
 def test_multiple_surfaces_release_independently(surfaces):
     a,c,r=surfaces;a._remember_external_target=lambda:None
     c.show_window();r.show();QTest.qWait(10)
-    r.widget.hide();a.hud.show_receiving('still suppressed');QTest.qWait(10)
-    assert not a.hud._widget.isVisible()
+    r.widget.hide();a.hud.show_receiving('settings coexists');QTest.qWait(10)
+    assert a.hud._widget.isVisible() and c.widget.isVisible()
     c.widget.hide();a.hud.show_receiving('show now');QTest.qWait(10)
     assert a.hud._widget.isVisible()

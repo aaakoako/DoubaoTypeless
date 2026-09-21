@@ -24,6 +24,7 @@ export class SharedEditor {
   layer: Konva.Layer;
   imageLayer: Konva.Layer;
   tool: Tool = "pen";
+  onTextRequest?: (point: {x:number;y:number}) => void;
   color = "#D45243";
   width = 5;
   ops = 0;
@@ -209,8 +210,23 @@ export class SharedEditor {
     return { color: this.color, width: this.width, opacity: 1 };
   }
 
+  addText(value: string, point: {x:number;y:number}): void {
+    if (this.destroyed || !value.trim()) return;
+    this.pushUndo();
+    this.layer.add(new Konva.Text({x:point.x,y:point.y,text:value,fill:this.color,fontSize:28}));
+    this.ops += 1;
+    this.layer.draw();
+  }
+
   private onPointerDown(ev: PointerEvent): void {
+    if (this.destroyed || ev.button > 0) return;
     ev.preventDefault();
+    // Text opens an in-page editor before any pointer capture. Native prompt
+    // swallowed pointerup on mobile and redirected later toolbar taps here.
+    if (this.tool === "text") {
+      this.onTextRequest?.(this.world(ev));
+      return;
+    }
     (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId);
     this.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
     if (this.pointers.size === 2) {
@@ -253,15 +269,6 @@ export class SharedEditor {
       g.add(new Konva.Circle({ radius: 18, fill: this.color }));
       g.add(new Konva.Text({ text: String(this.numbers), fill: "#fff", fontSize: 16, offsetX: 5, offsetY: 8 }));
       this.layer.add(g);
-      this.ops += 1;
-      this.layer.draw();
-      return;
-    }
-    if (this.tool === "text") {
-      const value = window.prompt("添加文字", "") || "";
-      if (!value) return;
-      this.pushUndo();
-      this.layer.add(new Konva.Text({ x: p.x, y: p.y, text: value, fill: this.color, fontSize: 28 }));
       this.ops += 1;
       this.layer.draw();
       return;
@@ -365,6 +372,8 @@ export class SharedEditor {
   }
 
   private onPointerUp(ev: PointerEvent, cancel = false): void {
+    const host = this.stage.container();
+    if (host.hasPointerCapture(ev.pointerId)) host.releasePointerCapture(ev.pointerId);
     this.pointers.delete(ev.pointerId);
     this.panStart = null;
     if (this.pinch) {

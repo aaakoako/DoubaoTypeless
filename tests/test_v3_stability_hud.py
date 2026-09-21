@@ -33,7 +33,7 @@ def test_failure_is_visible_copy_remains_and_success_can_hide(hud):
     QTest.qWait(20)
     assert hud._widget.isVisible() and hud._insert.isEnabled()
     assert hud._copy.isEnabled() and '离线' in hud._status.text()
-    assert hud._timer.interval()==12000
+    assert not hud._timer.isActive()
     hud.operation_event('delivery_start')
     hud.operation_event('delivery_complete',result='UNKNOWN',rotated=True,text_sent=True)
     assert hud._timer.interval()==900
@@ -59,7 +59,7 @@ def test_new_content_during_operation_is_not_hidden_by_previous_receipt(hud):
     hud.show_receiving('下一段',revision=3)
     hud.operation_event('delivery_complete',result='UNKNOWN',rotated=False,text_sent=True)
     assert hud._mode=='receiving' and hud._body.toPlainText()=='下一段'
-    assert hud._timer.interval()==6000
+    assert not hud._timer.isActive()
 
 
 def test_image_updates_do_not_remove_waiting_feedback(hud):

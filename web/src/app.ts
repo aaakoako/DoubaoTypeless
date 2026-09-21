@@ -1,3 +1,4 @@
+import { decorateTools } from "./icons";
 import { SharedEditor, type Tool } from "./editor/canvas";
 import { applyReady, applyRotated, buildDraftUpdate, buildPrimaryUpdate, rotatePrimary, DraftOutbox } from "./sync.js";
 import { looksLikeKeyScript, newId } from "./transport/protocol";
@@ -72,6 +73,10 @@ export function boot(root: HTMLElement): void {
           <button id="redoBtn" aria-label="重做">重做</button>
           <button class="primary" id="done">保存图片</button>
         </div>
+        <div id="canvasTextPanel" class="canvas-text-panel" hidden>
+          <label for="canvasTextInput">画布文字</label><textarea id="canvasTextInput" rows="2" placeholder="输入要标注的文字"></textarea>
+          <div><button id="canvasTextCancel">取消文字</button><button id="canvasTextAdd" class="primary">放入画布</button></div>
+        </div>
         <p id="editorStatus" role="status" aria-live="polite" hidden></p><div id="stage"></div>
         <div class="crop-actions" id="cropActions">
           <button id="cropReset">全图</button>
@@ -142,7 +147,21 @@ export function boot(root: HTMLElement): void {
   function finishFeedback(msg: any): boolean {
     return !!activeSend?.intentId && msg.intent_id === activeSend.intentId && finishSend(activeSend);
   }
+  decorateTools(root);
   let editor: SharedEditor | null = null;
+  let textPoint: {x:number;y:number} | null = null;
+  function closeCanvasText() {
+    $("canvasTextPanel").hidden = true;
+    textPoint = null;
+  }
+  function chooseTool(tool: Tool) {
+    if (editor) editor.tool = tool;
+    root.querySelectorAll<HTMLElement>("[data-tool]").forEach(b => {
+      b.classList.toggle("selected", b.dataset.tool === tool);
+      b.setAttribute("aria-pressed", String(b.dataset.tool === tool));
+    });
+    $("cropActions").classList.toggle("show", tool === "crop");
+  }
   let currentId = "";
   const blobUrls: string[] = [];
   let reconnectTimer = 0;
@@ -169,6 +188,16 @@ export function boot(root: HTMLElement): void {
     }
   }
   const $ = (id: string) => document.getElementById(id)!;
+  $("canvasTextCancel").onclick = () => {closeCanvasText(); chooseTool("pen");};
+  function commitCanvasText(): boolean {
+    if (!editor || !textPoint) return false;
+    const value = ($("canvasTextInput") as HTMLTextAreaElement).value;
+    if (!value.trim()) return false;
+    editor.addText(value, textPoint);
+    closeCanvasText(); chooseTool("select"); saveOpenEditor();
+    return true;
+  }
+  $("canvasTextAdd").onclick = () => {if (!commitCanvasText()) $("canvasTextInput").focus();};
   const headers = (): Record<string, string> =>
     state.session
       ? { "X-DT-Session": state.session.session_id, "X-DT-Token": state.session.token }
@@ -310,7 +339,7 @@ export function boot(root: HTMLElement): void {
   }
 
   function connect() {
-    if (!state.session) return;
+    if (!state.session || !navigator.onLine) return;
     window.clearTimeout(reconnectTimer);
     if (ws && ws.readyState <= 1) return;
     closingForAuth = false;
@@ -537,6 +566,11 @@ export function boot(root: HTMLElement): void {
     if (Date.now()-lastPong > 18000) {ws.close();return;}
     ws.send(JSON.stringify({type:"ping"}));
   },6000);
+  window.addEventListener("offline", () => {
+    // A lost network must not keep displaying a live socket until the heartbeat expires.
+    state.online = false; sessionReady = false; outbox.disconnect();
+    finishSend(activeSend); ws?.close(); update();
+  });
   window.addEventListener("online", () => {connect(); void uploadPending();});
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {connect(); if(sessionReady) publishCurrent();}
@@ -666,7 +700,15 @@ export function boot(root: HTMLElement): void {
     const host = $("stage") as HTMLDivElement;
     editor?.destroy();
     host.replaceChildren();
+    closeCanvasText();
     editor = new SharedEditor(host, asset.w || 1600, asset.h || 1000);
+    editor.onTextRequest = point => {
+      if (textPoint) {$("canvasTextInput").focus();return;}
+      textPoint = point;
+      $("canvasTextPanel").hidden = false;
+      const input = $("canvasTextInput") as HTMLTextAreaElement;
+      input.value = ""; input.focus();
+    };
     const view = editor;
     document.querySelectorAll("[data-tool]").forEach(b => b.classList.toggle("selected", (b as HTMLElement).dataset.tool === view.tool));
     document.querySelectorAll("[data-color]").forEach(b => b.classList.toggle("selected", (b as HTMLElement).dataset.color === view.color));
@@ -716,7 +758,8 @@ export function boot(root: HTMLElement): void {
     btn.addEventListener("click", () => {
       document.querySelectorAll("[data-tool]").forEach((b) => b.classList.remove("selected"));
       btn.classList.add("selected");
-      if (editor) editor.tool = (btn as HTMLElement).dataset.tool as Tool;
+      commitCanvasText(); closeCanvasText();
+      chooseTool((btn as HTMLElement).dataset.tool as Tool);
       $("cropActions").classList.toggle("show", (btn as HTMLElement).dataset.tool === "crop");
     });
   });
@@ -783,6 +826,7 @@ export function boot(root: HTMLElement): void {
     }
   }
   async function finishEditor() {
+    commitCanvasText();
     if (!editor || finishingEditor || editorLoading) return;
     if (state.editorKind === "快速白板" && editor.ops === 0) {toast("先画一点内容，再加入本次图文");return;}
     finishingEditor = true;
@@ -893,7 +937,7 @@ export function boot(root: HTMLElement): void {
   const stageResize = new ResizeObserver(()=>{if(editor&&!editorLoading) editor.resize();});
   stageResize.observe($("stage"));
 
-  $("connectBtn").onclick = () => {void resumeRemembered().then(ok=>{if(!ok)showPair();}).catch(()=>showPair());};
+  $("connectBtn").onclick = () => {if (state.session) {connect();return;} void resumeRemembered().then(ok=>{if(!ok)showPair();}).catch(()=>showPair());};
   $("sendBtn").onclick = () => { void sendBundle(); };
   async function sendBundle() {
     if (activeSend || state.sending) return;
@@ -1109,14 +1153,21 @@ export function boot(root: HTMLElement): void {
     ++sheetRevision;
     const sheet = $("sheet");
     const preset = pairCodeFromUrl();
-    $("sheetCard").innerHTML = `<h2>连接这台电脑</h2><p>扫电脑上的二维码即可配对。备用才手输 4 位短码。手机不能自授按键或截屏。练习插入用电脑 Alt+I。召回是 Alt+Shift+I，不是跳过纠错。</p><input id="pairCode" /><button class="primary" id="pairGo">配对</button><button id="writeOffline">先写草稿</button>`;
-    (document.getElementById("pairCode") as HTMLInputElement).value = preset;
+    $("sheetCard").innerHTML = `<h2>连接电脑</h2><p id="pairStatus" role="status">扫描电脑连接页当前显示的二维码，就能连接。草稿会保留在手机。</p><details><summary>无法扫码？使用备用短码</summary><input id="pairCode" aria-label="备用配对短码" inputmode="numeric" placeholder="电脑显示的 4 位短码" /><button class="primary" id="pairGo">使用短码连接</button></details><button id="writeOffline">继续写草稿</button>`;
     sheet.classList.add("show");
-    $("writeOffline").onclick = () => $("sheet").classList.remove("show");
-    $("pairGo").onclick = async () => {
-      await submitPair((document.getElementById("pairCode") as HTMLInputElement).value);
+    $("writeOffline").onclick = () => sheet.classList.remove("show");
+    const pair = async (code:string, scanned:boolean) => {
+      const button = $("pairGo") as HTMLButtonElement; button.disabled = true;
+      $("pairStatus").textContent = "正在连接电脑…";
+      try {
+        if (!await submitPair(code)) $("pairStatus").textContent = scanned ?
+          "这个二维码已过期或已使用。电脑连接页会自动刷新，请重新扫描当前二维码；手机草稿仍在。" :
+          "短码无效或已过期，请核对电脑当前显示的短码。";
+      } catch { $("pairStatus").textContent = "暂时连不上电脑。请确认同一网络；可以继续离线写草稿。"; }
+      finally {button.disabled = false;}
     };
-    if (preset) void submitPair(preset);
+    $("pairGo").onclick = () => {void pair(($("pairCode") as HTMLInputElement).value, false);};
+    if (preset) void pair(preset, true);
   }
 
   function showRestoreProposal(message: any) {

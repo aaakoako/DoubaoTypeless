@@ -64,7 +64,8 @@ def test_ui_command_receives_actual_unattempted_text_progress(app):
     assert app.draft.text=='尚未发出的正文'
     complete=next(kw for name,kw in events if name=='delivery_complete')
     assert complete['progress']['awaiting_image_confirmation']
-    assert any(name=='recovery_ask' for name,_ in events)
+    assert any(name=='recovery_available' for name,_ in events)
+    assert not any(name=='recovery_ask' for name,_ in events)
 
 @pytest.mark.parametrize('changes',[
     {'password':True},{'readonly':True},{'enabled':False},{'offscreen':True},

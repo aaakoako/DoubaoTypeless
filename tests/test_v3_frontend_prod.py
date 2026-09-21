@@ -42,6 +42,7 @@ def test_production_frontend_syncs_text_without_extra_fields(tmp_path):
                         posts.append(request.post_data or "")
                 page.on("request", on_request)
                 await page.goto(f"http://127.0.0.1:{port}/")
+                await page.locator("#sheetCard summary").click()
                 await page.wait_for_selector("#pairCode", state="visible")
                 await page.fill("#pairCode", code)
                 async with page.expect_response(lambda r: r.url.endswith("/v3/pair") and r.request.method == "POST") as resp_info:
@@ -109,6 +110,7 @@ def test_production_page_reconnect_uses_phone_master_and_preserves_old_pc_draft(
                 page.on("websocket",socket_seen)
                 page.on("pageerror",lambda err:errors.append(str(err)))
                 await page.goto(f"http://127.0.0.1:{port}/")
+                await page.locator("#sheetCard summary").click()
                 await page.wait_for_selector("#pairCode", state="visible")
                 code = auth.new_pairing_challenge()
                 await page.fill("#pairCode", code)

@@ -320,6 +320,11 @@ class V3Bridge:
             except Exception:
                 pass
 
+    def online_device_ids(self) -> set[str]:
+        return {bound.device_id for ws in list(self._clients)
+                if not ws.closed and (bound := self._ws_auth.get(id(ws))) is not None
+                and bound.session_id in self.auth.sessions}
+
     async def prepare_phone(self, device_id: str) -> dict:
         request_id = str(uuid.uuid4())
         future = asyncio.get_running_loop().create_future()

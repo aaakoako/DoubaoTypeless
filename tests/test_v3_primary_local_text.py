@@ -60,7 +60,7 @@ def test_explicit_local_text_does_not_require_composer(primary, kind):
     app._locate_composer = locate
     result = app.request_insert().result(3)
     assert calls == [], 'plain-text manual insertion must not depend on Composer discovery'
-    assert prepared == ['device-a']
+    assert prepared == [], 'local action uses the displayed snapshot without a phone round trip'
     assert not result.get('error_code'), result
     assert [step['kind'] for step in result['steps']] == ['text']
     assert written == ['手机主稿  保留空格\n']
@@ -76,8 +76,8 @@ def test_unknown_target_with_images_still_requires_discovery(primary):
     app._locate_composer=lambda:(calls.append(True) or {'status':'not_found'})
     before=source_snapshot(app.draft)
     result=app.request_insert().result(3)
-    assert calls == [True] and not prepared and not written
-    assert result['error_code']=='COMPOSER_NOT_FOUND' and result['steps']==[]
+    assert calls == [] and not prepared and not written
+    assert result['error_code']=='IMAGE_EDITING' and result['steps']==[]
     assert source_snapshot(app.draft)==before
 
 
@@ -87,6 +87,6 @@ def test_local_plain_text_still_rejects_unsafe_targets(primary, kind):
     focus(app, kind)
     before = source_snapshot(app.draft)
     result = app.request_insert().result(3)
-    assert not written
+    assert not written and result.get('copied') == '文字'  # manual clipboard fallback, no injection
     assert result['error_code']=='NEEDS_TARGET' and result['steps']==[]
     assert source_snapshot(app.draft)==before and not result['phone_event']['rotated']

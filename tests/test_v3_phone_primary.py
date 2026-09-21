@@ -108,13 +108,18 @@ def test_pc_edits_are_saved_separately_and_phone_keeps_authority(app):
     assert app.review_text()=='手机继续输入'
 
 
-def test_offline_hotkey_never_falls_back_to_mirrored_text(app):
+def test_offline_local_insert_uses_visible_mirror_and_persists_exact_receipt(app):
+    from tests.test_v3_assistant_delivery import platform
+    written = platform(app)
     app.apply_phone_update(msg())
-    app._read_focus=lambda:('Edit','Notes',22)
-    pasted=[];app.delivery._paste=lambda:pasted.append(True)
-    result=app.request_insert().result(2)
-    assert result['result']=='NO_STEPS' and result['error_code']=='PHONE_OFFLINE'
-    assert pasted==[] and app.draft.text=='手机稿'
+    bound=source_snapshot(app.draft)
+    result=app.request_insert().result(3)
+    assert not result.get('error_code') and written==['手机稿']
+    assert result['phone_event']['rotated'] and source_snapshot(app.draft)==bound
+    event=json.loads((app.data_dir/'phone-event.json').read_text(encoding='utf-8'))
+    assert event['archived']['text']=='手机稿' and event['archived']['revision']==bound['revision']
+    app.apply_phone_update(msg('手机离线新写的内容',2))
+    assert app.draft.text=='手机离线新写的内容'
 
 
 def test_completion_in_primary_mode_does_not_name_next_phone_draft(app):

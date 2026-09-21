@@ -90,7 +90,7 @@ def test_inspection_failure_never_becomes_an_empty_allowed_target(app):
     assert result['result']=='UNKNOWN' and result['steps']==[]
     assert calls==[] and app.draft.text=='不应该发出'
     assert not app.ledger.busy
-    assert app.hud._mode=='failed'
+    assert app.hud._mode=='result' and result.get('copied')=='文字'
     assert '超时' in app.hud._operation_message
 
 
@@ -145,12 +145,12 @@ def test_empty_insert_has_visible_feedback(app):
     assert app.hud._mode=='failed' and '没有' in app.hud._operation_message
 
 
-def test_phone_disconnected_failure_not_lost_in_background_future(app):
+def test_phone_disconnected_allows_local_mirror_without_waiting(app):
     platform(app)
     app.draft.authority='phone'; app.draft.text='留在手机'
     out=app.request_insert().result(3)
-    assert out['error_code']=='PHONE_OFFLINE'
-    assert app.hud._mode=='failed' and app.draft.text=='留在手机'
+    assert not out.get('error_code') and out['steps']
+    assert app.hud._mode=='result' and app.draft.text=='留在手机'
 
 
 def test_runtime_entry_dispatches_frozen_process_before_loading_application():
