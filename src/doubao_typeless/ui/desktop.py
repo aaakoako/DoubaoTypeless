@@ -1019,7 +1019,9 @@ class ClientWindow:
         import threading
 
         timeout = _optional_float(self.byok_timeout.text()) or 8.0
-        svc = ByokService(endpoint=endpoint, api_key=key, model=model, timeout=timeout, post=_httpx_json_post)
+        svc = ByokService(endpoint=endpoint, api_key=key, model=model, timeout=timeout,
+                          extra_prompt=self.byok_prompt.toPlainText().strip(),
+                          temperature=_optional_float(self.byok_temperature.text()), post=_httpx_json_post)
         self.byok_status.setText("正在测试连接…")
         host = self.widget
 

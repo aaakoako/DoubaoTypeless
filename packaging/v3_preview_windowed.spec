@@ -53,6 +53,12 @@ a = Analysis(
     noarchive=False,
 )
 
+# Avoid incompatible Poppler ICU DLLs collected from PATH shadowing Windows ICU.
+import re
+a.binaries = [entry for entry in a.binaries
+              if Path(entry[0]).name.lower() not in {"icuuc.dll", "icuin.dll"}
+              and not re.fullmatch(r"icudt\d+\.dll", Path(entry[0]).name.lower())]
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(

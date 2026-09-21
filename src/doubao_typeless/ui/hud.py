@@ -56,6 +56,9 @@ class HudController:
         self._operation_content_serial = 0
         self._dispatch = None
         self._foreground_surfaces = set()
+        self._updating = False
+        self._follow_tail = True
+        self._latest = None
 
     def start(self) -> None:
         try:
@@ -80,12 +83,20 @@ class HudController:
             | Qt.WindowStaysOnTopHint
             | Qt.WindowDoesNotAcceptFocus
         )
+        w.setAttribute(Qt.WA_TranslucentBackground, True)
         w.setAttribute(Qt.WA_ShowWithoutActivating, True)
         w.setAttribute(Qt.WA_QuitOnClose, False)
         w.resize(*TOKENS["text_size"])
         style_root(w, hud=True)
-        layout = QVBoxLayout(w)
-        layout.setContentsMargins(16,12,16,12)
+        from PySide6.QtWidgets import QFrame
+        outer = QVBoxLayout(w)
+        outer.setContentsMargins(1, 1, 1, 1)
+        card = QFrame(w)
+        card.setObjectName("card")
+        outer.addWidget(card)
+        self._card = card
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(16,12,16,10)
         layout.setSpacing(8)
         self._status = QLabel("手机输入中")
         self._status.setProperty("role", "status")
@@ -111,7 +122,7 @@ class HudController:
         self._body.setObjectName("hudBody")
         bar = QWidget()
         bar.setFixedHeight(40)
-        bar.setStyleSheet("background:transparent;")
+        bar.setObjectName("hudActions")
         row = QHBoxLayout(bar)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(8)
@@ -137,11 +148,19 @@ class HudController:
         dismiss = QPushButton("×")
         dismiss.setToolTip("收起，不清空草稿")
         dismiss.setFixedSize(24, 28)
+        dismiss.setStyleSheet("QPushButton { padding:0; }")
         dismiss.clicked.connect(self.dismiss)
         row.addWidget(dismiss)
         for action in (expand, copy, btn, dismiss):
             action.setFocusPolicy(Qt.NoFocus)
-        layout.addWidget(self._status, 0)
+        header = QHBoxLayout()
+        header.addWidget(self._status, 1)
+        self._latest = QPushButton("回到最新 ↓")
+        self._latest.setFocusPolicy(Qt.NoFocus)
+        self._latest.clicked.connect(self._resume_tail)
+        self._latest.hide()
+        header.addWidget(self._latest)
+        layout.addLayout(header)
         layout.addWidget(self._body, 1)
         thumbs = QWidget()
         thumbs.setFixedHeight(62)
@@ -177,7 +196,10 @@ class HudController:
             self._body.selectionChanged.connect(self._pause_or_resume_idle)
             bar = self._body.verticalScrollBar()
             if bar is not None:
-                bar.valueChanged.connect(lambda _v: self._pause_or_resume_idle())
+                bar.valueChanged.connect(self._scroll_changed)
+                bar.sliderPressed.connect(self._pause_or_resume_idle)
+                bar.sliderReleased.connect(self._reading_changed)
+            self._body.selectionChanged.connect(self._reading_changed)
         except Exception:
             pass
 
@@ -334,7 +356,7 @@ class HudController:
         margins = 18
         spacing = 12
         try:
-            layout = self._widget.layout() if self._widget is not None else None
+            layout = self._card.layout() if getattr(self, "_card", None) is not None else None
             if layout is not None:
                 box = layout.contentsMargins()
                 margins = box.top() + box.bottom()
@@ -354,11 +376,35 @@ class HudController:
         except Exception:
             return max(40, 21 * max(1, (len(text) + 19) // 20))
 
+    def _scroll_changed(self, _value=0):
+        if self._updating:
+            return
+        scroll = self._body.verticalScrollBar()
+        self._follow_tail = not self._body.textCursor().hasSelection() and not scroll.isSliderDown() and scroll.value() >= scroll.maximum() - 4
+        self._latest.setVisible(not self._follow_tail)
+        self._pause_or_resume_idle()
+
+    def _reading_changed(self):
+        if self._updating:
+            return
+        self._scroll_changed()
+        if not self._body.textCursor().hasSelection() and not self._body.verticalScrollBar().isSliderDown():
+            self._apply_show()
+
+    def _resume_tail(self):
+        self._updating = True
+        cursor = self._body.textCursor()
+        cursor.clearSelection()
+        self._body.setTextCursor(cursor)
+        self._updating = False
+        self._follow_tail = True
+        self._apply_show()
+
     def _reading(self) -> bool:
         if self._body is None:
             return False
         try:
-            if self._body.textCursor().hasSelection():
+            if self._body.textCursor().hasSelection() or self._body.verticalScrollBar().isSliderDown():
                 return True
             bar = self._body.verticalScrollBar()
             if bar is not None and bar.maximum() > 0 and bar.value() < max(0, bar.maximum() - 4):
@@ -421,6 +467,13 @@ class HudController:
             return
         if self._widget is None:
             return
+        if not self.text and not self.assets:
+            self._updating = True
+            cursor = self._body.textCursor()
+            cursor.clearSelection()
+            self._body.setTextCursor(cursor)
+            self._follow_tail = True
+            self._updating = False
         self._refresh_thumbnails()
         unfinished = sum(a.get("status", "ready") != "ready" for a in self.assets)
         ready = len(self.assets) - unfinished
@@ -433,14 +486,28 @@ class HudController:
         self._insert.setText("处理中…" if self._mode == "busy" else ("图片同步中" if unfinished else "插入并复制"))
         body = self.text if self.text else ("图片准备中，可继续在手机写说明" if unfinished else "")
         # 程序主动写字造成的滚动条变化，不能被误判成用户正在读前文。
-        reading = self._widget.isVisible() and self._reading()
+        reading = not self._follow_tail or self._reading()
+        if self._body.textCursor().hasSelection() or self._body.verticalScrollBar().isSliderDown():
+            self._follow_tail = False
+            self._latest.show()
+            self._pause_or_resume_idle()
+            return
+        self._updating = True
         old_cursor = self._body.textCursor()
         position, anchor = old_cursor.position(), old_cursor.anchor()
         scroll = self._body.verticalScrollBar()
         scroll_pos = scroll.value()
         self._body.blockSignals(True)
         scroll.blockSignals(True)
-        self._body.setPlainText(body)
+        previous = self._body.toPlainText()
+        if body != previous:
+            if body.startswith(previous):
+                from PySide6.QtGui import QTextCursor
+                edit = QTextCursor(self._body.document())
+                edit.movePosition(QTextCursor.End)
+                edit.insertText(body[len(previous):])
+            else:
+                self._body.setPlainText(body)
         chrome = self._chrome_height()
         max_h = self._max_height()
         doc_h = self._text_height(body)
@@ -469,15 +536,19 @@ class HudController:
             scroll.setValue(scroll.maximum())
         self._body.blockSignals(False)
         scroll.blockSignals(False)
+        self._latest.setVisible(reading)
         self._widget.show()
+        self._updating = False
         from PySide6.QtCore import QTimer
         # 第一次show后QTextDocument可能再计算一次边距；只在仍然追尾时校正。
         generation = getattr(self, "_render_generation", 0) + 1
         self._render_generation = generation
         def settle_tail():
             if (self._widget.isVisible() and self._render_generation == generation
-                    and not reading and not self._reading()):
+                    and not reading and self._follow_tail):
+                self._updating = True
                 self._body.verticalScrollBar().setValue(self._body.verticalScrollBar().maximum())
+                self._updating = False
         QTimer.singleShot(0, self._widget, settle_tail)
         if self._timer:
             if self._mode == "busy" or (reading and self._mode != "result"):

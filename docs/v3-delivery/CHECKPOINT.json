@@ -6,7 +6,7 @@
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
   "last_completed_slice": "VERIFIED_EDITOR_TRANSACTIONS_THREE_IMAGES_AND_EXPLICIT_SEND",
   "active_slice": "WINDOWS_PRE_RELEASE_PRIVATE_TRIAL",
-  "next_action": "统一使用 aec0ee81bcd3274000a8799df54ef57cadfab8b3 完整目录包作为体验基线。根据真实用户/Agent兼容反馈继续，不重开产品规划。任何产品修改均重新执行全套与实际EXE门槛；不得沿用旧包哈希。",
+  "next_action": "体验本次蓝紫整合包；以 INTEGRATED_PREVIEW_20260922.md 和本地构建证据为准，旧 aec0ee8 云报告只作历史参考。",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -25,35 +25,51 @@
     "独立发送的准备/确认/取消；先记已消费再执行，执行前复验，重复/重连不补发"
   ],
   "last_commands": [
-    {"cmd":"Full Linux pytest from fixed product SHA","exit_code":0,"output":"478 passed, 5 Windows-only skipped; 0 failed/errors. Four actual Chromium production editor transaction cases passed."},
-    {"cmd":"Full Windows pytest from fixed product SHA","exit_code":0,"output":"483 passed; 0 failed/errors/skipped"},
-    {"cmd":"Actual frozen startup, legacy three text inserts, phone-primary three text inserts, production-page/native browser scenarios","exit_code":0,"output":"Four reports passed; 13 browser cases passed. Insertion Enter events 0; two separately confirmed sending events; page errors 0; process exit 0."},
-    {"cmd":"Downloaded artifact independent audit","exit_code":0,"output":"262-file set/length/SHA-256 verified; build-info matches actual EXE reports; original inner ZIP bytes preserved"}
+    {
+      "cmd": "Full Linux pytest from fixed product SHA",
+      "exit_code": 0,
+      "output": "478 passed, 5 Windows-only skipped; 0 failed/errors. Four actual Chromium production editor transaction cases passed."
+    },
+    {
+      "cmd": "Full Windows pytest from fixed product SHA",
+      "exit_code": 0,
+      "output": "483 passed; 0 failed/errors/skipped"
+    },
+    {
+      "cmd": "Actual frozen startup, legacy three text inserts, phone-primary three text inserts, production-page/native browser scenarios",
+      "exit_code": 0,
+      "output": "Four reports passed; 13 browser cases passed. Insertion Enter events 0; two separately confirmed sending events; page errors 0; process exit 0."
+    },
+    {
+      "cmd": "Downloaded artifact independent audit",
+      "exit_code": 0,
+      "output": "262-file set/length/SHA-256 verified; build-info matches actual EXE reports; original inner ZIP bytes preserved"
+    }
   ],
   "cloud_evidence": {
-    "run_id":35523383176,
-    "trigger_sha":"d47b239757100043f65109f45fc69e98d849cd12",
-    "source_sha":"aec0ee81bcd3274000a8799df54ef57cadfab8b3",
-    "conclusion":"success",
-    "native_browser_cases":13,
-    "three_images_one_click":true,
-    "desktop_button_tested":true,
-    "independent_enter_and_ctrl_enter_tested":true,
-    "actual_cursor_tested":false,
-    "actual_android_ime_tested":false,
-    "target_type":"independent Chromium test webpage, not production ChatGPT or Cursor"
+    "run_id": 35523383176,
+    "trigger_sha": "d47b239757100043f65109f45fc69e98d849cd12",
+    "source_sha": "aec0ee81bcd3274000a8799df54ef57cadfab8b3",
+    "conclusion": "success",
+    "native_browser_cases": 13,
+    "three_images_one_click": true,
+    "desktop_button_tested": true,
+    "independent_enter_and_ctrl_enter_tested": true,
+    "actual_cursor_tested": false,
+    "actual_android_ime_tested": false,
+    "target_type": "independent Chromium test webpage, not production ChatGPT or Cursor"
   },
   "candidate_artifact": {
-    "artifact_id":10609123727,
-    "source_sha":"aec0ee81bcd3274000a8799df54ef57cadfab8b3",
-    "filename":"DoubaoTypeless_V3_Composer_aec0ee8.zip",
-    "zip_bytes":65195942,
-    "zip_sha256":"2ecec7133cf24bf890ea969d0b519d2b5f7f82ca41b6e4a1578e9f08a3106788",
-    "exe_sha256":"76c3989630dc2c82235c805c0364f8b8cd47bdba2e4ec80368c89e347feec862",
-    "outer_artifact_sha256":"61124f5acb9bb3a9f4fd6afb893de7eadf4d3952a98d110210c6c75fc3bd85ff",
-    "files_verified":262,
-    "verified_after_download":true,
-    "original_zip_preserved":true
+    "artifact_id": 10609123727,
+    "source_sha": "aec0ee81bcd3274000a8799df54ef57cadfab8b3",
+    "filename": "DoubaoTypeless_V3_Composer_aec0ee8.zip",
+    "zip_bytes": 65195942,
+    "zip_sha256": "2ecec7133cf24bf890ea969d0b519d2b5f7f82ca41b6e4a1578e9f08a3106788",
+    "exe_sha256": "76c3989630dc2c82235c805c0364f8b8cd47bdba2e4ec80368c89e347feec862",
+    "outer_artifact_sha256": "61124f5acb9bb3a9f4fd6afb893de7eadf4d3952a98d110210c6c75fc3bd85ff",
+    "files_verified": 262,
+    "verified_after_download": true,
+    "original_zip_preserved": true
   },
   "open_defects": [
     "实际Android/豆包触控与输入法、真实Cursor/ChatGPT/其他Agent各版本和长期使用未由合成网页验证代替",
@@ -61,7 +77,17 @@
     "本次browser fault日志仍有一条0x8001010d；同PID完成13场景并正常退出0，保留记录不宣称零异常",
     "独立视觉与公开发布审批未完成"
   ],
-  "independent_review":{"status":"PRE_RELEASE_TRIAL_NOT_PUBLIC_RELEASE_READY","release_ready":false},
-  "published":false,
-  "task_complete":false
+  "independent_review": {
+    "status": "PRE_RELEASE_TRIAL_NOT_PUBLIC_RELEASE_READY",
+    "release_ready": false
+  },
+  "published": false,
+  "task_complete": false,
+  "integration_20260922": {
+    "branch": "v3/integrated-preview-20260922",
+    "base": "b32d2d536937d0fcad2c0e2ea76742d60fa47c42",
+    "status": "integrated_source_candidate",
+    "document": "docs/v3-delivery/INTEGRATED_PREVIEW_20260922.md",
+    "prior_evidence_is_not_current_package_evidence": true
+  }
 }

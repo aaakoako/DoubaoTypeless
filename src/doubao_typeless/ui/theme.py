@@ -4,7 +4,8 @@ from doubao_typeless.ui.theme_generated import COLORS as C, METRICS as M
 QSS = f"""
 QWidget {{ color:{C['ink']}; font-size:{M['text_size']}px; font-family: 'Microsoft YaHei UI','Microsoft YaHei','Noto Sans CJK SC','Segoe UI'; }}
 QWidget#appWindow, QDialog {{ background:{C['bg']}; }}
-QWidget#hudWindow, QFrame#card {{ background:{C['surface']}; border:1px solid {C['line']}; border-radius:{M['radius_card']}px; }}
+QWidget#hudWindow {{ background:transparent; border:0; }}
+QFrame#card {{ background:{C['surface']}; border:1px solid {C['line']}; border-radius:{M['radius_card']}px; }}
 QLabel {{ background:transparent; border:0; }}
 QLabel#muted {{ color:{C['muted']}; }}
 QLabel#error {{ color:{C['danger']}; }}

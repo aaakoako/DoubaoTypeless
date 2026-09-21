@@ -419,6 +419,7 @@ class V3App:
             loop = getattr(self, "_loop", None)
             if device and loop and loop.is_running() and getattr(self, "_active_delivery_primary", False):
                 progress = {"type":"delivery.progress", "stage":kwargs.get("stage"),
+                            "intent_id": getattr(self, "_active_delivery_intent", None),
                             "index":kwargs.get("index"), "total":kwargs.get("total")}
                 for session in list(self.auth.sessions.values()):
                     if session.device_id == device:
@@ -842,6 +843,7 @@ class V3App:
         payload = {**payload, "progress": summarize_delivery(bundle, payload)}
         rotated = self._maybe_start_next_draft(bundle, payload)
         event = self._phone_rotate_event(bundle, rotated, str(payload.get("result") or ""))
+        event["intent_id"] = payload.get("intent_id")
         event["progress"] = payload["progress"]
         self.phone_send.record_delivery(bundle, payload, self._last_target_fp)
         if payload.get("error_code"): event["error_code"] = payload["error_code"]
@@ -868,11 +870,14 @@ class V3App:
         self._notify_ui("hide_after_insert")
         try:
             payload = self._on_intent(intent, bundle)
-            return self._after_insert(bundle, payload, publish=intent.get("_source") != "remote")
+            payload["intent_id"] = str(intent.get("intent_id") or "")
+            result = self._after_insert(bundle, payload, publish=intent.get("_source") != "remote")
+            return result
         except Exception as exc:
             self._report_command_error(exc)
             self._notify_ui("delivery_failed", error_code="FINALIZE_FAILED")
             return {"result": "UNKNOWN", "error_code": "FINALIZE_FAILED",
+                    "intent_id": str(intent.get("intent_id") or ""),
                     "steps": payload.get("steps", []) if "payload" in locals() else []}
 
     def _on_intent(self, intent: dict, bundle: dict) -> dict:
@@ -886,6 +891,7 @@ class V3App:
                           bundle_id=bundle.get("bundle_id", ""), adapter_id="generic_text")
         phase = "prepare"
         self._active_delivery_device = bundle.get("device_id")
+        self._active_delivery_intent = intent_id
         self._active_delivery_primary = bundle.get("authority") == "phone"
         try:
             # 保存完整副本后才允许触碰剪贴板。未准备成功不执行任何按键。
@@ -921,7 +927,8 @@ class V3App:
                         attempt.steps.append(Step(len(attempt.steps), "image", old["asset_id"], "observed", old["evidence"]))
                 attempt = self.delivery.run(attempt, hydrated,
                     mode=str(intent.get("recovery_mode") or "full"),
-                    skip_asset_ids=set(intent.get("skip_asset_ids") or []), remote=remote)
+                    skip_asset_ids=set(intent.get("skip_asset_ids") or []), remote=remote,
+                    expected_focus=self._last_target_fp)
             if intent.get("recovery_mode") == "text_only" and bundle.get("assets") and attempt.steps:
                 # 用户选择只贴文字，不等于全部图片都已收到；保留待恢复图文。
                 attempt.result = "PARTIAL"
@@ -942,6 +949,7 @@ class V3App:
         finally:
             self.ledger.finish(intent_id, attempt.result)
             self._active_delivery_device = None
+            self._active_delivery_intent = None
             self._active_delivery_primary = False
         self._last_attempt = attempt
         self._last_attempt_bundle_id = bundle.get("bundle_id")

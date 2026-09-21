@@ -130,6 +130,18 @@ export function boot(root: HTMLElement): void {
     last_intent: null as {signature:string;id:string} | null,
   };
   let ws: WebSocket | null = null;
+  // One in-flight UI operation; its durable intent remains in last_intent for retries.
+  let activeSend: {intentId: string; timer: number} | null = null;
+  function finishSend(operation: typeof activeSend): boolean {
+    if (!operation || activeSend !== operation) return false;
+    window.clearTimeout(operation.timer);
+    activeSend = null;
+    state.sending = false;
+    return true;
+  }
+  function finishFeedback(msg: any): boolean {
+    return !!activeSend?.intentId && msg.intent_id === activeSend.intentId && finishSend(activeSend);
+  }
   let editor: SharedEditor | null = null;
   let currentId = "";
   const blobUrls: string[] = [];
@@ -313,7 +325,7 @@ export function boot(root: HTMLElement): void {
     ws.onclose = () => {
       if (ws !== socket) return;
       state.online = false;
-      state.sending = false;
+      finishSend(activeSend);
       submitAvailable = false; $("submitPanel").hidden = true;
       sessionReady = false;
       outbox.disconnect();
@@ -323,6 +335,7 @@ export function boot(root: HTMLElement): void {
       if (!closingForAuth && state.session) reconnectTimer = window.setTimeout(connect, 1500);
     };
     ws.onmessage = (ev) => {
+      if (ws !== socket) return;
       lastPong = Date.now();
       let msg: any;
       try {msg = JSON.parse(ev.data);} catch {return;}
@@ -351,13 +364,13 @@ export function boot(root: HTMLElement): void {
         else outbox.acknowledge(msg);
       }
       if (msg.type === "delivery.progress") {
-        state.sending = true;
+        if (activeSend && (!activeSend.intentId || msg.intent_id !== activeSend.intentId)) return;
         const detail = msg.stage === "text" ? "图片已处理，正在插入文字…" :
           `正在${msg.stage === "image_wait" ? "确认" : "插入"}第 ${msg.index} / ${msg.total} 张图片…`;
         $("deliveryStatus").textContent = detail; $("deliveryStatus").hidden = false; update();
       }
       if (msg.type === "attempt.status") {
-        state.sending = false;
+        if (activeSend && !finishFeedback(msg)) return;
         const labels: Record<string, string> = {CONFIRMED:"已放入输入框",UNKNOWN:"已尝试插入，可召回重试",NO_STEPS:"未插入，请先选中电脑输入框",PARTIAL:"只完成一部分，请查看恢复选项",BUSY:"正在处理上一份内容"};
         const detail = msg.progress?.message || labels[msg.result] || "插入未完成，内容保留";
         $("deliveryStatus").textContent=detail;$("deliveryStatus").hidden=false;
@@ -365,8 +378,9 @@ export function boot(root: HTMLElement): void {
         update();
       }
       if (msg.type === "draft.rotated") {
-        state.sending = false; update();
-        if(msg.progress?.message){$("deliveryStatus").textContent=msg.progress.message;$("deliveryStatus").hidden=false;}
+        const relevant = !activeSend || (!!activeSend.intentId && msg.intent_id === activeSend.intentId);
+        finishFeedback(msg); update();
+        if(relevant && msg.progress?.message){$("deliveryStatus").textContent=msg.progress.message;$("deliveryStatus").hidden=false;}
         void handleReceipt(msg);
       }
       if (msg.type === "draft.restore_proposal") {
@@ -374,7 +388,8 @@ export function boot(root: HTMLElement): void {
       }
       if (msg.type === "recall.ready") toast(msg.text_unchanged ? "已召回上次待插入，当前草稿未改" : "召回异常");
       if (msg.type === "error") {
-        state.sending = false;
+        const relevant = !activeSend || (!!activeSend.intentId && msg.intent_id === activeSend.intentId);
+        finishFeedback(msg);
         update();
         outbox.reject(msg);
         const err = String(msg.error || "");
@@ -389,6 +404,7 @@ export function boot(root: HTMLElement): void {
           sessionStorage.removeItem("dt.v3.session");
           state.session = null;
           closingForAuth = true;
+          finishSend(activeSend);
           ws?.close();
           ws = null;
           void resumeRemembered().then((ok) => {
@@ -396,7 +412,7 @@ export function boot(root: HTMLElement): void {
           }).catch(() => {toast("电脑未连接，草稿仍在"); showPair();});
           return;
         }
-        toast(err.includes("not granted") || err === "CAPTURE_DENIED" ? "这台手机还没有截图权限，文字仍可同步" : err);
+        if (relevant) toast(err.includes("not granted") || err === "CAPTURE_DENIED" ? "这台手机还没有截图权限，文字仍可同步" : err);
         return;
       }
       if (msg.type === "capture.result") {
@@ -488,7 +504,7 @@ export function boot(root: HTMLElement): void {
       toast("无法保全上次图文，当前稿未清空"); return;
     }
     if (rotatePrimary(state, msg, newId) !== "cleared") return;
-    state.sending = false; latestMessage = null;
+    latestMessage = null;
     outbox.disconnect(); if (sessionReady) outbox.connect();
     sendDraft(); update(); toast("已开始下一段，上次图文可召回");
     void refreshSubmit();
@@ -878,10 +894,9 @@ export function boot(root: HTMLElement): void {
   stageResize.observe($("stage"));
 
   $("connectBtn").onclick = () => {void resumeRemembered().then(ok=>{if(!ok)showPair();}).catch(()=>showPair());};
-  $("sendBtn").onclick = () => { void sendBundle().catch(() => {
-    state.sending = false; update(); toast("连接中断，图文已保留，没有自动重试");
-  }); };
+  $("sendBtn").onclick = () => { void sendBundle(); };
   async function sendBundle() {
+    if (activeSend || state.sending) return;
     if (!state.session || !ws || !state.online) {
       toast("未连接，草稿保留");
       return;
@@ -897,40 +912,48 @@ export function boot(root: HTMLElement): void {
     const message = currentMessage();
     const boundRevision = state.revision;
     const boundEpoch = state.epoch;
+    const socket = ws;
+    const session = {...state.session};
+    const operation = {intentId: "", timer: 0};
+    activeSend = operation;
+    let dispatched = false;
+    const isCurrent = () => activeSend === operation && ws === socket && socket.readyState === WebSocket.OPEN;
     state.sending = true; update();
+    try {
     publishCurrent();
     try {await outbox.flush(message.update_id);} catch {
-      state.sending=false; update(); toast("当前图文仍在同步，没有插入旧版本");return;
+      if (isCurrent()) toast("当前图文仍在同步，没有插入旧版本");return;
     }
-    const nonceRes = await fetch("/v3/nonce", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(state.session), signal:AbortSignal.timeout(6000) });
+    if (!isCurrent()) return;
+    const nonceRes = await fetch("/v3/nonce", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(session), signal:AbortSignal.timeout(6000) });
+    if (!isCurrent()) return;
     if (!nonceRes.ok) {
-      state.sending = false;
-      update();
       toast("请在电脑确认插入权限。拒绝后仍可同步文字。练习插入用电脑 Alt+I。");
       return;
     }
     const nonce = await nonceRes.json();
+    if (!isCurrent()) return;
     if (state.revision !== boundRevision || state.epoch !== boundEpoch) {
-      state.sending = false;
-      update();
       toast("内容刚有更新，请再次点插入");
       return;
     }
     const signature=JSON.stringify([state.draft_id,state.epoch,state.generation,state.revision]);
     const intentId=state.last_intent?.signature===signature ? state.last_intent.id : newId();
+    operation.intentId = intentId;
     state.last_intent={signature,id:intentId};
     repository.save(draftSnapshot());
-    try {await repository.flush();} catch {state.sending=false;update();toast("无法保存本次操作，未执行插入");return;}
-    if (!ws || ws.readyState!==1 || state.revision!==boundRevision || state.epoch!==boundEpoch) {
-      state.sending=false;update();toast("图文或连接有变化，请再次确认");return;
+    try {await repository.flush();} catch {if(isCurrent())toast("无法保存本次操作，未执行插入");return;}
+    if (!isCurrent()) return;
+    if (state.revision!==boundRevision || state.epoch!==boundEpoch) {
+      toast("图文或连接有变化，请再次确认");return;
     }
-    ws.send(
+    socket.send(
       JSON.stringify({
         ...message,
         protocol: 3,
         type: "insert.intent",
-        session_id: state.session.session_id,
-        token: state.session.token,
+        session_id: session.session_id,
+        token: session.token,
         nonce: nonce.nonce,
         intent_id: intentId,
         trigger: "phone",
@@ -944,11 +967,17 @@ export function boot(root: HTMLElement): void {
         asset_documents: documents(),
       })
     );
-    window.setTimeout(()=>{
-      if (state.sending && state.last_intent?.id===intentId) {
-        state.sending=false;update();toast("上次结果待确认，图文保留；再次点同一稿不会重复投递，可从最近内容召回");
+    dispatched = true;
+    operation.timer = window.setTimeout(()=>{
+      if (finishSend(operation)) {
+        update();toast("上次结果待确认，图文保留；再次点同一稿不会重复投递，可从最近内容召回");
       }
     },65000);
+    } catch {
+      if (isCurrent()) toast("连接中断，图文已保留，没有自动重试");
+    } finally {
+      if (!dispatched && finishSend(operation)) update();
+    }
   };
 
   const sendErrors: Record<string,string> = {

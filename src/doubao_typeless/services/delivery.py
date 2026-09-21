@@ -63,8 +63,13 @@ class DeliveryService:
         mode: str = "full",
         skip_asset_ids: set[str] | None = None,
         remote: bool = False,
+        expected_focus: tuple | None = None,
     ) -> Attempt:
         focus = self._read_focus()
+        if expected_focus is not None and not same_target(focus, expected_focus):
+            attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
+            attempt.error_code = "TARGET_CHANGED"
+            return attempt
         class_name = focus[0] if focus else ""
         control = focus[1] if len(focus) > 1 else ""
         kind = getattr(focus, "kind", None) or (str(focus[6]) if len(focus) > 6 else classify_focus(class_name, control))

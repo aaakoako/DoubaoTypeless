@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Any, Callable
+import inspect
 from urllib.parse import urlparse
 
 DEFAULT_POLISH_PROMPT = (
@@ -63,6 +64,19 @@ class ByokService:
     def available(self) -> bool:
         return bool(self.endpoint and self.api_key)
 
+    def request_payload(self, text: str) -> dict[str, Any]:
+        """连接检测和正文共用 Chat 请求格式。"""
+        payload: dict[str, Any] = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": self.extra_prompt or DEFAULT_POLISH_PROMPT},
+                {"role": "user", "content": text},
+            ],
+        }
+        if self.temperature is not None:
+            payload["temperature"] = self.temperature
+        return payload
+
     def polish(
         self,
         text: str,
@@ -82,24 +96,23 @@ class ByokService:
         if self._post is None:
             return {"status": "skipped", "reason": "no_transport", "message": ERROR_LABELS["no_transport"], "text": text}
         try:
-            messages = [{"role": "system", "content": self.extra_prompt or DEFAULT_POLISH_PROMPT}]
-            messages.append({"role": "user", "content": text})
-            payload: dict[str, Any] = {
-                "model": self.model,
-                "messages": messages,
-                "input": text,
-            }
-            if self.temperature is not None:
-                payload["temperature"] = self.temperature
+            payload = self.request_payload(text)
             headers = {"Authorization": f"Bearer {self.api_key}"}
             try:
+                inspect.signature(self._post).bind(chat_url(self.endpoint), payload, headers, timeout=self.timeout)
+                supports_timeout = True
+            except TypeError:
+                supports_timeout = False
+            except ValueError:
+                supports_timeout = True
+            if supports_timeout:
                 body = self._post(
                     chat_url(self.endpoint),
                     payload,
                     headers,
                     timeout=self.timeout,
                 )
-            except TypeError:
+            else:
                 body = self._post(chat_url(self.endpoint), payload, headers)
         except Exception as exc:
             reason = classify_api_error(exc, self.api_key)
@@ -131,6 +144,8 @@ class ByokService:
 
 ERROR_LABELS = {
     "unauthorized": "密钥无效（401），原文仍可插入",
+    "forbidden": "没有访问权限（403），请检查账户和模型权限；原文仍可插入",
+    "invalid_request": "请求参数不被接口接受（400），原文仍可插入",
     "not_found": "接口不存在（404），原文仍可插入",
     "rate_limited": "请求过于频繁（429），原文仍可插入",
     "timeout": "模型超时，原文仍可插入",
@@ -153,6 +168,10 @@ def classify_api_error(exc: Exception, api_key: str = "") -> str:
         return "tls"
     if "401" in message or "unauthorized" in message:
         return "unauthorized"
+    if "403" in message or "forbidden" in message:
+        return "forbidden"
+    if "400" in message or "bad request" in message:
+        return "invalid_request"
     if "404" in message or "not found" in message:
         return "not_found"
     if "429" in message or "rate" in message:
