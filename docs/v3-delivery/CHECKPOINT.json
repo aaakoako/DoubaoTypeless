@@ -86,8 +86,18 @@
   "integration_20260922": {
     "branch": "v3/integrated-preview-20260922",
     "base": "b32d2d536937d0fcad2c0e2ea76742d60fa47c42",
-    "status": "integrated_source_candidate",
+    "status": "private_trial_package_ready",
     "document": "docs/v3-delivery/INTEGRATED_PREVIEW_20260922.md",
-    "prior_evidence_is_not_current_package_evidence": true
+    "prior_evidence_is_not_current_package_evidence": true,
+    "product_source_sha": "d969f8f2166fb570680eb786d6c89aa7de0aedf3",
+    "tests": "491 passed; TypeScript and Vite build passed",
+    "frozen": "offscreen isolated Windows desktop: HTTP ready, acknowledged IPC quit, exit 0; no real input",
+    "package": {
+      "source_sha": "d969f8f2166fb570680eb786d6c89aa7de0aedf3",
+      "filename": "DoubaoTypeless_Integrated_d969f8f.zip",
+      "bytes": 81182200,
+      "sha256": "1f55fe07276ff2661ab0676992796f6ae106bea11b300288038aa340c571d5f5",
+      "release_ready": false
+    }
   }
 }

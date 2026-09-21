@@ -16,3 +16,14 @@
 验证以本次实际报告为准。前次 aec0ee8 的 EXE/浏览器报告是历史证据，不能冒充本包验证。手机页面自动化含显式网络替身；Qt离屏像素检查不等于用户桌面验收；真实Codex/Cursor、Android/iOS仍需本包体验。
 
 本包不merge主干、不打tag、不发布Release、不覆盖日用数据。候选与证据位于 G:/AgentStorage/Deliveries/typeless-integrated-20260922。
+
+## 本次制品证据
+
+产品源码 d969f8f2166fb570680eb786d6c89aa7de0aedf3；文档提交可晚于产品提交。
+全量最终491 passed；TypeScript与Vite生产构建通过。独立复核发现并关闭实际App跨稿HUD选择残留问题，新增真实通知路径回归。
+冻结EXE在独立Windows桌面、离屏Qt和无效热键下：HTTP就绪、IPC退出确认、退出码0、正常退出日志，无强杀，无真实粘贴。
+ZIP及全部文件长度/哈希核验通过。源码测试、离屏视觉和真实产品验收分开；本次未复验真实Codex/Cursor、手机触控及长时运行。
+
+包：DoubaoTypeless_Integrated_d969f8f.zip（81182200 bytes）
+SHA-256：1f55fe07276ff2661ab0676992796f6ae106bea11b300288038aa340c571d5f5
+完整清单、两次回归日志、构建日志、冻结启动报告和截图位于上述交付目录。
