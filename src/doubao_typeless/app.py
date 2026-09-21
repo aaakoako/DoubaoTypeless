@@ -580,7 +580,8 @@ class V3App:
                     item["path"] = str(self.store.root / (asset["asset_id"] + ".bin"))
                 previews.append(item)
             self.hud.show_receiving(text, image_count, assets=previews,
-                revision=self.draft.revision, phone_primary=self.draft.authority == "phone")
+                revision=self.draft.revision, phone_primary=self.draft.authority == "phone",
+                draft_key=(self.draft.draft_id, self.draft.epoch))
         else:
             self.hud.hide()
         self._notify_ui("activity")

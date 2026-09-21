@@ -59,6 +59,8 @@ class HudController:
         self._updating = False
         self._follow_tail = True
         self._latest = None
+        self._draft_key = None
+        self._rendered_draft_key = None
 
     def start(self) -> None:
         try:
@@ -204,13 +206,15 @@ class HudController:
             pass
 
     def show_receiving(self, text: str, image_count: int = 0, *, assets: list[dict] | None = None,
-                       revision: int = 0, phone_primary: bool = False) -> None:
+                       revision: int = 0, phone_primary: bool = False, draft_key: tuple | None = None) -> None:
         self._content_serial += 1
         self.text = text
         self.image_count = image_count
         self.assets = [dict(a) for a in (assets or [])]
         self.revision = revision
         self.phone_primary = phone_primary
+        if draft_key is not None:
+            self._draft_key = draft_key
         self.visible = True
         if self._widget is None:
             return
@@ -391,6 +395,20 @@ class HudController:
         if not self._body.textCursor().hasSelection() and not self._body.verticalScrollBar().isSliderDown():
             self._apply_show()
 
+    def _reset_reading(self):
+        if self._body is None:
+            return
+        from PySide6.QtGui import QTextCursor
+        self._updating = True
+        cursor = self._body.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        self._body.setTextCursor(cursor)
+        scroll = self._body.verticalScrollBar()
+        scroll.setSliderDown(False)
+        scroll.setValue(scroll.maximum())
+        self._follow_tail = True
+        self._updating = False
+
     def _resume_tail(self):
         self._updating = True
         cursor = self._body.textCursor()
@@ -467,13 +485,9 @@ class HudController:
             return
         if self._widget is None:
             return
-        if not self.text and not self.assets:
-            self._updating = True
-            cursor = self._body.textCursor()
-            cursor.clearSelection()
-            self._body.setTextCursor(cursor)
-            self._follow_tail = True
-            self._updating = False
+        if self._rendered_draft_key != self._draft_key or (not self.text and not self.assets):
+            self._reset_reading()
+            self._rendered_draft_key = self._draft_key
         self._refresh_thumbnails()
         unfinished = sum(a.get("status", "ready") != "ready" for a in self.assets)
         ready = len(self.assets) - unfinished
@@ -566,6 +580,7 @@ class HudController:
     def _apply_hide(self) -> None:
         if self._mode == "busy":
             return
+        self._reset_reading()
         self.visible = False
         if self._timer is not None:
             self._timer.stop()

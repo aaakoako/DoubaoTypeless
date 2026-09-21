@@ -57,3 +57,30 @@ def test_transport_typeerror_does_not_retry_or_send_input_field():
     out=svc.polish('text',draft_id='d',revision=1,current_draft_id='d',current_revision=1)
     assert out['status']=='error' and len(calls)==1
     assert 'input' not in calls[0] and calls[0]['messages'][-1]['content']=='text'
+
+
+def test_production_activity_next_draft_after_selection(hud, tmp_path):
+    from doubao_typeless.app import V3App
+    app = V3App(data_dir=tmp_path / "isolated", port=0)
+    app.hud = hud
+    try:
+        app._on_activity("previous paragraph", 0)
+        hud._body.selectAll()
+        hud.operation_event("delivery_start")
+        hud.operation_event("delivery_complete", result="UNKNOWN", rotated=True, text_sent=True)
+        hud._idle_timeout()
+        app._on_activity("", 0)
+        app.draft.draft_id = "next-draft"
+        app._on_activity("next paragraph", 0)
+        QTest.qWait(20)
+        assert hud._widget.isVisible()
+        assert hud._body.toPlainText() == "next paragraph"
+        assert not hud._body.textCursor().hasSelection()
+        # New identity must also reset without an intermediate empty ACK/hide.
+        hud._body.selectAll()
+        app.draft.draft_id = "third-draft"
+        app._on_activity("third paragraph", 0)
+        assert hud._body.toPlainText() == "third paragraph"
+        assert not hud._body.textCursor().hasSelection()
+    finally:
+        app._commands.close(3); app.db.conn.close(); app._lock.release()
