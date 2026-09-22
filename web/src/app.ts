@@ -449,20 +449,20 @@ export function boot(root: HTMLElement): void {
         if (activeSend && (!activeSend.intentId || msg.intent_id !== activeSend.intentId)) return;
         const detail = msg.stage === "text" ? "图片已处理，正在插入文字…" :
           `正在${msg.stage === "image_wait" ? "确认" : "插入"}第 ${msg.index} / ${msg.total} 张图片…`;
-        $("deliveryStatus").textContent = detail; $("deliveryStatus").hidden = false; update();
+        $("deliveryStatus").textContent = `电脑正在处理已提交的图文：${detail}`; $("deliveryStatus").hidden = false; update();
       }
       if (msg.type === "attempt.status") {
         if (activeSend && !finishFeedback(msg)) return;
         const labels: Record<string, string> = {CONFIRMED:"已放入输入框",UNKNOWN:"已尝试插入，可召回重试",NO_STEPS:"未插入，请先选中电脑输入框",PARTIAL:"只完成一部分，请查看恢复选项",BUSY:"正在处理上一份内容"};
         const detail = msg.progress?.message || labels[msg.result] || "插入未完成，内容保留";
-        $("deliveryStatus").textContent=detail;$("deliveryStatus").hidden=false;
-        toast(detail);
+        $("deliveryStatus").textContent=`上次插入：${detail}`;$("deliveryStatus").hidden=false;
+        toast(`上次插入：${detail}`);
         update();
       }
       if (msg.type === "draft.rotated") {
         const relevant = !activeSend || (!!activeSend.intentId && msg.intent_id === activeSend.intentId);
         finishFeedback(msg); update();
-        if(relevant && msg.progress?.message){$("deliveryStatus").textContent=msg.progress.message;$("deliveryStatus").hidden=false;}
+        if(relevant && msg.progress?.message){$("deliveryStatus").textContent=`上次插入：${msg.progress.message}`;$("deliveryStatus").hidden=false;}
         void handleReceipt(msg);
       }
       if (msg.type === "draft.restore_proposal") {
@@ -572,6 +572,9 @@ export function boot(root: HTMLElement): void {
   function sendDraft() {
     // New authoring cancels an old send affordance; rotation fetches a fresh status afterwards.
     submitAvailable = false; $("submitPanel").hidden = true;
+    // Feedback from an earlier insertion must never describe the newly edited draft.
+    $("deliveryStatus").hidden = true; $("deliveryStatus").textContent = "";
+    $("sync").textContent = "图在前，文字在后 · 不自动发送";
     latestMessage = buildPrimaryUpdate(state, newId());
     persistDraft();
     if (restored) publishCurrent();

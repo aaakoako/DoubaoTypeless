@@ -4,6 +4,28 @@ from tests.test_v3_editor_transactions import product, editing, synced, photo
 from tests.test_v3_frontend_prod import READ_DRAFT
 
 
+def test_next_draft_does_not_inherit_previous_insertion_feedback(tmp_path):
+    async def run():
+        async with product(tmp_path) as (page, app, _uploads):
+            from doubao_typeless.core.bundle import freeze_bundle
+            await page.fill('#text', '上一段');await synced(page)
+            bundle = freeze_bundle(app.draft, bundle_id='feedback-test')
+            event = app._phone_rotate_event(bundle, True, 'UNKNOWN')
+            event['progress'] = {'message':'文字已发出，接收待确认'}
+            await app.bridge.publish_phone_event(event)
+            await page.wait_for_function("document.querySelector('#text').value==='' && document.querySelector('#sync').textContent.includes('已开始下一段')")
+            await page.fill('#text', '这一段还没有插入');await synced(page)
+            assert await page.locator('#deliveryStatus').is_hidden()
+            assert '已开始下一段' not in await page.locator('#sync').inner_text()
+            # A late duplicate receipt remains explicitly historical and never clears the new text.
+            await app.bridge.publish_phone_event(event)
+            await page.wait_for_function("document.querySelector('#deliveryStatus').textContent.startsWith('上次插入：')")
+            assert await page.locator('#text').input_value() == '这一段还没有插入'
+            await page.fill('#text', '继续编辑这一段');await synced(page)
+            assert await page.locator('#deliveryStatus').is_hidden()
+    asyncio.run(run())
+
+
 def test_sheets_close_and_settings_describe_current_connection(tmp_path):
     async def run():
         async with product(tmp_path, touch=True) as (page, app, uploads):

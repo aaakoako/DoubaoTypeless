@@ -338,6 +338,8 @@ async def exercise(child,data,result,report):
                 await phone.fill('#text',text)
                 await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
                 expected_text=text+'\n\n图1：第一张标注\n图2：第二张标注'
+                assert await phone.locator('#deliveryStatus').is_hidden(),'previous insertion feedback leaked into new draft'
+                assert '已开始下一段' not in await phone.locator('#sync').inner_text()
                 await phone.screenshot(path=str(report.with_name(report.stem+'-phone.png')))
                 expected_images=await phone.evaluate("""async()=>{const out=[];for(const im of document.querySelectorAll('.attach-card img')){await im.decode();const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;c.getContext('2d').drawImage(im,0,0);const a=c.getContext('2d').getImageData(0,0,c.width,c.height).data,r=new Uint8Array(c.width*c.height*3);for(let i=0,j=0;i<a.length;i+=4){r[j++]=a[i];r[j++]=a[i+1];r[j++]=a[i+2]}const d=await crypto.subtle.digest('SHA-256',r);out.push({w:c.width,h:c.height,sha256:[...new Uint8Array(d)].map(v=>v.toString(16).padStart(2,'0')).join('')})}return out}""")
                 await target.bring_to_front();await target.locator('#prompt-textarea').click()
@@ -497,7 +499,7 @@ async def exercise(child,data,result,report):
                             id:e.id,value:e.value,text:e.textContent,innerText:e.innerText,html:e.innerHTML})),
                         pastes:window.pasteRecords,enterEvents:window.enterEvents,title:document.title
                     })''')
-                    result['phone_text']=await phone.locator('#text').input_value()
+                    result['phone_text']=await phone.evaluate("document.querySelector('#text')?.value ?? null")
                     result['hud_text']=hud_text()
                     rw=own_window(child.pid,'上次结果未知')
                     result['recovery_visible']=bool(rw and win32gui.IsWindowVisible(rw))
