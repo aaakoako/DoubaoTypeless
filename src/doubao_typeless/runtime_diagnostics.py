@@ -177,8 +177,8 @@ class RuntimeDiagnostics:
 
 def run_application() -> None:
     """PyInstaller/源码共用入口，早于 GUI 和平台模块导入安装取证。"""
-    from doubao_typeless.runtime import v3_data_dir
-
+    from doubao_typeless.runtime import v3_data_dir, configure_launch
+    configure_launch(sys.argv)
     diagnostics = RuntimeDiagnostics(v3_data_dir()).install()
 
     def entry() -> None:

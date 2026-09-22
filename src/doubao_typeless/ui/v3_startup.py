@@ -2,25 +2,30 @@
 from __future__ import annotations
 
 import sys
+import subprocess
 from pathlib import Path
 
 V3_RUN_NAME = "DoubaoTypelessV3Preview"
 DAILY_RUN_NAME = "DoubaoTypeless"
 
 
-def startup_command() -> str:
+def startup_command(*, data_dir: Path | None = None) -> str:
+    from doubao_typeless.runtime import v3_data_dir
+    from doubao_typeless.ui.single_instance import pipe_name
     if getattr(sys, "frozen", False):
-        return f'"{Path(sys.executable).resolve()}" --minimized'
-    root = Path(__file__).resolve().parents[3]
-    launcher = Path(sys.executable).resolve()
-    pythonw = launcher.parent / "pythonw.exe"
-    if pythonw.is_file():
-        launcher = pythonw
-    script = root / "tools" / "run_v3.py"
-    return f'"{launcher}" "{script}" --minimized'
+        args = [str(Path(sys.executable).resolve())]
+    else:
+        root = Path(__file__).resolve().parents[3]
+        launcher = Path(sys.executable).resolve()
+        pythonw = launcher.parent / "pythonw.exe"
+        if pythonw.is_file():
+            launcher = pythonw
+        args = [str(launcher), str(root / "tools" / "run_v3.py")]
+    args += ["--minimized", "--data-dir", str((data_dir or v3_data_dir()).resolve()), "--instance-name", pipe_name()]
+    return subprocess.list2cmdline(args)
 
 
-def apply_v3_autostart(enabled: bool) -> tuple[bool, str]:
+def apply_v3_autostart(enabled: bool, *, data_dir: Path | None = None) -> tuple[bool, str]:
     if sys.platform != "win32":
         return False, "仅 Windows 支持开机自启"
     try:
@@ -36,7 +41,7 @@ def apply_v3_autostart(enabled: bool) -> tuple[bool, str]:
         return False, str(exc)
     try:
         if enabled:
-            winreg.SetValueEx(key, V3_RUN_NAME, 0, winreg.REG_SZ, startup_command())
+            winreg.SetValueEx(key, V3_RUN_NAME, 0, winreg.REG_SZ, startup_command(data_dir=data_dir))
         else:
             try:
                 winreg.DeleteValue(key, V3_RUN_NAME)

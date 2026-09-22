@@ -284,9 +284,12 @@ def test_production_settings_and_pc_copy(tmp_path):
                 await page.click("#sendBtn")
                 await page.wait_for_function("() => (document.getElementById('sync')||{}).textContent && document.getElementById('sync').textContent.indexOf('电脑确认插入') >= 0")
                 await page.click("#settingsBtn")
+                await page.get_by_text("AI 辅助与确认发送", exact=True).click()
                 settings = await page.locator("#sheetCard").inner_text()
-                assert "密钥只存在电脑" in settings
-                assert "拒绝截图仍可同步" in settings
+                assert "不需要配置 AI 密钥" in settings
+                assert "日常怎么用" in settings
+                await page.get_by_text("连接不上或插入不了", exact=True).click()
+                assert "插入、截图权限" in await page.locator("#sheetCard").inner_text()
                 await page.goto(f"http://127.0.0.1:{port}/pc")
                 assert "允许插入" in await page.content()
                 await browser.close()

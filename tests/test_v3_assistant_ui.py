@@ -58,6 +58,16 @@ def test_reading_selection_survives_append_and_pauses_idle(hud):
     assert not hud._timer.isActive()
 
 
+def test_late_document_layout_follows_tail_but_keeps_manual_reading(hud):
+    hud.show_receiving('长文内容\n' * 80);QTest.qWait(30)
+    bar = hud._body.verticalScrollBar()
+    hud._body.document().setDocumentMargin(22);QTest.qWait(20)
+    assert bar.value() == bar.maximum()
+    bar.setValue(20)
+    hud._body.document().setDocumentMargin(30);QTest.qWait(20)
+    assert bar.value() == 20
+
+
 def test_hud_shrinks_for_next_short_draft(hud):
     hud.show_receiving('long line '*400);QTest.qWait(20)
     old=hud._widget.height()

@@ -237,6 +237,7 @@ class HudController:
             bar = self._body.verticalScrollBar()
             if bar is not None:
                 bar.valueChanged.connect(self._scroll_changed)
+                bar.rangeChanged.connect(self._scroll_range_changed)
                 bar.sliderPressed.connect(self._pause_or_resume_idle)
                 bar.sliderReleased.connect(self._reading_changed)
             self._body.selectionChanged.connect(self._reading_changed)
@@ -455,6 +456,15 @@ class HudController:
             return max(40, rect.height() + 12)
         except Exception:
             return max(40, 21 * max(1, (len(text) + 19) // 20))
+
+    def _scroll_range_changed(self, _minimum, maximum):
+        # Layout/font changes can add height after the initial queued tail adjustment.
+        # Only the existing follow mode may move; manual reading keeps its position.
+        if self._updating or not self._follow_tail or self._body.textCursor().hasSelection():
+            return
+        bar = self._body.verticalScrollBar()
+        if not bar.isSliderDown():
+            bar.setValue(maximum)
 
     def _scroll_changed(self, _value=0):
         if self._updating:

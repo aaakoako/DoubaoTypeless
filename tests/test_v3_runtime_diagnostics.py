@@ -253,10 +253,12 @@ def test_unwritable_directory_does_not_stop_entry(tmp_path, monkeypatch):
 def test_production_launcher_installs_before_app_main(tmp_path, monkeypatch):
     runtime = ModuleType("doubao_typeless.runtime")
     runtime.v3_data_dir = lambda: tmp_path
+    configured = []
+    runtime.configure_launch = lambda argv: configured.append(list(argv))
     app = ModuleType("doubao_typeless.app")
     checks = []
     def main():
-        checks.append(any(e["event"] == "process_start" for e in events(tmp_path / "logs/runtime.log")))
+        checks.append(bool(configured) and any(e["event"] == "process_start" for e in events(tmp_path / "logs/runtime.log")))
         raise SystemExit(0)
     app.main = main
     monkeypatch.setitem(sys.modules, "doubao_typeless.runtime", runtime)

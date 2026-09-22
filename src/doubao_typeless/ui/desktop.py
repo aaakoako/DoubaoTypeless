@@ -521,7 +521,7 @@ class ClientWindow:
         info.addWidget(self.url_label)
         self.code_label = QLabel("")
         info.addWidget(self.code_label)
-        hint = QLabel("用手机浏览器打开并连接。手机与电脑须在同一局域网。二维码不含截图或插入权限。")
+        hint = QLabel("1. 手机与电脑连同一网络，扫码连接。\n2. 在下方允许手机插入或截电脑。\n3. 点一下目标输入框，再从手机或浮窗插入。")
         hint.setObjectName("muted")
         hint.setWordWrap(True)
         info.addWidget(hint)
@@ -551,7 +551,7 @@ class ClientWindow:
         cl.addWidget(self.device_name)
         self.grant_row = QVBoxLayout()
         cl.addLayout(self.grant_row)
-        self.remember_box = QCheckBox("记住这台设备 30 天（需明确勾选，不是默认）")
+        self.remember_box = QCheckBox("记住这台手机 30 天，下次自动续接")
         self.remember_box.clicked.connect(self._toggle_remember)
         cl.addWidget(self.remember_box)
         self.practice_toggle = QToolButton()
@@ -769,10 +769,12 @@ class ClientWindow:
             self.widget,
             "帮助与诊断",
             f"{preview_version_label()}\n\n"
-            "1. 手机浏览器扫码或打开窗口里的地址。\n"
-            "2. 电脑批准插入后，点外部目标，再按「插入并复制」或 Alt+I。\n"
-            "3. 不要改 JSON、不要设环境变量、不必打开 pc.html、不必读 pair.txt。\n"
-            "4. 检查更新只打开公开下载页，不会覆盖日用安装。\n"
+            "连接：手机与电脑连同一网络，扫描当前窗口的二维码。\n"
+            "插入：在连接页允许手机插入，点一下目标输入框，再操作手机或浮窗。\n"
+            "失败：文字已复制时可手动粘贴；图片结果待确认时点浮窗「恢复」。\n"
+            "浮窗：拖动顶部可移动；展开后可返回；关闭设置仍在托盘运行。\n"
+            "断线：手机继续保存草稿，电脑已收到的稿仍可使用。\n"
+            "版本：手机设置与这里显示的版本号应一致。\n"
             f"日志：{log}",
         )
 
@@ -1008,7 +1010,7 @@ class ClientWindow:
             expand=stored["hotkey_expand"],
             capture=stored["hotkey_capture"],
         )
-        ok, err = apply_v3_autostart(bool(stored["autostart"]))
+        ok, err = apply_v3_autostart(bool(stored["autostart"]), data_dir=self.app.data_dir)
         if stored["autostart"] and not ok:
             self.byok_status.setText(f"设置已保存。开机自启未写入：{err}")
             self.byok_status.setObjectName("error")

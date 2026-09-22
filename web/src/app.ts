@@ -32,6 +32,7 @@ type Asset = {
   edit_original?: Asset | null;
   edit_scene?: string;
   edit_caption?: string;
+  edit_text?: {value: string; x: number; y: number};
 };
 
 export function boot(root: HTMLElement): void {
@@ -46,12 +47,13 @@ export function boot(root: HTMLElement): void {
       <section class="composer" id="composer">
         <div class="composer-heading">这次想做什么？</div>
         <div class="attach" id="attachments"></div>
+        <div id="removeNotice" class="undo-notice" role="status" hidden><span id="removeMessage"></span><button id="undoRemove">撤销删除</button></div>
         <div id="conflictBanner" class="conflict" hidden>
           <b>手机和电脑有不同的草稿</b><p>两份内容都还在，请选择这次继续使用哪一份。</p>
           <button id="useLocal">继续手机这份</button><button id="useServer">采用电脑这份</button>
         </div>
         <textarea id="text" placeholder="点这里，用手机输入法说话…&#10;&#10;也可以圈出问题，或画个草图。" aria-label="本次图文说明"></textarea>
-        <div class="writehint"><span>用你习惯的输入法，不需要 API Key</span><span id="charCount">0 字</span></div>
+        <div class="writehint"><span>用手机输入法说话，文字自动同步</span><span id="charCount">0 字</span></div>
         <div class="writehint"><span id="captionHint"></span></div>
         <div class="tools">
           <button id="captureBtn">截电脑</button>
@@ -115,7 +117,7 @@ export function boot(root: HTMLElement): void {
       </section>
     </div>
     <input id="file" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden />
-    <div class="sheet" id="sheet"><div class="card" id="sheetCard"></div></div>
+    <div class="sheet" id="sheet"><div class="card" role="dialog" aria-modal="true" aria-label="操作面板" id="sheetDialog"><div class="sheet-toolbar"><button id="closeSheet" aria-label="关闭面板">关闭</button></div><div id="sheetCard"></div></div></div>
   `;
 
   const state = {
@@ -129,7 +131,7 @@ export function boot(root: HTMLElement): void {
     online: false,
     uploading: false,
     editorKind: "图片标注",
-    removed: [] as Asset[],
+    removed: [] as {asset: Asset; index: number; epoch: string}[],
     conflict: null as any,
     sending: false,
     last_intent: null as {signature:string;id:string} | null,
@@ -188,7 +190,23 @@ export function boot(root: HTMLElement): void {
     }
   }
   const $ = (id: string) => document.getElementById(id)!;
-  $("canvasTextCancel").onclick = () => {closeCanvasText(); chooseTool("pen");};
+  let sheetReturnFocus: HTMLElement | null = null;
+  function openSheet() {
+    if (!$("sheet").classList.contains("show")) sheetReturnFocus = document.activeElement as HTMLElement;
+    $("sheet").classList.add("show");
+    root.querySelector<HTMLElement>(".page")!.inert = true;
+    $("sheetDialog").setAttribute("aria-label", $("sheetCard").querySelector("h2,h3")?.textContent || "操作面板");
+    $("closeSheet").focus({preventScroll:true});
+  }
+  function closeSheet() {
+    ++sheetRevision; // Closed panels cannot be rewritten by a late network response.
+    $("sheet").classList.remove("show");
+    root.querySelector<HTMLElement>(".page")!.inert = false;
+    if (sheetReturnFocus?.isConnected && sheetReturnFocus.getClientRects().length) sheetReturnFocus.focus({preventScroll:true});
+    sheetReturnFocus = null;
+  }
+  $("closeSheet").onclick = closeSheet;
+  $("canvasTextCancel").onclick = () => {closeCanvasText(); chooseTool("pen"); saveOpenEditor();};
   function commitCanvasText(): boolean {
     if (!editor || !textPoint) return false;
     const value = ($("canvasTextInput") as HTMLTextAreaElement).value;
@@ -244,10 +262,13 @@ export function boot(root: HTMLElement): void {
       state.generation = Number(saved.generation || 0);
       state.last_intent = saved.last_intent && typeof saved.last_intent.id === "string" ? saved.last_intent : null;
       state.assets = Array.isArray(saved.assets) ? saved.assets.slice(0,6) : [];
+      let recoveredEditing = false;
       for (const a of state.assets) {
-        if (!a.id || typeof a.preview !== "string") {a.id ||= newId(); a.preview = ""; a.status = "failed";}
-        if (a.status === "editing") a.status = "failed";
+        if (!a.id || typeof a.preview !== "string") {a.id ||= newId(); a.preview = ""; a.status = "failed"; recoveredEditing = true;}
+        if (a.status === "editing") {a.status = "failed"; recoveredEditing = true;}
       }
+      // A recovered editor is a new asset state; reusing its old revision causes a false conflict.
+      if (recoveredEditing) {state.revision++; state.last_intent = null;}
     }
     state.draft_id ||= newId();
     state.epoch ||= newId();
@@ -277,6 +298,9 @@ export function boot(root: HTMLElement): void {
     btn.disabled = !state.online || !state.session || state.uploading || state.sending || !!state.conflict ||
       state.assets.some(a => !a.asset_id || (a.status && a.status !== "ready")) || (!state.text.trim() && !state.assets.length);
     $("conflictBanner").hidden = !state.conflict;
+    state.removed = state.removed.filter(item => item.epoch === state.epoch);
+    $("removeNotice").hidden = !state.removed.length;
+    $("removeMessage").textContent = state.removed.length ? `已移除${state.removed[state.removed.length-1].asset.kind}` : "";
     const signature = JSON.stringify(state.assets.map(a => [a.id,a.asset_id,a.status,a.render_revision,a.preview,a.progress]));
     if (signature === attachmentsSignature) return;
     attachmentsSignature = signature;
@@ -311,6 +335,12 @@ export function boot(root: HTMLElement): void {
       });
       wrap.querySelector(".right")!.addEventListener("click", () => move(i, 1));
       wrap.querySelector(".remove")!.addEventListener("click", () => removeAt(i));
+      const left = wrap.querySelector<HTMLButtonElement>(".left")!;
+      const right = wrap.querySelector<HTMLButtonElement>(".right")!;
+      left.disabled = i === 0; right.disabled = i === state.assets.length - 1;
+      left.setAttribute("aria-label", `前移第 ${i+1} 张图片`);
+      right.setAttribute("aria-label", `后移第 ${i+1} 张图片`);
+      wrap.querySelector(".remove")!.setAttribute("aria-label", `删除第 ${i+1} 张图片`);
       if (a.pending_png && a.status === "failed") {
         const retry = document.createElement("button"); retry.textContent = "重试上传";
         retry.className = "retry";
@@ -333,10 +363,18 @@ export function boot(root: HTMLElement): void {
   function removeAt(i: number) {
     const removed = state.assets.splice(i, 1)[0];
     uploadControllers.get(removed.id)?.abort();
-    state.removed.push(removed);
+    state.removed.push({asset:removed, index:i, epoch:state.epoch});
     sendDraft();
     update();
   }
+
+  $("undoRemove").onclick = () => {
+    if (state.assets.length >= 6) {toast("本次已有六张图片，请先移除一张再撤销"); return;}
+    const item = state.removed.pop();
+    if (!item || item.epoch !== state.epoch) {update(); return;}
+    state.assets.splice(Math.min(item.index, state.assets.length), 0, item.asset);
+    sendDraft(); update(); void uploadPending();
+  };
 
   function connect() {
     if (!state.session || !navigator.onLine) return;
@@ -749,6 +787,12 @@ export function boot(root: HTMLElement): void {
     ($("done") as HTMLButtonElement).disabled = false;
     host.dataset.ready="1";
     editorStartScene = editor.exportScene();
+    if (asset.edit_text?.value) {
+      textPoint = {x:asset.edit_text.x, y:asset.edit_text.y};
+      ($("canvasTextInput") as HTMLTextAreaElement).value = asset.edit_text.value;
+      $("canvasTextPanel").hidden = false;
+      chooseTool("text");
+    }
     requestAnimationFrame(() => editor?.resize());
     update();
     if (ws?.readyState === 1) ws.send(JSON.stringify({ protocol: 3, type: "editor.activity", kind: "edit" }));
@@ -846,7 +890,7 @@ export function boot(root: HTMLElement): void {
         scene:JSON.stringify(sceneData), preview, w:bmp.width, h:bmp.height, pending_png:blob,
         asset_id:undefined, upload_ticket:undefined, progress:0, status:"queued"};
       bmp.close();
-      delete next.edit_original; delete next.edit_scene; delete next.edit_caption;
+      delete next.edit_original; delete next.edit_scene; delete next.edit_caption; delete next.edit_text;
       const index=state.assets.indexOf(item);
       if(index<0) return;
       // Persist a separate committed candidate before publishing ready/uploadable state.
@@ -874,11 +918,14 @@ export function boot(root: HTMLElement): void {
       if (scene.source) scene.source.url = item.source || "";
       item.edit_scene = JSON.stringify(scene);
       item.edit_caption = ($("captionInput") as HTMLTextAreaElement).value;
+      const pendingText = ($("canvasTextInput") as HTMLTextAreaElement).value;
+      item.edit_text = textPoint && pendingText ? {...textPoint, value:pendingText} : undefined;
       repository.save(draftSnapshot());
     } catch { $("localSave").textContent = "当前编辑尚未保存，请保留页面"; }
   }
   $("stage").addEventListener("pointerup", () => window.setTimeout(saveOpenEditor, 0));
   $("captionInput").addEventListener("input", saveOpenEditor);
+  $("canvasTextInput").addEventListener("input", saveOpenEditor);
   for (const id of ["undoBtn", "redoBtn", "wire", "cropApply", "cropReset"]) {
     $(id).addEventListener("click", () => window.setTimeout(saveOpenEditor, 0));
   }
@@ -916,20 +963,20 @@ export function boot(root: HTMLElement): void {
     ++editorSequence; editorAbort?.abort();
     editor?.destroy(); editor = null; editorLoading = false;
     $("editor").classList.remove("show"); $("composer").style.display="flex"; $("mobileHead").style.display="flex";
-    $("sheet").classList.remove("show");
+    closeSheet();
     sendDraft(); update(); void uploadPending();
     toast("已放弃未保存的编辑，没有加入新图片");
   }
   function cancelEditor() {
     if (finishingEditor || !editorOpen()) return;
     const item=state.assets.find(a=>a.id===currentId);
-    const changed = !editorLoading && editor && (editor.exportScene() !== editorStartScene ||
+    const changed = !editorLoading && editor && ((textPoint && ($("canvasTextInput") as HTMLTextAreaElement).value.trim()) || editor.exportScene() !== editorStartScene ||
       ($("captionInput") as HTMLTextAreaElement).value !== (item?.edit_original?.caption || ""));
     if (!changed) {discardEditor(); return;}
     ++sheetRevision;
     $("sheetCard").innerHTML='<h3>放弃未保存的编辑？</h3><p>已保存的图片不会改变。新建但未保存的白板不会加入图文。</p><button id="keepEditing" class="primary">继续编辑</button> <button id="discardEditing">放弃更改</button>';
-    $("sheet").classList.add("show");
-    $("keepEditing").onclick=()=>$("sheet").classList.remove("show");
+    openSheet();
+    $("keepEditing").onclick=()=>closeSheet();
     $("discardEditing").onclick=discardEditor;
   }
   $("back").onclick = cancelEditor;
@@ -1060,18 +1107,18 @@ export function boot(root: HTMLElement): void {
       ++sheetRevision;
       $("sheetCard").innerHTML='<h3>发送电脑上的上一份图文？</h3><p>请先看电脑，确认图片、文字与目标都正确。这一步只发送，不重复粘贴。</p><p id="submitShortcut"></p><button id="confirmSend" class="primary">确认发送</button> <button id="cancelSend">取消</button>';
       $("submitShortcut").textContent=`将执行 ${info.shortcut}，不会自动重试。`;
-      $("sheet").classList.add("show");
-      $("cancelSend").onclick=()=>$("sheet").classList.remove("show");
+      openSheet();
+      $("cancelSend").onclick=()=>closeSheet();
       $("confirmSend").onclick=()=>{void (async()=>{
         const btn=$("confirmSend") as HTMLButtonElement; if(btn.disabled)return;btn.disabled=true;
-        if(state.epoch!==epoch || state.revision!==rev || state.session!==originalSession || !state.online){toast("内容或连接已变化，没有发送");$("sheet").classList.remove("show");return;}
+        if(state.epoch!==epoch || state.revision!==rev || state.session!==originalSession || !state.online){toast("内容或连接已变化，没有发送");closeSheet();return;}
         try {
           const result=await fetch("/v3/send/commit",{method:"POST",headers:{...headers(),"Content-Type":"application/json"},
             body:JSON.stringify({ticket:info.ticket,delivery_id:info.delivery_id,confirmed:true}),signal:AbortSignal.timeout(6000)});
           const status=await result.json();
           toast(status.result==="KEYS_SENT"?"发送按键已执行，请查看电脑结果":sendErrors[status.error_code]||"发送未确认，请查看电脑，不会自动重试");
         }catch{toast("发送回执未收到，请看电脑结果；不会自动重试");}
-        finally {submitAvailable=false;$("submitPanel").hidden=true;$("sheet").classList.remove("show");}
+        finally {submitAvailable=false;$("submitPanel").hidden=true;closeSheet();}
       })();};
     }catch{toast("电脑未连接，没有发送");}finally{submitBusy=false;}
   }
@@ -1131,39 +1178,40 @@ export function boot(root: HTMLElement): void {
     return true;
   }
 
-  async function submitPair(code: string): Promise<boolean> {
+  async function submitPair(code: string, panelVersion: number): Promise<boolean> {
     const res = await fetch("/v3/pair", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code }),
+      signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) return false;
     state.session = await res.json();
     sessionStorage.setItem("dt.v3.session", JSON.stringify(state.session));
     const clean = new URL(location.href); clean.searchParams.delete("pair");
     history.replaceState(null, "", clean.pathname + clean.search + clean.hash);
-    ++sheetRevision;
-    $("sheet").classList.remove("show");
+    if (sheetRevision === panelVersion) closeSheet();
     connect();
     update();
     return true;
   }
 
   function showPair() {
-    ++sheetRevision;
-    const sheet = $("sheet");
+    const version = ++sheetRevision;
     const preset = pairCodeFromUrl();
     $("sheetCard").innerHTML = `<h2>连接电脑</h2><p id="pairStatus" role="status">扫描电脑连接页当前显示的二维码，就能连接。草稿会保留在手机。</p><details><summary>无法扫码？使用备用短码</summary><input id="pairCode" aria-label="备用配对短码" inputmode="numeric" placeholder="电脑显示的 4 位短码" /><button class="primary" id="pairGo">使用短码连接</button></details><button id="writeOffline">继续写草稿</button>`;
-    sheet.classList.add("show");
-    $("writeOffline").onclick = () => sheet.classList.remove("show");
+    openSheet();
+    $("writeOffline").onclick = () => closeSheet();
     const pair = async (code:string, scanned:boolean) => {
       const button = $("pairGo") as HTMLButtonElement; button.disabled = true;
       $("pairStatus").textContent = "正在连接电脑…";
       try {
-        if (!await submitPair(code)) $("pairStatus").textContent = scanned ?
+        const paired = await submitPair(code, version);
+        if (sheetRevision !== version) return;
+        if (!paired) $("pairStatus").textContent = scanned ?
           "这个二维码已过期或已使用。电脑连接页会自动刷新，请重新扫描当前二维码；手机草稿仍在。" :
           "短码无效或已过期，请核对电脑当前显示的短码。";
-      } catch { $("pairStatus").textContent = "暂时连不上电脑。请确认同一网络；可以继续离线写草稿。"; }
+      } catch { if (sheetRevision === version) $("pairStatus").textContent = "暂时连不上电脑。请确认同一网络；可以继续离线写草稿。"; }
       finally {button.disabled = false;}
     };
     $("pairGo").onclick = () => {void pair(($("pairCode") as HTMLInputElement).value, false);};
@@ -1171,31 +1219,34 @@ export function boot(root: HTMLElement): void {
   }
 
   function showRestoreProposal(message: any) {
-    ++sheetRevision;
+    const version = ++sheetRevision;
     const card=$("sheetCard");card.replaceChildren();
     const title=document.createElement("h2");title.textContent="恢复为手机新稿？";
     const desc=document.createElement("p");desc.textContent="当前图文会先在手机保留副本，恢复后仍由手机编辑。不会自动插入。";
     const text=document.createElement("p");text.textContent=String(message.text||"").slice(0,160);
     const accept=document.createElement("button");accept.className="primary";accept.textContent="保留当前，恢复图文";
-    const cancel=document.createElement("button");cancel.textContent="取消";cancel.onclick=()=>$("sheet").classList.remove("show");
-    card.append(title,desc,text,accept,cancel);$("sheet").classList.add("show");
+    const cancel=document.createElement("button");cancel.textContent="取消";cancel.onclick=()=>closeSheet();
+    card.append(title,desc,text,accept,cancel);openSheet();
     accept.onclick=async()=>{
+      if (accept.disabled) return;
+      accept.disabled = true;
       saveOpenEditor();const before=draftSnapshot();
-      try{repository.save(before);await repository.backup(before);}catch{toast("手机存储失败，未替换当前稿");return;}
+      try{repository.save(before);await repository.backup(before);}catch{accept.disabled=false;toast("手机存储失败，未替换当前稿");return;}
+      if (sheetRevision !== version) return;
       for(const controller of uploadControllers.values())controller.abort();
       state.text=String(message.text||"");
       state.assets=message.local_snapshot ? structuredClone(message.local_snapshot.assets||[]) :
         (message.assets||[]).map((a:any)=>({...a,id:a.id||newId(),kind:"图片",preview:`/v3/assets/${a.asset_id}`,status:"ready"}));
       state.epoch=newId();state.generation++;state.revision=0;state.conflict=null;
       editor?.destroy();editor=null;$("editor").classList.remove("show");$("composer").style.display="flex";$("mobileHead").style.display="flex";
-      $("sheet").classList.remove("show");latestMessage=null;outbox.disconnect();if(sessionReady)outbox.connect();sendDraft();update();void uploadPending();
+      closeSheet();latestMessage=null;outbox.disconnect();if(sessionReady)outbox.connect();sendDraft();update();void uploadPending();
     };
   }
 
   $("historyBtn").onclick = async () => {
     const version=++sheetRevision;
     const card=$("sheetCard");card.innerHTML="<h2>最近图文</h2><p>恢复为新稿不自动插入；上次完整图文仍可在电脑召回。</p>";
-    $("sheet").classList.add("show");
+    openSheet();
     try {
       const local=await repository.load("before-replace");
       if(sheetRevision!==version)return;
@@ -1205,6 +1256,7 @@ export function boot(root: HTMLElement): void {
         restore.onclick=()=>showRestoreProposal({text:local.text,local_snapshot:local});card.append(preview,restore);
       }
     }catch{toast("无法读取手机恢复记录，当前稿不受影响");}
+    if(sheetRevision!==version)return;
     if (!state.session || !state.online) {
       const note=document.createElement("p");note.textContent="电脑离线；本机记录仍可恢复。";card.append(note);return;
     }
@@ -1213,25 +1265,26 @@ export function boot(root: HTMLElement): void {
       if(!res.ok)throw new Error("offline");const data=await res.json();if(sheetRevision!==version)return;
       for(const item of data.items||[]){const row=document.createElement("div");row.textContent=`电脑记录 · ${item.asset_count} 图 · ${item.text_chars} 字`;card.append(row);}
       const recall=document.createElement("button");recall.className="primary";recall.id="recallLast";recall.textContent="电脑召回上次（保留手机当前稿）";
-      recall.onclick=()=>{if(ws?.readyState===1)ws.send(JSON.stringify({protocol:3,type:"recall.last"}));$("sheet").classList.remove("show");};card.append(recall);
-    }catch{const note=document.createElement("p");note.textContent="电脑记录暂未读到，可稍后再试。";card.append(note);}
+      recall.onclick=()=>{if(ws?.readyState===1)ws.send(JSON.stringify({protocol:3,type:"recall.last"}));closeSheet();};card.append(recall);
+    }catch{if(sheetRevision!==version)return;const note=document.createElement("p");note.textContent="电脑记录暂未读到，可稍后再试。";card.append(note);}
   };
   $("settingsBtn").onclick = () => {
     const version = ++sheetRevision;
     $("sheetCard").innerHTML = `<h2>连接与设置</h2>
-      <p id="settingsStatus">正在读取电脑状态…</p><p id="settingsGrant"></p>
-      <p>密钥只存在电脑，不配 Key 也能输入、画图和投递。</p>
-      <p>拒绝截图仍可同步文字。截图和插入权限由电脑端批准。</p>
-      <p>Alt+I 插入并复制 · Alt+Shift+I 召回上次。</p>
-      <p>AI 文字辅助仅在电脑主动调用，不负责手机听写。</p>
-      <p>需要纯手机发送：在电脑常用设置开启「允许手机确认后发送」，选择该应用的 Enter / Ctrl+Enter。插入之后，手机另行确认发送。</p>`;
-    $("sheet").classList.add("show");
-    void fetch("/v3/status", {headers:headers()}).then(async res => {
+      <p id="settingsStatus" role="status">正在读取电脑状态…</p><p id="settingsVersion"></p><p id="settingsGrant"></p>
+      <h3>日常怎么用</h3><ol class="quick-start"><li>在手机写字、说话或加图，内容自动同步。</li><li>在电脑点一下要输入的位置，再点手机「插入电脑」或电脑「插入并复制」。</li><li>插入完成后写下一段；上一份可在「最近」找回。</li></ol>
+      <details><summary>连接不上或插入不了</summary><p>确认手机和电脑在同一网络，并扫描正在运行的这一版二维码。电脑连接页可开启本机的插入、截图权限。</p><p>自动插入失败时，在电脑选择输入框再粘贴；图片结果不确定时，从电脑浮窗「恢复」查看已完成的部分。</p><p>断线仍可写草稿，重连后继续同步。连接和重连不会自动插入。</p></details>
+      <details><summary>AI 辅助与确认发送</summary><p>手机听写使用输入法，不需要配置 AI 密钥。AI 改写仅在电脑主动调用。</p><p>需要手机确认发送时，在电脑常用设置开启「允许手机确认后发送」。插入完成后，另行核对电脑内容并确认发送。</p></details>`;
+    openSheet();
+    void fetch("/v3/status", {headers:headers(),signal:AbortSignal.timeout(6000)}).then(async res => {
       if (!res.ok) throw new Error("offline");
       const st = await res.json();
       if (sheetRevision !== version) return;
-      $("settingsStatus").textContent = `协议 ${st.protocol} · 草稿 r${st.revision}`;
-      $("settingsGrant").textContent = state.session ? "权限可在电脑的连接窗口调整" : "尚未配对";
+      $("settingsStatus").textContent = state.online ? "已连接电脑 · " + location.host : "电脑可访问，正在恢复连接";
+      const source = st.build?.source_sha;
+      $("settingsVersion").textContent = source ? `电脑版本：${source === "development" ? "开发预览" : "V3 体验版 · " + source.slice(0,8)}（可与电脑连接页核对）` : "电脑未提供版本信息";
+      $("settingsGrant").textContent = st.permissions ?
+        `手机插入：${st.permissions.insert ? "已允许" : "未开启"} · 截电脑：${st.permissions.capture ? "已允许" : "未开启"}。可在电脑连接页调整。` : "尚未配对，可先继续写草稿。";
     }).catch(() => {
       if (sheetRevision === version) $("settingsStatus").textContent = "电脑未连接，草稿仍保留";
     });
@@ -1269,13 +1322,17 @@ export function boot(root: HTMLElement): void {
   $("useLocal").onclick = () => { void resolveConflict(true); };
   $("useServer").onclick = () => { void resolveConflict(false); };
   $("sheet").onclick = (e) => {
-    if (e.target === $("sheet")) $("sheet").classList.remove("show");
+    if (e.target === $("sheet")) closeSheet();
   };
   document.addEventListener("keydown", (e) => {
-    if (e.key === "z" && (e.ctrlKey || e.metaKey) && state.removed.length) {
-      state.assets.push(state.removed.pop()!);
-      sendDraft(); update();
-    }
+    if (!$("sheet").classList.contains("show")) return;
+    if (e.key === "Escape") {e.preventDefault(); closeSheet(); return;}
+    if (e.key !== "Tab") return;
+    const controls = Array.from($("sheetDialog").querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled),summary,[tabindex="0"]'))
+      .filter(el => el.getClientRects().length > 0);
+    const first = controls[0], last = controls[controls.length-1];
+    if (e.shiftKey && document.activeElement === first) {e.preventDefault(); last?.focus();}
+    else if (!e.shiftKey && document.activeElement === last) {e.preventDefault(); first?.focus();}
   });
 
   try {

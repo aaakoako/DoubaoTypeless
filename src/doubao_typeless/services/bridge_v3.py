@@ -241,6 +241,11 @@ class V3Bridge:
         return web.json_response(result or {"result": "UNKNOWN"})
 
     async def _status(self, request: web.Request) -> web.Response:
+        from doubao_typeless.build_info import build_info
+        permissions = None
+        if request.headers.get("X-DT-Session"):
+            session = self._session_from(request)
+            permissions = {"insert": session.allow_insert, "capture": session.allow_capture}
         return web.json_response(
             {
                 "protocol": 3,
@@ -248,6 +253,8 @@ class V3Bridge:
                 "epoch": self.draft.epoch,
                 "revision": self.draft.revision,
                 "idle_hud": True,
+                "build": build_info(),
+                "permissions": permissions,
             }
         )
 

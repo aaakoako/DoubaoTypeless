@@ -8,6 +8,19 @@ from pathlib import Path
 PREVIEW_NAME = "preview-v3"
 
 
+def configure_launch(argv: list[str]) -> None:
+    """Keep explicitly selected preview storage and IPC identity across Windows login."""
+    import argparse
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--data-dir")
+    parser.add_argument("--instance-name")
+    options, _ = parser.parse_known_args(argv[1:])
+    if options.data_dir:
+        os.environ["DT_V3_DATA_DIR"] = str(Path(options.data_dir).resolve())
+    if options.instance_name:
+        os.environ["DT_V3_PIPE"] = options.instance_name
+
+
 def daily_use_config_candidates() -> list[Path]:
     out: list[Path] = []
     for env in ("APPDATA", "LOCALAPPDATA"):
