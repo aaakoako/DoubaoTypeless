@@ -194,13 +194,6 @@ async def exercise(child,data,result,report):
                 target=await browser.new_page(viewport={'width':1100,'height':850})
                 await target.goto(target_url)
                 phone=await phone_browser.new_page(viewport={'width':430,'height':850})
-                # 测试网络延迟只延迟原页面生成的准备回执，不补造协议字段。
-                await phone.add_init_script('''window.prepareDelay=0;
-const raw=WebSocket.prototype.send;WebSocket.prototype.send=function(data){
- let value;try{value=JSON.parse(data)}catch{}
- if(value?.type==='draft.prepared'&&window.prepareDelay){setTimeout(()=>{if(this.readyState===1)raw.call(this,data)},window.prepareDelay)}
- else raw.call(this,data);
-};''')
                 errors=[];phone.on('pageerror',lambda e:errors.append(str(e)))
                 await phone.goto(base+'/?pair='+code)
                 await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
@@ -254,21 +247,42 @@ const raw=WebSocket.prototype.send;WebSocket.prototype.send=function(data){
                 await target.evaluate('clearInterval(window.dynamicTitle)')
                 cases.append({'name':'contenteditable_dynamic_title_hotkey','passed':True})
 
-                # 回执等待中换到同窗口的另一输入控件，必须停止，不得贴错位置。
+                # 按住真实 Shift，让投递停在松键保护阶段；改焦点后必须停止。
+                # 桌面插入直接使用已收到的草稿，不依赖手机准备回执。
                 result['stage']='target_change_then_recover'
                 await target.locator('#prompt-textarea').fill('')
                 text='换焦点不得贴错'
-                await ready(text);await phone.evaluate('window.prepareDelay=1400');hotkey()
-                await until(lambda:'确认手机' in hud_text())
-                await target.locator('#other').click()
+                await ready(text)
+                from pynput.keyboard import Controller, Key
+                keyboard=Controller();keyboard.press(Key.shift)
+                try:
+                    assert inspector.click(hud(),'插入并复制'),hud_text()
+                    await until(lambda:clipboard_text()==text,timeout=1.2,
+                                message='delivery did not reach modifier guard')
+                    await target.locator('#other').click()
+                finally:
+                    keyboard.release(Key.shift)
                 await until(lambda:'目标变化' in hud_text(),timeout=10,message='target change had no visible result')
                 assert await phone.locator('#text').input_value()==text
                 assert await target.locator('#other').input_value()==''
                 assert await target.locator('#prompt-textarea').input_value()==''
                 assert child.poll() is None
-                await phone.evaluate('window.prepareDelay=0')
                 await target.locator('#prompt-textarea').click();hotkey();await completed(text)
                 cases.append({'name':'wrong_target_rejected_then_retry_succeeds','passed':True})
+
+                # 关闭手机页面断开真实连接，电脑已收到的文字仍可插入；重连不复活旧稿。
+                result['stage']='offline_desktop_insert_then_phone_reconnect'
+                await target.locator('#prompt-textarea').fill('')
+                text='手机断线后电脑保留的草稿'
+                await ready(text)
+                await phone.goto('about:blank')
+                await until(lambda:'手机离线' in hud_text(),message='disconnect not visible in HUD')
+                await target.bring_to_front();await target.locator('#prompt-textarea').click();hotkey()
+                await until(lambda:_matches(target,'#prompt-textarea',text),message='offline desktop insert failed')
+                await phone.goto(base+'/')
+                await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
+                await completed(text)
+                cases.append({'name':'offline_received_draft_insert_and_reconnect_without_resurrection','passed':True})
 
                 result['stage']='clipboard_failure_then_recover'
                 await target.locator('#prompt-textarea').fill('')
@@ -383,7 +397,7 @@ const raw=WebSocket.prototype.send;WebSocket.prototype.send=function(data){
                 cases.append({'name':'unnamed_composer_remove_attachment_controls_auto_continue','passed':True})
                 await target.evaluate("document.querySelector('[role=group]').id='composer';document.querySelector('#composer').setAttribute('aria-label','Composer');window.removeOnly=false;document.querySelector('#attachments').replaceChildren()")
 
-                # 不暴露附件接收证据的目标：明确询问，点击继续文字不重新贴图。
+                # 无附件接收证据时保留正文，不自动弹窗；主动恢复后继续文字不重复贴图。
                 result['stage']='unknown_image_explicit_continue_text'
                 await target.locator('#prompt-textarea').fill('')
                 await target.evaluate("window.imageRecords=[];window.pasteRecords=[];window.shiftImageFocus=false;window.hideImageAccessibility=true")
@@ -391,7 +405,11 @@ const raw=WebSocket.prototype.send;WebSocket.prototype.send=function(data){
                 text='接收未知时文字仍保留'
                 await phone.fill('#text',text);await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
                 await target.bring_to_front();await target.locator('#prompt-textarea').click();hotkey()
-                recovery=await until(lambda:own_window(child.pid,'上次结果未知'),timeout=15,message='missing image recovery dialog')
+                await until(lambda:'恢复' in hud_text(),timeout=15,message='missing explicit recovery action')
+                recovery=own_window(child.pid,'上次结果未知')
+                assert not recovery or not win32gui.IsWindowVisible(recovery),'recovery must not open unexpectedly'
+                assert inspector.click(hud(),'恢复'),hud_text()
+                recovery=await until(lambda:own_window(child.pid,'上次结果未知'),message='missing image recovery dialog')
                 await until(lambda:win32gui.IsWindowVisible(recovery))
                 assert await target.locator('#prompt-textarea').input_value()==''
                 assert await phone.locator('#text').input_value()==text
