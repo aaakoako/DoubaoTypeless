@@ -2,11 +2,11 @@
   "schema_version": 1,
   "product_goal": "沿用 MASTER_PLAN，保留原版插入并复制等体验，交付可实际体验的完整 Windows V3 发布前候选。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "交互返修产品固定为 d5f978b66fc21f10aa3d601b942d1e153c35db90；文档提交可晚于产品提交。旧 cloud_evidence 和 candidate_artifact 为历史证据。",
+  "working_tree": "日常使用优化产品固定为 dfa48cf4f2bac75b87b294c20d84d448de4a4895；后续文档 HEAD 不冒充产品来源。旧候选元数据与云证据仅作历史参考。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
-  "last_completed_slice": "USER_FEEDBACK_CONTINUOUS_INTERACTION_REPAIR",
+  "last_completed_slice": "DAILY_USABILITY_EXIT_UNDO_RECOVERY_AND_STARTUP_IDENTITY",
   "active_slice": "WINDOWS_PRE_RELEASE_PRIVATE_TRIAL",
-  "next_action": "打开交互返修包并用真实手机及 Codex/Cursor 体验；见 INTERACTION_REPAIR_20260922.md，旧包保留，不把自动化通过视为用户验收。",
+  "next_action": "优先在真实 Codex/Cursor 验证文字、三图、切换焦点和恢复；随后收敛固定安装入口与可回退数据升级。新体验包见 USABILITY_20260922.md。",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -125,5 +125,22 @@
       "physical phone IME and soft keyboard",
       "real multi-monitor drag and long-running use"
     ]
+  },
+  "usability_20260922": {
+    "product_source_sha": "dfa48cf4f2bac75b87b294c20d84d448de4a4895",
+    "document": "docs/v3-delivery/USABILITY_20260922.md",
+    "status": "private_trial_package_ready",
+    "tests": "501 passed; TypeScript and production build passed",
+    "frozen": "isolated desktop; no inherited data/IPC environment; CLI data and instance flags; HTTP/IPC quit/exit0 passed; no real input",
+    "delivery_root": "G:\\AgentStorage\\Deliveries\\typeless-usability-20260922",
+    "package": {
+      "source_sha": "dfa48cf4f2bac75b87b294c20d84d448de4a4895",
+      "filename": "DoubaoTypeless_Usability_dfa48cf.zip",
+      "bytes": 81222479,
+      "sha256": "663f793b1419dd77ab54057366b6e18e886108e5c9412601a15efdfc654034b8",
+      "files_verified": 942,
+      "release_ready": false
+    },
+    "real_product_acceptance": false
   }
 }
