@@ -2,6 +2,21 @@ import asyncio
 from tests.test_v3_editor_transactions import product, editing, stroke
 
 
+def test_compact_composer_keeps_insert_action_in_visible_area(tmp_path):
+    async def run():
+        async with product(tmp_path,touch=True) as (page,app,uploads):
+            await page.fill('#text','手机键盘弹出之后，仍然能点击插入。')
+            await page.set_viewport_size({'width':390,'height':390})
+            await page.wait_for_function("document.querySelector('#app').classList.contains('compact-keyboard')")
+            box=await page.locator('#sendBtn').bounding_box()
+            assert box and 0<=box['y'] and box['y']+box['height']<=390
+            await page.locator('#sendBtn').click(trial=True)
+            assert await page.locator('#text').input_value()=='手机键盘弹出之后，仍然能点击插入。'
+            await page.set_viewport_size({'width':390,'height':844})
+            assert await page.locator('#text').input_value()=='手机键盘弹出之后，仍然能点击插入。'
+    asyncio.run(run())
+
+
 def test_browser_back_closes_sheet_then_confirms_dirty_editor_without_leaving(tmp_path):
     async def run():
         async with product(tmp_path,touch=True) as (page,app,uploads):
