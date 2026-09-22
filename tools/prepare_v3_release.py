@@ -10,8 +10,9 @@ sys.path.insert(0,str(ROOT/'src'))
 from doubao_typeless.build_info import VERSION
 
 def prepare(channel, tag=None):
-    if subprocess.check_output(['git','status','--porcelain'],cwd=ROOT,text=True).strip():
-        raise RuntimeError('Commit source changes before generating release identity')
+    status=subprocess.check_output(['git','status','--porcelain'],cwd=ROOT,text=True).strip()
+    if status:
+        raise RuntimeError('Commit source changes before generating release identity:\n'+status)
     if tag is not None and tag != 'v'+VERSION:
         raise RuntimeError(f'Tag {tag} does not match source version {VERSION}')
     sha=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
