@@ -407,31 +407,26 @@ async def exercise(child,data,result,report):
                 cases.append({'name':'unnamed_composer_remove_attachment_controls_auto_continue','passed':True})
                 await target.evaluate("document.querySelector('[role=group]').id='composer';document.querySelector('#composer').setAttribute('aria-label','Composer');window.removeOnly=false;document.querySelector('#attachments').replaceChildren()")
 
-                # 无附件接收证据时保留正文，不自动弹窗；主动恢复后继续文字不重复贴图。
-                result['stage']='unknown_image_explicit_continue_text'
+                # Missing UIA image evidence and a slow upload must not block text.
+                result['stage']='slow_unobservable_image_continues_text'
                 await target.locator('#prompt-textarea').fill('')
-                await target.evaluate("window.imageRecords=[];window.pasteRecords=[];window.shiftImageFocus=false;window.hideImageAccessibility=true")
-                await add_photo(fixtures[0],'手动确认图片')
-                text='接收未知时文字仍保留'
+                await target.evaluate("window.imageRecords=[];window.pasteRecords=[];window.shiftImageFocus=false;window.hideImageAccessibility=true;window.attachDelay=15000")
+                await add_photo(fixtures[0],'上传未完成也继续')
+                text='图片上传期间正文立即跟上'
                 await phone.fill('#text',text);await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
-                await target.bring_to_front();await target.locator('#prompt-textarea').click();hotkey()
-                await until(lambda:'恢复' in hud_text(),timeout=15,message='missing explicit recovery action')
-                recovery=own_window(child.pid,'上次结果未知')
-                assert not recovery or not win32gui.IsWindowVisible(recovery),'recovery must not open unexpectedly'
-                assert inspector.click(hud(),'恢复'),hud_text()
-                recovery=await until(lambda:own_window(child.pid,'上次结果未知'),message='missing image recovery dialog')
-                await until(lambda:win32gui.IsWindowVisible(recovery))
-                assert await target.locator('#prompt-textarea').input_value()==''
-                assert await phone.locator('#text').input_value()==text
-                await until(lambda:not win32gui.IsWindowVisible(hud()), message='HUD covers modal recovery controls')
-                assert inspector.click(recovery,'图片已出现，继续文字'),inspector.text(recovery)
-                await until(lambda:not win32gui.IsWindowVisible(recovery), message='recovery confirmation click did not close the dialog')
-                expected=text+'\n\n图1：手动确认图片'
+                await target.bring_to_front();await target.locator('#prompt-textarea').click()
+                await phone.click('#sendBtn')
+                expected=text+'\n\n图1：上传未完成也继续'
                 await completed(expected)
-                assert len(await target.evaluate('window.imageRecords'))==1
-                assert len(await target.evaluate('window.pasteRecords'))==2
-                cases.append({'name':'unknown_attachment_user_confirms_then_text_only_once','passed':True})
-                await target.evaluate('window.hideImageAccessibility=false')
+                assert await target.evaluate('window.imageRecords.length')==0,'text waited for upload completion'
+                records=await target.evaluate('window.pasteRecords')
+                assert len(records)==2 and records[-1]['text']==expected
+                recovery=own_window(child.pid,'上次结果未知')
+                assert not recovery or not win32gui.IsWindowVisible(recovery)
+                await target.wait_for_function('window.imageRecords.length===1',timeout=20000)
+                assert await target.evaluate('window.enterEvents')==0
+                cases.append({'name':'slow_unobservable_image_then_text_before_upload_completed','passed':True})
+                await target.evaluate('window.hideImageAccessibility=false;window.attachDelay=300')
 
                 # 自动定位：当前窗口只有一个明确Composer时，定位后不擅自粘贴。
                 result['stage']='locate_composer_from_review'

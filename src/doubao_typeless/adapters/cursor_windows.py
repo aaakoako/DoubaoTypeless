@@ -161,7 +161,7 @@ def same_composer_scope(baseline, report):
     return report.get("focus")==baseline.get("focus")
 
 
-def observe_image(baseline=None, *, timeout_s=5.0, cancelled=None) -> str:
+def observe_image(baseline=None, *, timeout_s=0.25, cancelled=None) -> str:
     if not baseline or not baseline.get("composer_control"):return "unknown"
     previous={tuple(n["runtime_id"]) for n in baseline.get("image_children") or [] if n.get("runtime_id")}
     deadline=time.monotonic()+max(0,min(timeout_s,8));stable=None

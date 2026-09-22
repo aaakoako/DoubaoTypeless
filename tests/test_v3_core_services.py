@@ -51,7 +51,7 @@ def test_code_focus_does_not_inject_images():
     assert classify_focus("TkTopLevel", "DT-S1-TextTarget") == "unknown"
 
 
-def test_delivery_unknown_image_does_not_paste_text_or_enter():
+def test_delivery_unknown_image_continues_text_without_enter():
     pasted = []
     keys = []
 
@@ -68,11 +68,11 @@ def test_delivery_unknown_image_does_not_paste_text_or_enter():
     )
     attempt = Attempt("a", "i", "b", "cursor_windows")
     bundle = {
-        "text": "should not appear",
+        "text": "text follows image without upload receipt",
         "assets": [{"asset_id": "00000000-0000-4000-8000-000000000005", "bytes_data": b"\x89PNG\r\n\x1a\n"}],
     }
     out = svc.run(attempt, bundle)
     assert out.result == "UNKNOWN"
-    assert "text" not in pasted
+    assert pasted == ["image", "paste", "text", "paste"]
     assert VK_RETURN not in [k[0] for k in keys]
     assert recovery_choice("UNKNOWN", True, 0, 1, False) == "ask"

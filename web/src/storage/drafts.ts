@@ -100,4 +100,21 @@ export class DraftRepository {
     await this.flush();
     await this.write("before-replace", value);
   }
+
+  async replaceWithBackup(before: SavedDraft, after: SavedDraft): Promise<void> {
+    await this.flush();
+    const db = await this.open();
+    await new Promise<void>((resolve, reject) => {
+      let tx: IDBTransaction;
+      try {tx = db.transaction(STORE, "readwrite", {durability: "strict"});}
+      catch {tx = db.transaction(STORE, "readwrite");}
+      tx.oncomplete = () => resolve();
+      tx.onabort = tx.onerror = () => reject(new Error("LOCAL_STORAGE_WRITE_FAILED"));
+      try {
+        tx.objectStore(STORE).put(before, "before-replace");
+        tx.objectStore(STORE).put(after, "current");
+      } catch {try {tx.abort();} catch {} reject(new Error("LOCAL_STORAGE_WRITE_FAILED"));}
+    });
+    this.onState("saved");
+  }
 }

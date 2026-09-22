@@ -37,18 +37,22 @@ def test_mixed_all_images_observed_then_text_attempt_is_complete_not_claimed_con
     assert app.history.last_bundle()['text']==b['text']
     assert calls==['image','paste','image','paste',('text',b['text']),'paste']
 
-def test_one_unknown_image_preserves_text_and_never_pastes_it_early(app):
+def test_unobservable_image_still_pastes_text_and_preserves_history(app):
     calls=[];platform(app,paste=lambda:calls.append('paste'))
     app.delivery._observe_image=lambda:'unknown';app.delivery._set_text=lambda _:calls.append('text')
     b=mixed(app);result=app.deliver_and_finish({'intent_id':'unknown'},b)
-    assert calls==['paste'] and not result['phone_event']['rotated']
-    assert result['progress']['text_state']=='not_attempted'
-    assert app.draft.text==b['source_text']
+    assert calls==['paste','text','paste'] and result['phone_event']['rotated']
+    assert result['progress']['text_state']=='attempted_unconfirmed'
+    assert app.draft.text=='' and app.history.last_bundle()['text']==b['text']
 
 def test_manual_confirm_continues_without_repeating_image(app):
     calls=[];platform(app,paste=lambda:calls.append('paste'))
     app.delivery._observe_image=lambda:'unknown';b=mixed(app)
+    # Recover a persisted pre-fix attempt whose image receipt was unknown.
+    app.delivery._resume_input=lambda _:None
     app.deliver_and_finish({'intent_id':'first'},b)
+    app._last_attempt.steps[-1].state='unknown';app._last_attempt.error_code=None
+    app.delivery._resume_input=None
     result=app.confirm_recovery('confirm_continue')
     assert calls==['paste','paste']
     assert result['steps'][0]['evidence']=='user_confirmed'
@@ -57,7 +61,9 @@ def test_manual_confirm_continues_without_repeating_image(app):
 
 def test_text_only_recovery_keeps_unconfirmed_images(app):
     platform(app);app.delivery._observe_image=lambda:'unknown';b=mixed(app)
+    app.delivery._resume_input=lambda _:None
     app.deliver_and_finish({'intent_id':'first'},b)
+    app.delivery._resume_input=None
     result=app.confirm_recovery('text_only')
     assert result['text_only'] and not result['phone_event']['rotated']
     assert app.draft.assets and app.draft.text==b['source_text']
@@ -179,3 +185,23 @@ def test_production_input_stamp_uses_windows_state(monkeypatch):
     monkeypatch.setitem(sys.modules,'win32api',types.SimpleNamespace(GetLastInputInfo=lambda:1234))
     monkeypatch.setattr(sys,'platform','win32')
     assert V3App._input_stamp()==1234
+
+
+def test_uploading_attachment_does_not_claim_completed_receipt(monkeypatch):
+    b=baseline()
+    monkeypatch.setattr(adapter,'capture_image_baseline',lambda _=None:{**b,
+        'image_children':[{'runtime_id':[200],'control_type':'50006','pending':True}]})
+    assert adapter.observe_image(b,timeout_s=.2)=='unknown'
+
+
+@pytest.mark.parametrize('receipt',['unknown','absent'])
+def test_three_images_then_text_no_receipt_does_not_short_circuit(receipt):
+    calls=[]
+    d=DeliveryService(read_focus=lambda:FOCUS,paste=lambda:calls.append('paste'),
+        set_clipboard_image=lambda b:calls.append(b),set_clipboard_text=lambda t:calls.append(t),
+        observe_image=lambda:receipt)
+    bundle={'assets':[{'asset_id':str(n),'bytes_data':bytes([n])} for n in range(3)],'text':'正文'}
+    result=d.run(Attempt('a','i','b','test'),bundle)
+    assert calls==[bytes([0]),'paste',bytes([1]),'paste',bytes([2]),'paste','正文','paste']
+    assert result.result=='UNKNOWN' and d.enter_count==0
+    assert all(s.evidence=='os_input_count' for s in result.steps)

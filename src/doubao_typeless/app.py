@@ -679,6 +679,9 @@ class V3App:
 
         send_paste()
         self._injected_input_stamp = self._input_stamp()
+        # Pace separate clipboard pastes so the target can dispatch Ctrl+V.
+        # This is not an upload wait or proof that the target accepted content.
+        time.sleep(0.15)
 
     @staticmethod
     def _input_stamp():
@@ -719,14 +722,24 @@ class V3App:
         if self._observer is not None:
             return
         from doubao_typeless.adapters.cursor_windows import capture_image_baseline
-        self._image_baseline = capture_image_baseline()
+        self._image_baseline = None
+        try:
+            self._image_baseline = capture_image_baseline()
+        except Exception as exc:
+            from doubao_typeless.runtime_diagnostics import record_runtime_exception
+            record_runtime_exception("attachment_observation", exc, self.data_dir)
 
     def _observe_image(self) -> str:
         if self._observer is not None:
             return self._observer.observe_image()
         from doubao_typeless.adapters.cursor_windows import observe_image
 
-        return observe_image(getattr(self, "_image_baseline", None), cancelled=lambda:self._stopping)
+        try:
+            return observe_image(getattr(self, "_image_baseline", None), cancelled=lambda:self._stopping)
+        except Exception as exc:
+            from doubao_typeless.runtime_diagnostics import record_runtime_exception
+            record_runtime_exception("attachment_observation", exc, self.data_dir)
+            return "unknown"
 
     def _observe_text(self) -> str:
         if self._observer is not None:
@@ -785,12 +798,15 @@ class V3App:
         text_done = any(s.get("kind") == "text" and s.get("state") in {"injected", "observed", "unknown"}
                         for s in steps if isinstance(s, dict))
         planned = {a.get("asset_id") for a in bundle.get("assets") or []}
-        observed = {st.get("asset_id") for st in steps if st.get("kind")=="image" and st.get("state")=="observed"}
-        # 图片全部有接收证据 + 文字已成功发键，可归档但仍诚实保留UNKNOWN接收状态。
+        pasted = {st.get("asset_id") for st in steps if st.get("kind")=="image"
+                  and st.get("state") in {"injected", "observed"}
+                  and st.get("evidence") in {"os_input_count", "target_attachment", "user_confirmed"}}
+        # A complete explicit paste sequence may start the next draft; external
+        # receipt stays UNKNOWN when only successful OS input is available.
         text_injected = any(st.get("kind")=="text" and st.get("state") in {"injected","observed"}
                             and st.get("evidence") in {"os_input_count","target_text"} for st in steps)
-        complete_attempt = (bool(planned) and planned <= observed and bool(bundle.get("text"))
-                            and text_injected and not payload.get("text_only"))
+        complete_attempt = (bool(planned) and planned <= pasted
+                            and (not bundle.get("text") or text_injected) and not payload.get("text_only"))
         may_rotate = result == "CONFIRMED" or (result in {"UNKNOWN","PARTIAL"} and
                        ((not planned and text_done) or complete_attempt))
         if not may_rotate:

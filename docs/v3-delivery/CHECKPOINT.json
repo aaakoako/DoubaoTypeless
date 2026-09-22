@@ -2,46 +2,40 @@
   "schema_version": 1,
   "product_goal": "沿用 MASTER_PLAN，保留原版插入并复制等体验，交付可实际体验的完整 Windows V3 发布前候选。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "产品固定为 ae75cf32957af27d13c0490af388afe0f108713c；后续验收文档 HEAD 不冒充制品来源。",
+  "working_tree": "正在交付 Codex 图文连续粘贴与手机一键清空修复；旧 ae75cf3 制品仍是用户当前运行版本，不能冒充已包含修复。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
   "last_completed_slice": "RELEASE_INSTALL_UPGRADE_NATIVE_CAPTURE_AND_CONTINUOUS_DRAFT",
-  "active_slice": "REAL_CODEX_CURSOR_PHONE_AND_MULTIMONITOR_ACCEPTANCE",
-  "next_action": "前台许可到达后，用固定候选验证真实 Codex/Cursor 文字与三图、切焦点及恢复；补实体手机与多屏验收，保留原生异常记录，不公开发布未验收结果",
+  "active_slice": "CODEX_SEQUENTIAL_PASTE_AND_PHONE_CLEAR",
+  "next_action": "提交修复并运行完整发行流水线，验证慢上传时正文先于上传完成进入目标；下载绑定源码的新候选，保留真实 Codex 和实体手机的验收边界。",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
     "桌面、HUD、手机与弹框共用蓝紫/雾蓝灰设计语言，非绿色主色，无凸起导航阴影",
     "新建白板须明确保存；取消恢复原成品或移除未保存白板；容量错误不丢画布不开始上传",
-    "按手机顺序自动逐图再正文；未取得可靠附件证据时仍明确恢复，不假确认、不重复已贴图片",
+    "按手机顺序逐图再正文，不因图片上传或接收证据缺失阻塞后续粘贴；逐步验证目标，缺证据仍记录UNKNOWN。",
     "用户新增独立手机发送：电脑默认关闭授权；用户检查电脑后在手机单独确认 Enter 或 Ctrl+Enter",
     "插入/同步/重连/恢复不自动发Enter；发送票据绑定来源、图文、目标、权限、时限并至多执行一次",
     "不merge、不tag、不Release、不覆盖日用数据、不强制结束用户进程",
     "未完成浮窗可拖动并保存位置、切换应用常驻置顶，展开可返回；设置与浮窗并存",
     "用户明确操作电脑已有稿不依赖手机在线；重连回执只清理对应旧稿",
-    "不自动弹出图文恢复窗口；失败可复制时提供手动粘贴退路；白板文字使用可退出的页面内编辑"
+    "不自动弹出图文恢复窗口；失败可复制时提供手动粘贴退路；白板文字使用可退出的页面内编辑",
+    "手机一键清空文字与图片，原稿原子备份可恢复；清空取消未发出的插入准备和旧异步结果，不撤回已贴入电脑的内容。"
   ],
   "implemented_this_batch": [
-    "正式安装与固定数据目录、完整升级备份和可重试卸载",
-    "手机返回键、小视口插入与文字编辑按钮可达",
-    "浮窗屏幕变化恢复、隐藏设置时在线状态仍更新",
-    "主显示器按标记选择；生产截图、相册、白板真实三图流程",
-    "旧回执与当前新稿反馈隔离；明确上次插入结果"
+    "手机一键清空、原子备份、离线清空、旧回执与异步图片隔离",
+    "图片接收未知时继续正文；观察失败不取消粘贴，保持焦点保护和真实证据级别",
+    "9个正式页面清空回归、慢上传原生验证场景替换旧暂停契约"
   ],
   "last_commands": [
     {
-      "cmd": "Full fixed-source CI",
+      "cmd": "Focused delivery and phone regressions",
       "exit_code": 0,
-      "output": "Windows 512 passed; Linux 506 passed, 6 skipped; evidence checker 18 passed; TypeScript/Vite passed"
+      "output": "67 delivery checks passed; latest 46 focused tests passed including 9 clear scenarios, persistence and product usability; TypeScript/Vite passed"
     },
     {
-      "cmd": "Frozen startup/text/phone-primary/browser/installer",
-      "exit_code": 0,
-      "output": "Five reports passed; 14 native browser cases; actual screen capture; insertion Enter 0; explicit send events 2; browser page errors 0; normal exit 0"
-    },
-    {
-      "cmd": "Downloaded full artifact audit",
-      "exit_code": 0,
-      "output": "264 files: set/size/hash match; installer and ZIP SHA256 match; EXE identity matches reports"
+      "cmd": "Local full suite before final callback guards",
+      "exit_code": 1,
+      "output": "519 passed; one large IndexedDB cross-page read failed once and passed focused rerun; complete clean-source CI still required"
     }
   ],
   "cloud_evidence": {

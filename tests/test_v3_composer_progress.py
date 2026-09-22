@@ -42,17 +42,17 @@ def test_text_injected_not_observed_is_never_confirmed():
     assert result["text_state"] == "attempted_unconfirmed"
     assert "接收待确认" in result["message"]
 
-def test_unknown_image_stops_before_text_using_production_delivery():
+def test_unknown_image_continues_text_using_production_delivery():
     actions=[]
     d=DeliveryService(paste=lambda:actions.append('paste'),set_clipboard_image=lambda _:actions.append('image'),
                       set_clipboard_text=lambda _:actions.append('text'),read_focus=lambda:('Composer','chatinput',1),
                       observe_image=lambda:'unknown')
     a=d.run(Attempt('a','i','b','test'),BUNDLE)
-    assert actions == ['image','paste']
+    assert actions == ['image','paste','text','paste']
     assert a.result=='UNKNOWN'
-    assert summarize_delivery(BUNDLE,a.to_dict())["text_state"]=='not_attempted'
+    assert summarize_delivery(BUNDLE,a.to_dict())["text_state"]=='attempted_unconfirmed'
 
-def test_ui_command_receives_actual_unattempted_text_progress(app):
+def test_ui_command_receives_actual_mixed_paste_progress(app):
     platform(app)
     app.delivery._observe_image=lambda:'unknown'
     # 素材注入仅替代文件系统，投递/收尾/事件均为生产方法。
@@ -60,11 +60,11 @@ def test_ui_command_receives_actual_unattempted_text_progress(app):
     bundle=prepare(app,'尚未发出的正文');bundle['assets']=[{'asset_id':'image-a'}]
     events=[];app.ui_hook=lambda name,**kw:events.append((name,kw))
     output=app.deliver_and_finish({'intent_id':'image-pause'},bundle)
-    assert output['progress']['text_state']=='not_attempted'
-    assert app.draft.text=='尚未发出的正文'
+    assert output['progress']['text_state']=='attempted_unconfirmed'
+    assert app.history.last_bundle()['text']=='尚未发出的正文'
     complete=next(kw for name,kw in events if name=='delivery_complete')
-    assert complete['progress']['awaiting_image_confirmation']
-    assert any(name=='recovery_available' for name,_ in events)
+    assert not complete['progress']['awaiting_image_confirmation']
+    assert not any(name=='recovery_available' for name,_ in events)
     assert not any(name=='recovery_ask' for name,_ in events)
 
 @pytest.mark.parametrize('changes',[

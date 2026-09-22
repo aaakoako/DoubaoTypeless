@@ -131,16 +131,9 @@ class DeliveryService:
                 observed = self._observe_image()
                 if observed == "observed":
                     state, evidence = "observed", "target_attachment"
-                elif observed == "unknown":
-                    state, evidence = "unknown", "none"
-                    step.state, step.evidence = state, evidence
-                    attempt.result = "UNKNOWN"
-                    return attempt
-            else:
-                state, evidence = "unknown", "none"
-                step.state, step.evidence = state, evidence
-                attempt.result = "UNKNOWN"
-                return attempt
+                # Missing accessibility/upload feedback does not cancel the rest
+                # of an explicit paste sequence. Keep OS-input evidence only;
+                # never claim external receipt from the successful key injection.
             step.state, step.evidence = state, evidence
             if self._resume_input:
                 restored = self._resume_input(focus)

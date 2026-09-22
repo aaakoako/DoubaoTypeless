@@ -26,9 +26,11 @@ def summarize_delivery(bundle: dict, payload: dict) -> dict:
     elif text_state == "not_attempted" and attempted:
         message = f"已尝试 {len(attempted)}/{len(assets)} 张图；文字尚未插入，已保留"
     elif text_state == "attempted_unconfirmed":
-        message = f"图片已确认 {len(observed)}/{len(assets)}；文字已发出，接收待确认" if assets else "文字已发出，接收待确认"
+        message = f"已发出 {len(attempted)} 张图片和文字的粘贴，接收待确认" if assets else "文字已发出，接收待确认"
     elif payload.get("result") == "CONFIRMED":
         message = "本次图文已确认接收" if assets and text_required else "本次内容已确认接收"
+    elif images and all(s.get("state") in {"injected", "observed"} for s in images) and not payload.get("error_code"):
+        message = f"已发出 {len(attempted)} 张图片的粘贴，接收待确认"
     else:
         message = "本次内容仍保留，请检查目标"
     return {"images_total": len(assets), "images_attempted": len(attempted),

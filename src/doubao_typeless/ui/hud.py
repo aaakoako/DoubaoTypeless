@@ -301,8 +301,8 @@ class HudController:
         elif event == "delivery_progress":
             stage,index,total=payload.get("stage"),payload.get("index",0),payload.get("total",0)
             message = (f"正在插入第 {index}/{total} 张图片…" if stage=="image" else
-                       f"图片 {index}/{total} 已发出，正在等待附件反馈…" if stage=="image_wait" else
-                       "图片已接收，正在插入文字…" if total else "正在插入文字…")
+                       f"图片 {index}/{total} 粘贴已发出，正在继续…" if stage=="image_wait" else
+                       "图片粘贴已发出，正在插入文字…" if total else "正在插入文字…")
             self._mode,self._operation_message="busy",message
         elif event == "composer_locating":
             self._mode, self._operation_message = "busy", "正在查找当前窗口的对话输入框…"

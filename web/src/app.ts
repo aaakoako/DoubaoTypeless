@@ -46,7 +46,7 @@ export function boot(root: HTMLElement): void {
         <button id="settingsBtn" aria-label="设置">设置</button>
       </header>
       <section class="composer" id="composer">
-        <div class="composer-heading">这次想做什么？</div>
+        <div class="composer-heading"><span>这次想做什么？</span><button id="clearDraft" aria-label="清空当前文字和图片">清空</button></div>
         <div class="attach" id="attachments"></div>
         <div id="removeNotice" class="undo-notice" role="status" hidden><span id="removeMessage"></span><button id="undoRemove">撤销删除</button></div>
         <div id="conflictBanner" class="conflict" hidden>
@@ -140,6 +140,7 @@ export function boot(root: HTMLElement): void {
   let ws: WebSocket | null = null;
   // One in-flight UI operation; its durable intent remains in last_intent for retries.
   let activeSend: {intentId: string; timer: number} | null = null;
+  let clearingDraft = false;
   function finishSend(operation: typeof activeSend): boolean {
     if (!operation || activeSend !== operation) return false;
     window.clearTimeout(operation.timer);
@@ -309,6 +310,8 @@ export function boot(root: HTMLElement): void {
     $("connDot").style.background = state.online ? "#5B5CE2" : "#858DA0";
     $("connectBtn").hidden = state.online;
     const btn = $("sendBtn") as HTMLButtonElement;
+    ($("clearDraft") as HTMLButtonElement).disabled = !restored || clearingDraft || finishingEditor ||
+      (!state.text && !state.assets.length && !state.sending && !state.conflict && !pendingCapture);
     btn.textContent = sendLabel();
     btn.disabled = !state.online || !state.session || state.uploading || state.sending || !!state.conflict ||
       state.assets.some(a => !a.asset_id || (a.status && a.status !== "ready")) || (!state.text.trim() && !state.assets.length);
@@ -431,7 +434,7 @@ export function boot(root: HTMLElement): void {
         }
         outbox.disconnect();
         // 先处理上次可能丢失的完成回执，再同步本地最新版本。不采纳电脑旧镜像。
-        void reconcileReceipt().finally(() => {if (ws === socket && sessionReady) {outbox.connect();publishCurrent();void uploadPending();}});
+        void reconcileReceipt().finally(() => {if (ws === socket && sessionReady && !clearingDraft) {publishCurrent();outbox.connect();void uploadPending();}});
         update();
       }
       if (msg.type === "draft.prepare") {
@@ -447,8 +450,8 @@ export function boot(root: HTMLElement): void {
       }
       if (msg.type === "delivery.progress") {
         if (activeSend && (!activeSend.intentId || msg.intent_id !== activeSend.intentId)) return;
-        const detail = msg.stage === "text" ? "图片已处理，正在插入文字…" :
-          `正在${msg.stage === "image_wait" ? "确认" : "插入"}第 ${msg.index} / ${msg.total} 张图片…`;
+        const detail = msg.stage === "text" ? "图片粘贴已发出，正在插入文字…" :
+          `第 ${msg.index} / ${msg.total} 张图片${msg.stage === "image_wait" ? "粘贴已发出，正在继续" : "正在插入"}…`;
         $("deliveryStatus").textContent = `电脑正在处理已提交的图文：${detail}`; $("deliveryStatus").hidden = false; update();
       }
       if (msg.type === "attempt.status") {
@@ -498,6 +501,7 @@ export function boot(root: HTMLElement): void {
         return;
       }
       if (msg.type === "capture.result") {
+        if (clearingDraft) return;
         // 过期请求不能冒充后来一次截图，也不能重新打开已经取消的编辑流程。
         if (msg.request_id && msg.request_id !== pendingCapture) return;
         pendingCapture = ""; ($("captureBtn") as HTMLButtonElement).disabled = false;
@@ -567,9 +571,11 @@ export function boot(root: HTMLElement): void {
     return latestMessage;
   }
   function publishCurrent() {
+    if (clearingDraft) return;
     outbox.offer(currentMessage());
   }
   function sendDraft() {
+    if (clearingDraft) return;
     // New authoring cancels an old send affordance; rotation fetches a fresh status afterwards.
     submitAvailable = false; $("submitPanel").hidden = true;
     // Feedback from an earlier insertion must never describe the newly edited draft.
@@ -598,6 +604,49 @@ export function boot(root: HTMLElement): void {
     receiptChain = receiptChain.then(() => handleReceiptNow(msg)).catch(() => {toast("上次回执待确认，当前稿保留");});
     return receiptChain;
   }
+  async function clearCurrentDraft() {
+    if (clearingDraft || finishingEditor || !restored) return;
+    saveOpenEditor();
+    clearingDraft = true;
+    finishSend(activeSend);
+    outbox.disconnect();
+    root.querySelector<HTMLElement>(".page")!.inert = true;
+    ($("clearDraft") as HTMLButtonElement).disabled = true;
+    // Serialize with completion receipts; queued file/capture/upload callbacks
+    // are invalidated so an old async result cannot repopulate the new draft.
+    receiptChain = receiptChain.then(async () => {
+      for (const controller of uploadControllers.values()) controller.abort();
+      pendingCapture = "";($("captureBtn") as HTMLButtonElement).disabled=false;
+      const before = structuredClone(draftSnapshot());
+      const after: SavedDraft = {...before, text:"", assets:[], epoch:newId(),
+        generation:(before.generation || 0)+1, revision:0, last_intent:null, saved_at:Date.now()};
+      try {
+        window.clearTimeout(persistTimer);
+        await repository.replaceWithBackup(before, after);
+      } catch {
+        toast("清空未完成，原稿仍保留；请重试");return;
+      }
+      finishSend(activeSend);
+      ++editorSequence;editorAbort?.abort();editor?.destroy();editor=null;editorLoading=false;
+      state.text="";state.assets=[];state.removed=[];state.uploading=false;state.conflict=null;state.last_intent=null;
+      state.epoch=after.epoch;state.generation=after.generation!;state.revision=0;
+      closeCanvasText();currentId="";
+      ($("canvasTextInput") as HTMLTextAreaElement).value="";
+      ($("captionInput") as HTMLTextAreaElement).value="";
+      ($("captureBtn") as HTMLButtonElement).disabled=false;
+      ($("file") as HTMLInputElement).value="";
+      $("editor").classList.remove("show");$("composer").style.display="flex";$("mobileHead").style.display="flex";
+      closeSheet();forgetBlobs();
+      outbox.disconnect();latestMessage=null;
+      clearingDraft=false;sendDraft();if(sessionReady)outbox.connect();
+      toast("当前图文已清空，可从「最近」恢复；已贴到电脑的内容不会撤回");
+    }).catch(() => {toast("清空未完成，请检查当前稿后重试");}).finally(() => {
+      clearingDraft=false;root.querySelector<HTMLElement>(".page")!.inert=false;
+      publishCurrent();if(sessionReady)outbox.connect();update();
+    });
+    await receiptChain;
+  }
+  $("clearDraft").onclick=()=>{void clearCurrentDraft();};
   async function reconcileReceipt() {
     try {
       const res = await fetch("/v3/phone/event", {headers:headers(), signal:AbortSignal.timeout(2500)});
@@ -663,9 +712,9 @@ export function boot(root: HTMLElement): void {
     if (!state.session || !ws || !state.online || ws.readyState !== 1) {toast("截图需要电脑在线；相册和白板仍可使用");return;}
     if (pendingCapture) return;
     pendingCapture = newId(); const requestId = pendingCapture;
-    ($("captureBtn") as HTMLButtonElement).disabled = true;
+    ($("captureBtn") as HTMLButtonElement).disabled = true;update();
     ws.send(JSON.stringify({ protocol: 3, type: "capture.request", session_id: state.session.session_id, token: state.session.token, scope: "primary", request_id:requestId }));
-    window.setTimeout(() => {if(pendingCapture===requestId){pendingCapture="";($("captureBtn") as HTMLButtonElement).disabled=false;toast("截图未确认；不会自动重复截图，可重新操作");}}, 10000);
+    window.setTimeout(() => {if(pendingCapture===requestId){pendingCapture="";($("captureBtn") as HTMLButtonElement).disabled=false;update();toast("截图未确认；不会自动重复截图，可重新操作");}}, 10000);
   };
   $("cropApply").onclick = () => {
     if (!editor?.applyCrop()) toast("请拖出至少64×64像素的选区");
@@ -682,6 +731,8 @@ export function boot(root: HTMLElement): void {
   }
 
   $("file").addEventListener("change", async (e) => {
+    if (clearingDraft) return;
+    const fileEpoch = state.epoch;
     const files = Array.from((e.target as HTMLInputElement).files || []);
     for (const f of files) {
       if (state.assets.length >= 6) break;
@@ -692,12 +743,15 @@ export function boot(root: HTMLElement): void {
       }
       if (f.size > 20*1024*1024) {toast("图片超过20 MiB，请先缩小");continue;}
       const preview = await fileToDataUrl(f);
+      if (clearingDraft || state.epoch !== fileEpoch) return;
       const a: Asset = { id: "p-" + newId(), kind: "图片", preview, source: preview };
       const image = new Image();
       image.src = preview;
       try {
         await image.decode();
+        if (clearingDraft || state.epoch !== fileEpoch) return;
       } catch {
+        if (clearingDraft || state.epoch !== fileEpoch) return;
         toast("图片无法解码");
         continue;
       }
@@ -855,29 +909,29 @@ export function boot(root: HTMLElement): void {
   let finishingEditor = false;
   async function uploadPending() {
     if (uploadQueueRunning) {uploadWakeRequested = true; return;}
-    if (!sessionReady || !state.session) return;
+    if (clearingDraft || !sessionReady || !state.session) return;
     uploadQueueRunning = true;
     const attempted = new Set<string>();
     try {
-      while (sessionReady && state.session) {
+      while (!clearingDraft && sessionReady && state.session) {
         const item = state.assets.find(a=>a.pending_png && a.status!=="editing" && a.status!=="ready" && !attempted.has(`${a.id}:${a.render_revision}`));
         if (!item) break;
         attempted.add(`${item.id}:${item.render_revision}`);
-        const version = item.render_revision; const blob = item.pending_png!;
+        const version = item.render_revision; const uploadEpoch=state.epoch; const blob = item.pending_png!;
         const controller = new AbortController(); uploadControllers.set(item.id,controller);
         state.uploading = true; item.status = "queued"; update();
         try {
           const meta = await uploadPng(blob,headers(),item.w||1,item.h||1,item.kind==="白板"?"whiteboard":"markup",{
             signal:controller.signal,ticket:item.upload_ticket,
-            checkpoint: async ticket => {item.upload_ticket=ticket; repository.save(draftSnapshot()); await repository.flush();},
+            checkpoint: async ticket => {if(clearingDraft || state.epoch!==uploadEpoch || controller.signal.aborted || !state.assets.includes(item))throw new Error("DRAFT_CHANGED");item.upload_ticket=ticket; repository.save(draftSnapshot()); await repository.flush();},
             progress: (sent,total) => {item.progress=Math.floor(100*sent/Math.max(1,total));update();},
           });
-          if (!controller.signal.aborted && state.assets.includes(item) && item.render_revision===version) {
+          if (!clearingDraft && state.epoch===uploadEpoch && !controller.signal.aborted && state.assets.includes(item) && item.render_revision===version) {
             item.asset_id=meta.asset_id; item.status="ready"; item.pending_png=undefined; item.upload_ticket=undefined;
             item.progress=100; sendDraft();
           }
         } catch {
-          if (state.assets.includes(item) && item.render_revision===version && String(item.status)!=="editing") {
+          if (!clearingDraft && state.epoch===uploadEpoch && !controller.signal.aborted && state.assets.includes(item) && item.render_revision===version && String(item.status)!=="editing") {
             item.status="failed"; item.asset_id=undefined; sendDraft();
           }
         } finally {uploadControllers.delete(item.id); state.uploading=false; update();}
@@ -928,7 +982,7 @@ export function boot(root: HTMLElement): void {
   }
 
   function saveOpenEditor() {
-    if (!editor || !editorOpen() || finishingEditor) return;
+    if (clearingDraft || !editor || !editorOpen() || finishingEditor) return;
     const item = state.assets.find(a => a.id === currentId);
     if (!item) return;
     try {
@@ -948,7 +1002,7 @@ export function boot(root: HTMLElement): void {
     $(id).addEventListener("click", () => window.setTimeout(saveOpenEditor, 0));
   }
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden" && restored) {
+    if (document.visibilityState === "hidden" && restored && !clearingDraft) {
       window.clearTimeout(persistTimer);
       saveOpenEditor(); repository.save(draftSnapshot());
     }
