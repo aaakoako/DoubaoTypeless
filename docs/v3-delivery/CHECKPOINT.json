@@ -2,11 +2,11 @@
   "schema_version": 1,
   "product_goal": "沿用 MASTER_PLAN，保留原版插入并复制等体验，交付可实际体验的完整 Windows V3 发布前候选。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "日常使用优化产品固定为 dfa48cf4f2bac75b87b294c20d84d448de4a4895；后续文档 HEAD 不冒充产品来源。旧候选元数据与云证据仅作历史参考。",
+  "working_tree": "产品固定为 ae75cf32957af27d13c0490af388afe0f108713c；后续验收文档 HEAD 不冒充制品来源。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
-  "last_completed_slice": "DAILY_USABILITY_EXIT_UNDO_RECOVERY_AND_STARTUP_IDENTITY",
-  "active_slice": "RELEASE_0_5_0_INSTALL_UPGRADE_AND_REAL_TARGET_ACCEPTANCE",
-  "next_action": "固定源码构建安装包，实际验证安装升级卸载；允许前台后继续真实 Codex/Cursor 图文插入，不发布未验收结果",
+  "last_completed_slice": "RELEASE_INSTALL_UPGRADE_NATIVE_CAPTURE_AND_CONTINUOUS_DRAFT",
+  "active_slice": "REAL_CODEX_CURSOR_PHONE_AND_MULTIMONITOR_ACCEPTANCE",
+  "next_action": "前台许可到达后，用固定候选验证真实 Codex/Cursor 文字与三图、切焦点及恢复；补实体手机与多屏验收，保留原生异常记录，不公开发布未验收结果",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -21,68 +21,63 @@
     "不自动弹出图文恢复窗口；失败可复制时提供手动粘贴退路；白板文字使用可退出的页面内编辑"
   ],
   "implemented_this_batch": [
-    "编辑事务、独立scratch恢复、原图恢复、保存失败留在画布、多选逐张编辑与过期截图回执过滤",
-    "手机画板取消/撤销/重做/保存固定顶部，常用工具底部横排，图注/更多工具折叠",
-    "受限结构化Composer识别与移除附件形式观察；浮窗动作不抢键盘焦点",
-    "手机逐图进度仅发主稿协议，保留旧协议回执顺序",
-    "独立发送的准备/确认/取消；先记已消费再执行，执行前复验，重复/重连不补发"
+    "正式安装与固定数据目录、完整升级备份和可重试卸载",
+    "手机返回键、小视口插入与文字编辑按钮可达",
+    "浮窗屏幕变化恢复、隐藏设置时在线状态仍更新",
+    "主显示器按标记选择；生产截图、相册、白板真实三图流程",
+    "旧回执与当前新稿反馈隔离；明确上次插入结果"
   ],
   "last_commands": [
     {
-      "cmd": "Full Linux pytest from fixed product SHA",
+      "cmd": "Full fixed-source CI",
       "exit_code": 0,
-      "output": "478 passed, 5 Windows-only skipped; 0 failed/errors. Four actual Chromium production editor transaction cases passed."
+      "output": "Windows 512 passed; Linux 506 passed, 6 skipped; evidence checker 18 passed; TypeScript/Vite passed"
     },
     {
-      "cmd": "Full Windows pytest from fixed product SHA",
+      "cmd": "Frozen startup/text/phone-primary/browser/installer",
       "exit_code": 0,
-      "output": "483 passed; 0 failed/errors/skipped"
+      "output": "Five reports passed; 14 native browser cases; actual screen capture; insertion Enter 0; explicit send events 2; browser page errors 0; normal exit 0"
     },
     {
-      "cmd": "Actual frozen startup, legacy three text inserts, phone-primary three text inserts, production-page/native browser scenarios",
+      "cmd": "Downloaded full artifact audit",
       "exit_code": 0,
-      "output": "Four reports passed; 13 browser cases passed. Insertion Enter events 0; two separately confirmed sending events; page errors 0; process exit 0."
-    },
-    {
-      "cmd": "Downloaded artifact independent audit",
-      "exit_code": 0,
-      "output": "262-file set/length/SHA-256 verified; build-info matches actual EXE reports; original inner ZIP bytes preserved"
+      "output": "264 files: set/size/hash match; installer and ZIP SHA256 match; EXE identity matches reports"
     }
   ],
   "cloud_evidence": {
-    "run_id": 35523383176,
-    "trigger_sha": "d47b239757100043f65109f45fc69e98d849cd12",
-    "source_sha": "aec0ee81bcd3274000a8799df54ef57cadfab8b3",
+    "run_id": 35705371132,
+    "source_sha": "ae75cf32957af27d13c0490af388afe0f108713c",
     "conclusion": "success",
-    "native_browser_cases": 13,
-    "three_images_one_click": true,
-    "desktop_button_tested": true,
-    "independent_enter_and_ctrl_enter_tested": true,
+    "native_browser_cases": 14,
+    "actual_screen_capture": true,
+    "actual_codex_tested": false,
     "actual_cursor_tested": false,
     "actual_android_ime_tested": false,
-    "target_type": "independent Chromium test webpage, not production ChatGPT or Cursor"
+    "target_type": "independent Chromium test webpage"
   },
   "candidate_artifact": {
-    "artifact_id": 10609123727,
-    "source_sha": "aec0ee81bcd3274000a8799df54ef57cadfab8b3",
-    "filename": "DoubaoTypeless_V3_Composer_aec0ee8.zip",
-    "zip_bytes": 65195942,
-    "zip_sha256": "2ecec7133cf24bf890ea969d0b519d2b5f7f82ca41b6e4a1578e9f08a3106788",
-    "exe_sha256": "76c3989630dc2c82235c805c0364f8b8cd47bdba2e4ec80368c89e347feec862",
-    "outer_artifact_sha256": "61124f5acb9bb3a9f4fd6afb893de7eadf4d3952a98d110210c6c75fc3bd85ff",
-    "files_verified": 262,
+    "artifact_id": 10684612510,
+    "source_sha": "ae75cf32957af27d13c0490af388afe0f108713c",
+    "version": "0.5.0",
+    "channel": "release-candidate",
+    "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.0-RC-ae75cf3",
+    "setup_sha256": "2c3ab7a46e30be74ca47994237cfc1dfcf8c156e4aecc1792f3f2f7bd700d8a6",
+    "zip_sha256": "31220f5a0a1d7ca810b35b90eb096603f53082ca9ce3b0c367b98e5c660247b7",
+    "exe_sha256": "5a9ccf8f066e3771c50b9826665b145d36b6f77ed7dab0d2f4a03a22c37a4ba5",
+    "files_verified": 264,
     "verified_after_download": true,
-    "original_zip_preserved": true
+    "release_ready": false
   },
   "open_defects": [
-    "实际Android/豆包触控与输入法、真实Cursor/ChatGPT/其他Agent各版本和长期使用未由合成网页验证代替",
-    "历史偶发退出无用户现场证据，不能宣称已全部确诊",
-    "本次browser fault日志仍有一条0x8001010d；同PID完成13场景并正常退出0，保留记录不宣称零异常",
-    "独立视觉与公开发布审批未完成"
+    "真实 Codex/Cursor 图文插入与恢复未验收，前台许可待回复",
+    "实体手机输入法/软键盘/扫码及长后台、多屏拔插未实机验收",
+    "本次 browser fault 日志仍有 0x8001010d；同 PID 完成 14 场景并退出 0，保留调查项；历史偶发退出未凭现场证据确诊",
+    "独立实机验收及公开发布审批未完成"
   ],
   "independent_review": {
-    "status": "PRE_RELEASE_TRIAL_NOT_PUBLIC_RELEASE_READY",
-    "release_ready": false
+    "status": "SOURCE_REVIEW_COMPLETED_REAL_ACCEPTANCE_PENDING",
+    "release_ready": false,
+    "document": "docs/v3-delivery/RELEASE_0_5_0_ACCEPTANCE.md"
   },
   "published": false,
   "task_complete": false,
@@ -146,10 +141,62 @@
   "release_preparation_20260922": {
     "version": "0.5.0",
     "branch": "v3/integrated-preview-20260922",
-    "status": "building_and_validating",
-    "delivery_root": "G:/AgentStorage/Deliveries/typeless-release-0.5.0-rc1-20260922",
+    "status": "candidate_verified_real_acceptance_pending",
+    "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.0-RC-ae75cf3",
     "real_target_acceptance": false,
     "foreground_permission": "pending",
-    "public_release": false
+    "public_release": false,
+    "source_sha": "ae75cf32957af27d13c0490af388afe0f108713c",
+    "run_id": 35705371132,
+    "document": "docs/v3-delivery/RELEASE_0_5_0_ACCEPTANCE.md"
+  },
+  "historical_pre_release_evidence_20260921": {
+    "last_commands": [
+      {
+        "cmd": "Full Linux pytest from fixed product SHA",
+        "exit_code": 0,
+        "output": "478 passed, 5 Windows-only skipped; 0 failed/errors. Four actual Chromium production editor transaction cases passed."
+      },
+      {
+        "cmd": "Full Windows pytest from fixed product SHA",
+        "exit_code": 0,
+        "output": "483 passed; 0 failed/errors/skipped"
+      },
+      {
+        "cmd": "Actual frozen startup, legacy three text inserts, phone-primary three text inserts, production-page/native browser scenarios",
+        "exit_code": 0,
+        "output": "Four reports passed; 13 browser cases passed. Insertion Enter events 0; two separately confirmed sending events; page errors 0; process exit 0."
+      },
+      {
+        "cmd": "Downloaded artifact independent audit",
+        "exit_code": 0,
+        "output": "262-file set/length/SHA-256 verified; build-info matches actual EXE reports; original inner ZIP bytes preserved"
+      }
+    ],
+    "cloud_evidence": {
+      "run_id": 35523383176,
+      "trigger_sha": "d47b239757100043f65109f45fc69e98d849cd12",
+      "source_sha": "aec0ee81bcd3274000a8799df54ef57cadfab8b3",
+      "conclusion": "success",
+      "native_browser_cases": 13,
+      "three_images_one_click": true,
+      "desktop_button_tested": true,
+      "independent_enter_and_ctrl_enter_tested": true,
+      "actual_cursor_tested": false,
+      "actual_android_ime_tested": false,
+      "target_type": "independent Chromium test webpage, not production ChatGPT or Cursor"
+    },
+    "candidate_artifact": {
+      "artifact_id": 10609123727,
+      "source_sha": "aec0ee81bcd3274000a8799df54ef57cadfab8b3",
+      "filename": "DoubaoTypeless_V3_Composer_aec0ee8.zip",
+      "zip_bytes": 65195942,
+      "zip_sha256": "2ecec7133cf24bf890ea969d0b519d2b5f7f82ca41b6e4a1578e9f08a3106788",
+      "exe_sha256": "76c3989630dc2c82235c805c0364f8b8cd47bdba2e4ec80368c89e347feec862",
+      "outer_artifact_sha256": "61124f5acb9bb3a9f4fd6afb893de7eadf4d3952a98d110210c6c75fc3bd85ff",
+      "files_verified": 262,
+      "verified_after_download": true,
+      "original_zip_preserved": true
+    }
   }
 }
