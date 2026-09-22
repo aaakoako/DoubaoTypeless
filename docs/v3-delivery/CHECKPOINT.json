@@ -2,11 +2,11 @@
   "schema_version": 1,
   "product_goal": "沿用 MASTER_PLAN，保留原版插入并复制等体验，交付可实际体验的完整 Windows V3 发布前候选。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "正在交付 Codex 图文连续粘贴与手机一键清空修复；旧 ae75cf3 制品仍是用户当前运行版本，不能冒充已包含修复。",
+  "working_tree": "产品固定为 b69f7bc5a3f189f01339468202a3beebcd64f54a；后续文档 HEAD 不冒充制品来源。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
-  "last_completed_slice": "RELEASE_INSTALL_UPGRADE_NATIVE_CAPTURE_AND_CONTINUOUS_DRAFT",
-  "active_slice": "CODEX_SEQUENTIAL_PASTE_AND_PHONE_CLEAR",
-  "next_action": "提交修复并运行完整发行流水线，验证慢上传时正文先于上传完成进入目标；下载绑定源码的新候选，保留真实 Codex 和实体手机的验收边界。",
+  "last_completed_slice": "CODEX_SEQUENTIAL_PASTE_AND_PHONE_CLEAR",
+  "active_slice": "REAL_CODEX_PHONE_ACCEPTANCE",
+  "next_action": "用户正常退出旧版并体验 b69f7bc 新候选，确认真实 Codex 图后文和手机清空；前台许可到达后补真实兼容与设备验收。无 merge/tag/公开 Release。",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -28,19 +28,24 @@
   ],
   "last_commands": [
     {
-      "cmd": "Focused delivery and phone regressions",
+      "cmd": "Fixed-source CI and release validation",
       "exit_code": 0,
-      "output": "67 delivery checks passed; latest 46 focused tests passed including 9 clear scenarios, persistence and product usability; TypeScript/Vite passed"
+      "output": "Windows 525 passed; Linux 519 passed, 6 skipped; 18 evidence checks; TypeScript/Vite passed"
     },
     {
-      "cmd": "Local full suite before final callback guards",
-      "exit_code": 1,
-      "output": "519 passed; one large IndexedDB cross-page read failed once and passed focused rerun; complete clean-source CI still required"
+      "cmd": "Frozen native and installer validation",
+      "exit_code": 0,
+      "output": "Five reports passed; 14 native browser cases including text before 15-second upload completes; insertion Enter 0; exit 0"
+    },
+    {
+      "cmd": "Full downloaded candidate audit",
+      "exit_code": 0,
+      "output": "264 files verified; setup/zip/executable hashes match; artifact 10707185260"
     }
   ],
   "cloud_evidence": {
-    "run_id": 35705371132,
-    "source_sha": "ae75cf32957af27d13c0490af388afe0f108713c",
+    "run_id": 35751219901,
+    "source_sha": "b69f7bc5a3f189f01339468202a3beebcd64f54a",
     "conclusion": "success",
     "native_browser_cases": 14,
     "actual_screen_capture": true,
@@ -50,14 +55,14 @@
     "target_type": "independent Chromium test webpage"
   },
   "candidate_artifact": {
-    "artifact_id": 10684612510,
-    "source_sha": "ae75cf32957af27d13c0490af388afe0f108713c",
+    "artifact_id": 10707185260,
+    "source_sha": "b69f7bc5a3f189f01339468202a3beebcd64f54a",
     "version": "0.5.0",
     "channel": "release-candidate",
-    "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.0-RC-ae75cf3",
-    "setup_sha256": "2c3ab7a46e30be74ca47994237cfc1dfcf8c156e4aecc1792f3f2f7bd700d8a6",
-    "zip_sha256": "31220f5a0a1d7ca810b35b90eb096603f53082ca9ce3b0c367b98e5c660247b7",
-    "exe_sha256": "5a9ccf8f066e3771c50b9826665b145d36b6f77ed7dab0d2f4a03a22c37a4ba5",
+    "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.0-RC-b69f7bc",
+    "setup_sha256": "ddd72ce90f0dbe97fc5d559635c19c8830182994176d720664d1639b30456f8d",
+    "zip_sha256": "9d4b64f149a74009f250044d4d4f1d714f1467e8371c35286660df2848cc27c7",
+    "exe_sha256": "731fd3b50cc8921a94fa0ba1752ab9e48c5acccc2edab24755190cdb236cb9ae",
     "files_verified": 264,
     "verified_after_download": true,
     "release_ready": false
