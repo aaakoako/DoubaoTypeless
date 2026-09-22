@@ -642,7 +642,7 @@ export function boot(root: HTMLElement): void {
       toast("当前图文已清空，可从「最近」恢复；已贴到电脑的内容不会撤回");
     }).catch(() => {toast("清空未完成，请检查当前稿后重试");}).finally(() => {
       clearingDraft=false;root.querySelector<HTMLElement>(".page")!.inert=false;
-      publishCurrent();if(sessionReady)outbox.connect();update();
+      publishCurrent();if(sessionReady)outbox.connect();update();void uploadPending();
     });
     await receiptChain;
   }

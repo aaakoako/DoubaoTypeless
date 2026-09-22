@@ -57,3 +57,13 @@ def test_storage_failure_keeps_last_committed_draft(storage_page):
       repo.save({...d,text:"new",revision:2});let failed=false;try{await repo.flush()}catch{failed=true}
       IDBObjectStore.prototype.put=old;return {failed,still:(await repo.load()).text,events}}''')
     assert result["failed"] and result["still"]=="old" and result["events"][-1]=="unavailable"
+
+
+def test_clearing_empty_state_preserves_previous_backup(storage_page):
+    page,_,_=storage_page
+    result=page.evaluate('''async()=>{let d={schema:1,text:"recover me",revision:1,draft_id:"d",epoch:"e",assets:[],saved_at:1};
+      let empty={...d,text:"",epoch:"new"};await repo.replaceWithBackup(d,empty);
+      await repo.replaceWithBackup(empty,{...empty,epoch:"newer"});
+      return {current:await repo.load(),backup:await repo.load("before-replace")}}''')
+    assert result['current']['epoch']=='newer' and result['current']['text']==''
+    assert result['backup']['text']=='recover me'

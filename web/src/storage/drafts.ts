@@ -111,7 +111,9 @@ export class DraftRepository {
       tx.oncomplete = () => resolve();
       tx.onabort = tx.onerror = () => reject(new Error("LOCAL_STORAGE_WRITE_FAILED"));
       try {
-        tx.objectStore(STORE).put(before, "before-replace");
+        // A preceding completion receipt may already have archived this draft.
+        // Resetting an empty/stuck state must not erase that recovery copy.
+        if (before.text || before.assets.length) tx.objectStore(STORE).put(before, "before-replace");
         tx.objectStore(STORE).put(after, "current");
       } catch {try {tx.abort();} catch {} reject(new Error("LOCAL_STORAGE_WRITE_FAILED"));}
     });
