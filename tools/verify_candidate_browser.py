@@ -356,7 +356,15 @@ async def exercise(child,data,result,report):
                 await target.locator('#prompt-textarea').fill('')
                 await target.evaluate("window.imageRecords=[];window.pasteRecords=[];document.querySelector('#attachments').replaceChildren()")
                 await add_photo(fixtures[0],'相册标注')
-                await add_photo(fixtures[1],'截图标注')
+                # 第二张必须走手机「截电脑」和 EXE 的真实屏幕采集，不能用相册替身。
+                await target.bring_to_front()
+                await phone.click('#captureBtn')
+                await phone.wait_for_function("document.querySelector('#editor').classList.contains('show') && document.querySelector('#stage').dataset.ready==='1'")
+                await phone.click('#captionToggle');await phone.fill('#captionInput','截图标注')
+                await phone.click('#done');await phone.wait_for_selector('#editor.show',state='hidden')
+                await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本') && document.querySelectorAll('.attach-card').length===2")
+                captured=await phone.locator('.attach-card img').nth(1).evaluate("async im=>{await im.decode();return {width:im.naturalWidth,height:im.naturalHeight}}")
+                assert captured['width']>=800 and captured['height']>=600,captured
                 await phone.click('#boardBtn')
                 await phone.wait_for_function("document.querySelector('#stage').dataset.ready==='1' && !document.querySelector('#done').disabled")
                 box=await phone.locator('#stage').bounding_box()
@@ -381,7 +389,7 @@ async def exercise(child,data,result,report):
                 records=await target.evaluate('window.pasteRecords')
                 assert [x['text'] for x in records]==['','','',expected],records
                 assert not own_window(child.pid,'上次结果未知') or not win32gui.IsWindowVisible(own_window(child.pid,'上次结果未知'))
-                cases.append({'name':'three_reordered_renders_one_native_click_no_per_image_confirmation','passed':True,'image_pixels':expected_three})
+                cases.append({'name':'three_reordered_renders_one_native_click_no_per_image_confirmation','passed':True,'image_pixels':expected_three,'actual_desktop_capture':captured})
 
                 # 无语义名称的窄 Composer 容器 + 仅移除附件按钮（真实 UIA，不替换观察器）。
                 result['stage']='structural_scope_remove_buttons'
