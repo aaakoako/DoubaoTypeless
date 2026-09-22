@@ -877,9 +877,20 @@ class ClientWindow:
         return f"扫码即连。备用短码 {short}  （{remain}s）"
 
     def _tick_countdown(self) -> None:
+        self._refresh_phone_status()
         if not self.widget.isVisible() or self.qr.isHidden():
             return
         self.refresh()
+
+    def _refresh_phone_status(self) -> None:
+        # Connection changes must reach the HUD even while settings is in the tray.
+        # Only repaint an already visible HUD: reconnecting must not reopen it.
+        hud = self.app.hud
+        phone_online = self.app.draft.editor_device_id in self.app.bridge.online_device_ids()
+        if hud.phone_online != phone_online:
+            hud.phone_online = phone_online
+            if hud._widget is not None and hud._widget.isVisible():
+                hud._apply_show()
 
     def _toggle_remember(self) -> None:
         if not self.remember_box.isChecked():
@@ -907,11 +918,7 @@ class ClientWindow:
         self.code_label.setText(self._pair_caption())
         sessions = self.app.auth.public_sessions()
         online = self.app.bridge.online_device_ids()
-        hud = self.app.hud
-        phone_online = self.app.draft.editor_device_id in online
-        if hud.phone_online != phone_online:
-            hud.phone_online = phone_online
-            if hud._widget is not None and hud._widget.isVisible(): hud._apply_show()
+        self._refresh_phone_status()
         sig = tuple((s["session_id"], s["allow_insert"], s["allow_capture"], s["device_id"] in online) for s in sessions)
         if sig != self._session_sig:
             self._session_sig = sig

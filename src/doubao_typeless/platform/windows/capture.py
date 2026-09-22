@@ -30,7 +30,7 @@ def ensure_dpi_aware() -> str:
 
 
 def _monitor_enum() -> list[tuple[int, int, int, int]]:
-    monitors: list[tuple[int, int, int, int]] = []
+    monitors: list[tuple[bool, tuple[int, int, int, int]]] = []
 
     class RECT(ctypes.Structure):
         _fields_ = [
@@ -55,13 +55,16 @@ def _monitor_enum() -> list[tuple[int, int, int, int]]:
     def _cb(hmon, _hdc, _lprc, _lp):
         info = MONITORINFO()
         info.cbSize = ctypes.sizeof(MONITORINFO)
-        user32.GetMonitorInfoW(hmon, ctypes.byref(info))
+        if not user32.GetMonitorInfoW(hmon, ctypes.byref(info)):
+            return 1
         r = info.rcMonitor
-        monitors.append((int(r.left), int(r.top), int(r.right), int(r.bottom)))
+        monitors.append((bool(info.dwFlags & 1), (int(r.left), int(r.top), int(r.right), int(r.bottom))))
         return 1
 
     user32.EnumDisplayMonitors(0, 0, MonitorEnumProc(_cb), 0)
-    return monitors
+    # EnumDisplayMonitors does not identify the primary display by position.
+    # Keep secondary display order, but bind "primary" to MONITORINFOF_PRIMARY.
+    return [bounds for primary, bounds in sorted(monitors, key=lambda item: not item[0])]
 
 
 def list_monitors() -> list[dict]:

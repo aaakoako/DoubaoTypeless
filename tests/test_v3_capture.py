@@ -64,3 +64,27 @@ def test_scope_parser_physical_pixels():
     assert (x, y, r - x, b - y) == (-100, 20, 64, 48)
     with pytest.raises(ValueError):
         parse_scope("hwnd:1")
+
+
+def test_primary_capture_uses_monitor_flag_not_enumeration_order(monkeypatch):
+    import ctypes
+    from types import SimpleNamespace
+    from doubao_typeless.platform.windows import capture
+
+    def info(handle, pointer):
+        value = pointer._obj
+        bounds = (-1920, 0, 0, 1080) if handle == 1 else (0, 0, 2560, 1440)
+        value.rcMonitor.left, value.rcMonitor.top, value.rcMonitor.right, value.rcMonitor.bottom = bounds
+        value.dwFlags = 0 if handle == 1 else 1
+        return 1
+
+    def enumerate_monitors(_hdc, _clip, callback, _data):
+        callback(1, 0, None, 0)
+        callback(2, 0, None, 0)
+        return 1
+
+    monkeypatch.setattr(ctypes, "WINFUNCTYPE", getattr(ctypes, "WINFUNCTYPE", ctypes.CFUNCTYPE), raising=False)
+    monkeypatch.setattr(capture, "user32", SimpleNamespace(GetMonitorInfoW=info, EnumDisplayMonitors=enumerate_monitors))
+    monkeypatch.setattr(capture, "ensure_dpi_aware", lambda: "test")
+    assert capture.parse_scope("primary") == (0, 0, 2560, 1440)
+    assert capture.parse_scope("display:2") == (-1920, 0, 0, 1080)
