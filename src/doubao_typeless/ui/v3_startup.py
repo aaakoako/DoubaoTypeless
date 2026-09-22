@@ -9,6 +9,11 @@ V3_RUN_NAME = "DoubaoTypelessV3Preview"
 DAILY_RUN_NAME = "DoubaoTypeless"
 
 
+def run_name() -> str:
+    from doubao_typeless.build_info import release_layout
+    return "DoubaoTypelessV3" if release_layout() else V3_RUN_NAME
+
+
 def startup_command(*, data_dir: Path | None = None) -> str:
     from doubao_typeless.runtime import v3_data_dir
     from doubao_typeless.ui.single_instance import pipe_name
@@ -32,7 +37,8 @@ def apply_v3_autostart(enabled: bool, *, data_dir: Path | None = None) -> tuple[
         import winreg
     except ImportError:
         return False, "无法加载 winreg"
-    if V3_RUN_NAME == DAILY_RUN_NAME:
+    name = run_name()
+    if name == DAILY_RUN_NAME:
         return False, "拒绝写入日用自启动项"
     key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
     try:
@@ -41,10 +47,10 @@ def apply_v3_autostart(enabled: bool, *, data_dir: Path | None = None) -> tuple[
         return False, str(exc)
     try:
         if enabled:
-            winreg.SetValueEx(key, V3_RUN_NAME, 0, winreg.REG_SZ, startup_command(data_dir=data_dir))
+            winreg.SetValueEx(key, name, 0, winreg.REG_SZ, startup_command(data_dir=data_dir))
         else:
             try:
-                winreg.DeleteValue(key, V3_RUN_NAME)
+                winreg.DeleteValue(key, name)
             except FileNotFoundError:
                 pass
         return True, ""

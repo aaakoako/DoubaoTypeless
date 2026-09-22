@@ -6,6 +6,7 @@ import socket
 from pathlib import Path
 
 PREVIEW_NAME = "preview-v3"
+RELEASE_DATA_NAME = "workspace-v3"
 
 
 def configure_launch(argv: list[str]) -> None:
@@ -34,10 +35,12 @@ def v3_data_dir() -> Path:
     override = os.environ.get("DT_V3_DATA_DIR", "").strip()
     if override:
         return Path(override)
+    from doubao_typeless.build_info import release_layout
+    name = RELEASE_DATA_NAME if release_layout() else PREVIEW_NAME
     local = os.environ.get("LOCALAPPDATA")
     if local:
-        return Path(local) / "DoubaoTypeless" / PREVIEW_NAME
-    return Path.home() / "DoubaoTypeless" / PREVIEW_NAME
+        return Path(local) / "DoubaoTypeless" / name
+    return Path.home() / "DoubaoTypeless" / name
 
 
 def pick_port(preferred: int = 8766) -> int:

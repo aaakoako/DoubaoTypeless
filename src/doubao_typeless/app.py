@@ -68,6 +68,14 @@ class V3App:
         self._state_lock = threading.RLock()
         self._lock = instance_lock
         self._acquire_instance_lock()
+        from doubao_typeless.build_info import build_info, release_layout
+        if release_layout():
+            from doubao_typeless.storage.upgrade import prepare_upgrade
+            try:
+                prepare_upgrade(self.data_dir, version=build_info()['version'])
+            except Exception:
+                self._lock.release()
+                raise
         from doubao_typeless.services.command_queue import CommandQueue
         self._commands = CommandQueue(on_error=self._report_command_error)
         self._last_delivery_status: dict = {}

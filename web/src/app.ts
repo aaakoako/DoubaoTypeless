@@ -1,4 +1,5 @@
 import { decorateTools } from "./icons";
+import { overlayHistory } from "./overlay-history";
 import { SharedEditor, type Tool } from "./editor/canvas";
 import { applyReady, applyRotated, buildDraftUpdate, buildPrimaryUpdate, rotatePrimary, DraftOutbox } from "./sync.js";
 import { looksLikeKeyScript, newId } from "./transport/protocol";
@@ -206,6 +207,20 @@ export function boot(root: HTMLElement): void {
     sheetReturnFocus = null;
   }
   $("closeSheet").onclick = closeSheet;
+  const syncOverlayHistory = overlayHistory(
+    () => $("sheet").classList.contains("show") || editorOpen(),
+    () => {if ($("sheet").classList.contains("show")) closeSheet(); else cancelEditor();}
+  );
+  const overlayObserver = new MutationObserver(syncOverlayHistory);
+  for (const id of ["sheet", "editor"]) overlayObserver.observe($(id), {attributes:true, attributeFilter:["class"]});
+  const resizeViewport = () => {
+    const height = window.visualViewport?.height ?? window.innerHeight;
+    root.style.setProperty("--visible-height", `${height}px`);
+    root.classList.toggle("compact-keyboard", height < 520);
+  };
+  window.visualViewport?.addEventListener("resize", resizeViewport);
+  window.addEventListener("resize", resizeViewport);
+  resizeViewport();
   $("canvasTextCancel").onclick = () => {closeCanvasText(); chooseTool("pen"); saveOpenEditor();};
   function commitCanvasText(): boolean {
     if (!editor || !textPoint) return false;
@@ -1189,7 +1204,7 @@ export function boot(root: HTMLElement): void {
     state.session = await res.json();
     sessionStorage.setItem("dt.v3.session", JSON.stringify(state.session));
     const clean = new URL(location.href); clean.searchParams.delete("pair");
-    history.replaceState(null, "", clean.pathname + clean.search + clean.hash);
+    history.replaceState(history.state, "", clean.pathname + clean.search + clean.hash);
     if (sheetRevision === panelVersion) closeSheet();
     connect();
     update();

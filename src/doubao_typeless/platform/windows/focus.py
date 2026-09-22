@@ -61,8 +61,10 @@ def classify_element(descriptors: list[dict]) -> str:
         return "password"
     if item.get("readonly") is True:
         return "readonly"
-    context = " ".join(str(d.get(k) or "") for d in descriptors
-                       for k in ("class_name", "automation_id", "name")).lower()
+    # Ancestor names can include the conversation/project title. A task called
+    # "PowerShell" does not turn its message input into a terminal.
+    context = (" ".join(str(d.get(k) or "") for d in descriptors
+                       for k in ("class_name", "automation_id")) + " " + str(item.get('name') or '')).lower()
     if any(k in context for k in ("monaco", "scintilla", "codeditor", "editordocument", "view-lines")):
         return "code"
     if any(k in context for k in ("terminal", "powershell", "cmd.exe", "consolewindowclass")):
@@ -138,7 +140,10 @@ def _read_target_direct() -> FocusSnapshot:
                 return FocusSnapshot(cls, title, hwnd, pid)
             chain = focused_chain(uia, element)
             kind = classify_element([d for _, d in chain])
-            if base_kind in {"code", "terminal", "paste"}:
+            structural_kind = classify_focus(cls, "")
+            if structural_kind in {"code", "terminal", "paste"}:
+                kind = structural_kind
+            elif kind == "unknown" and base_kind in {"code", "terminal", "paste"}:
                 kind = base_kind
             return FocusSnapshot(cls, title, hwnd, pid,
                 int(property_value(element, "CurrentNativeWindowHandle", 0) or 0), runtime_id(element), kind)

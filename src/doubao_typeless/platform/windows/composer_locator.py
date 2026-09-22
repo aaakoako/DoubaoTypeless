@@ -10,7 +10,7 @@ from typing import Iterable
 
 # 标签用于识别候选而非证明某产品兼容；真实应用仍需逐版本测试。
 _ID_HINTS = ("prompt-textarea", "chat-input", "chatinput", "promptinput", "composer-input", "composerinput")
-_NAME_HINTS = ("ask anything", "send a message", "type a message", "message chatgpt",
+_NAME_HINTS = ("ask anything", "随心输入", "send a message", "type a message", "message chatgpt",
                "reply to claude", "问问 chatgpt", "问问chatgpt", "询问 chatgpt", "询问chatgpt", "向 chatgpt 发送消息", "message claude", "message input", "chat input", "ask a question", "输入消息", "发送消息", "询问任何问题")
 _BLOCKED = ("search", "find", "搜索", "查找", "password", "密码", "terminal", "console", "monaco", "scintilla", "codeeditor")
 

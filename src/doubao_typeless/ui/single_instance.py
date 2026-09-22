@@ -22,7 +22,8 @@ def _trace(stage: str, command: str = "", **details) -> None:
 
 
 def pipe_name() -> str:
-    return os.environ.get("DT_V3_PIPE", "").strip() or PIPE
+    from doubao_typeless.build_info import release_layout
+    return os.environ.get("DT_V3_PIPE", "").strip() or ("DoubaoTypelessV3" if release_layout() else PIPE)
 
 
 def _read_reply(sock, deadline: float) -> dict | None:

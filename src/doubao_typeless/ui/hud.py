@@ -131,6 +131,7 @@ class HudController:
                     return True
                 if event.type() == QEvent.MouseButtonRelease and controller._drag_offset is not None:
                     controller._drag_offset = None
+                    controller._place()
                     if controller._on_position:
                         controller._on_position([w.x(), w.y()])
                     return True
@@ -214,6 +215,12 @@ class HudController:
         self._bar = bar
         w.hide()
         self._widget = w
+        # An unplugged display may not produce a content update. Recover the
+        # visible HUD without activating it or moving it during a drag.
+        self._screen_timer = QTimer(w)
+        self._screen_timer.setInterval(1000)
+        self._screen_timer.timeout.connect(lambda: self._place() if w.isVisible() and self._user_positioned and self._drag_offset is None else None)
+        self._screen_timer.start()
         controller = self
         class Dispatcher(QObject):
             called = Signal(object)
@@ -351,10 +358,21 @@ class HudController:
         if self._saved_position and not self._user_positioned:
             if len(self._saved_position) == 2 and all(isinstance(v, int) for v in self._saved_position):
                 target = QPoint(*self._saved_position)
-                if any(screen.availableGeometry().contains(target) for screen in QGuiApplication.screens()):
-                    w.move(target); self._user_positioned = True
+                w.move(target); self._user_positioned = True
             self._saved_position = None
         if self._user_positioned:
+            areas = [s.availableGeometry() for s in QGuiApplication.screens()]
+            if areas:
+                bounds = w.frameGeometry()
+                def distance(area):
+                    p = bounds.center()
+                    return max(area.left()-p.x(), 0, p.x()-area.right())**2 + max(area.top()-p.y(), 0, p.y()-area.bottom())**2
+                area = min(areas, key=distance)
+                x = max(area.left(), min(w.x(), area.right()-w.width()+1))
+                y = max(area.top(), min(w.y(), area.bottom()-w.height()+1))
+                if (x, y) != (w.x(), w.y()):
+                    w.move(x, y)
+                    if self._on_position: self._on_position([x, y])
             return
         screen = w.screen() or QGuiApplication.primaryScreen()
         if not screen: return

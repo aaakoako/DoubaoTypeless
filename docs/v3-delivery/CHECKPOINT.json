@@ -5,8 +5,8 @@
   "working_tree": "日常使用优化产品固定为 dfa48cf4f2bac75b87b294c20d84d448de4a4895；后续文档 HEAD 不冒充产品来源。旧候选元数据与云证据仅作历史参考。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
   "last_completed_slice": "DAILY_USABILITY_EXIT_UNDO_RECOVERY_AND_STARTUP_IDENTITY",
-  "active_slice": "WINDOWS_PRE_RELEASE_PRIVATE_TRIAL",
-  "next_action": "优先在真实 Codex/Cursor 验证文字、三图、切换焦点和恢复；随后收敛固定安装入口与可回退数据升级。新体验包见 USABILITY_20260922.md。",
+  "active_slice": "RELEASE_0_5_0_INSTALL_UPGRADE_AND_REAL_TARGET_ACCEPTANCE",
+  "next_action": "固定源码构建安装包，实际验证安装升级卸载；允许前台后继续真实 Codex/Cursor 图文插入，不发布未验收结果",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -142,5 +142,14 @@
       "release_ready": false
     },
     "real_product_acceptance": false
+  },
+  "release_preparation_20260922": {
+    "version": "0.5.0",
+    "branch": "v3/integrated-preview-20260922",
+    "status": "building_and_validating",
+    "delivery_root": "G:/AgentStorage/Deliveries/typeless-release-0.5.0-rc1-20260922",
+    "real_target_acceptance": false,
+    "foreground_permission": "pending",
+    "public_release": false
   }
 }

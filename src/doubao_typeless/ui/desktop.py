@@ -680,8 +680,27 @@ class ClientWindow:
         import_vocab.setObjectName("ghost")
         import_vocab.clicked.connect(self.import_daily_vocab)
         update = QPushButton("检查更新")
+        self.update_button = update
         update.setObjectName("ghost")
         update.clicked.connect(self.check_update)
+        data_folder = QPushButton("数据与备份")
+        def open_data_folder():
+            from PySide6.QtCore import QUrl
+            from PySide6.QtGui import QDesktopServices
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.app.data_dir.resolve())))
+        data_folder.clicked.connect(open_data_folder)
+        self.update_status = QLabel("")
+        self.update_status.setWordWrap(True)
+        self.update_status.hide()
+        self.update_download = QPushButton("打开下载页")
+        self.update_download.hide()
+        def open_download():
+            import webbrowser
+            from doubao_typeless.services.v3_update import DOWNLOAD_PAGE
+            webbrowser.open(DOWNLOAD_PAGE)
+        self.update_download.clicked.connect(open_download)
+        sl.addRow(self.update_status)
+        sl.addRow(self.update_download)
         save = QPushButton("保存设置")
         save.setObjectName("primary")
         save.clicked.connect(self.save_settings)
@@ -692,6 +711,7 @@ class ClientWindow:
         sl.addRow(model_actions)
         srow.addWidget(export)
         srow.addWidget(update)
+        srow.addWidget(data_folder)
         srow.addStretch(1)
         srow.addWidget(save)
         settings_scroll = QScrollArea()
@@ -779,15 +799,27 @@ class ClientWindow:
         )
 
     def check_update(self) -> None:
-        import webbrowser
-
-        from PySide6.QtWidgets import QMessageBox
-
-        from doubao_typeless.services.v3_update import DOWNLOAD_PAGE, check_preview_update
-
-        info = check_preview_update()
-        QMessageBox.information(self.widget, "检查更新", info["message"])
-        webbrowser.open(DOWNLOAD_PAGE)
+        import threading
+        from PySide6.QtCore import QTimer
+        from doubao_typeless.services.v3_update import check_preview_update
+        if not self.update_button.isEnabled(): return
+        self.update_button.setEnabled(False)
+        self.update_status.setText("正在查询正式版本…")
+        self.update_status.show(); self.update_download.hide()
+        def work():
+            def get_json(url):
+                import httpx
+                response = httpx.get(url, timeout=8, headers={'Accept':'application/vnd.github+json'})
+                response.raise_for_status()
+                return response.json()
+            info = check_preview_update(get_json=get_json)
+            def apply():
+                self.update_status.setText(info['message'])
+                self.update_download.show()
+                self.update_button.setEnabled(True)
+            try: QTimer.singleShot(0, self.widget, apply)
+            except RuntimeError: pass
+        threading.Thread(target=work, daemon=True).start()
 
     def import_daily_vocab(self) -> None:
         from PySide6.QtWidgets import QFileDialog, QMessageBox

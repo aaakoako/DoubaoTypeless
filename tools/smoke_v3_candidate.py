@@ -12,13 +12,18 @@ from urllib.request import urlopen
 from urllib.parse import urlparse
 
 
-def run(exe: Path, data: Path) -> dict:
+def run(exe: Path, data: Path, *, existing_data: bool = False) -> dict:
     from PySide6.QtCore import QCoreApplication
     from PySide6.QtNetwork import QLocalSocket
     qt = QCoreApplication.instance() or QCoreApplication([])
-    data.mkdir(parents=True, exist_ok=False)
+    data.mkdir(parents=True, exist_ok=existing_data)
     settings = {name: "<smoke-disabled>" for name in ("hotkey_insert", "hotkey_recall", "hotkey_expand", "hotkey_capture")}
-    (data / "settings.json").write_text(json.dumps(settings), encoding="utf-8")
+    if existing_data:
+        configured = json.loads((data / 'settings.json').read_text(encoding='utf-8'))
+        if any(configured.get(k) != v for k,v in settings.items()):
+            raise ValueError('Existing test data must already disable native hotkeys')
+    else:
+        (data / "settings.json").write_text(json.dumps(settings), encoding="utf-8")
     pipe = "TypelessSmoke-" + uuid.uuid4().hex
     env = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "DT_V3_DATA_DIR": str(data), "DT_V3_PIPE": pipe}
     # Bootloader errors can show native dialogs before Qt loads. Isolate those

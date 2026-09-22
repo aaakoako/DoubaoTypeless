@@ -7,6 +7,7 @@ from pathlib import Path
 
 block_cipher = None
 ROOT = Path(SPECPATH).resolve().parent
+APP_NAME = globals().get("APP_NAME", "DoubaoTypelessV3PreviewUI")
 icon_path = ROOT / "assets" / "icon.ico"
 icon_arg = str(icon_path) if icon_path.is_file() else None
 web_dist = ROOT / "web" / "dist"
@@ -66,7 +67,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="DoubaoTypelessV3PreviewUI",
+    name=APP_NAME,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -74,6 +75,7 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     icon=icon_arg,
+    version=globals().get('VERSION_FILE'),
 )
 
 coll = COLLECT(
@@ -83,5 +85,5 @@ coll = COLLECT(
     a.datas,
     strip=False,
     upx=False,
-    name="DoubaoTypelessV3PreviewUI",
+    name=APP_NAME,
 )

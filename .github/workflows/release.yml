@@ -1,55 +1,69 @@
-# 推送以 v 开头的 tag（如 v0.1.0）时：在 Windows 上打单文件 exe，并创建带附件与自动生成 Release Notes 的 GitHub Release。
 name: Release
-
 on:
   push:
-    tags:
-      - "v*"
-
+    tags: ["v*"]
+  workflow_dispatch:
 permissions:
-  contents: write
-
+  contents: read
 jobs:
-  release:
+  validate:
+    uses: ./.github/workflows/ci.yml
+  package:
+    needs: validate
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt pyinstaller
-
-      - name: Ensure icon assets
-        shell: pwsh
-        run: |
-          if (-not (Test-Path "assets\icon.ico")) { python tools/gen_app_icon.py }
-
-      - name: Build exe (onefile)
-        run: pyinstaller --noconfirm DoubaoTypeless.spec
-
-      - name: Build portable (onedir)
-        run: pyinstaller --noconfirm DoubaoTypeless_portable.spec
-
-      - name: Zip portable folder
-        shell: pwsh
-        run: |
-          Compress-Archive -Path "dist/DoubaoTypeless" -DestinationPath "dist/DoubaoTypeless_win_portable.zip" -Force
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
         with:
+          node-version: '22'
+      - run: python -m pip install -r requirements-v3-release.txt playwright==1.60.0
+      - run: python -m playwright install chromium
+      - working-directory: web
+        run: npm ci
+      - working-directory: web
+        run: npm run typecheck
+      - working-directory: web
+        run: npm run build
+      - run: python tools/export_v3_icon.py
+      - name: Bind source and verify release tag
+        shell: pwsh
+        run: |
+          if ('${{ github.ref_type }}' -eq 'tag') {
+            python tools/prepare_v3_release.py --channel stable --tag '${{ github.ref_name }}'
+          } else {
+            python tools/prepare_v3_release.py --channel release-candidate
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - run: python -m PyInstaller --noconfirm packaging/v3_release.spec
+      - run: python tools/verify_candidate_startup.py dist/DoubaoTypeless/DoubaoTypeless.exe --report evidence/startup.json
+      - run: python tools/verify_candidate_text.py dist/DoubaoTypeless/DoubaoTypeless.exe --report evidence/text.json
+      - run: python tools/verify_candidate_text.py dist/DoubaoTypeless/DoubaoTypeless.exe --phone-primary --report evidence/phone-primary.json
+      - run: python tools/verify_candidate_browser.py dist/DoubaoTypeless/DoubaoTypeless.exe --report evidence/browser.json
+        timeout-minutes: 7
+      - run: python tools/fetch_nsis.py "${{ runner.temp }}/nsis"
+      - run: python tools/package_v3_release.py dist/DoubaoTypeless --output release --compiler "${{ runner.temp }}/nsis/nsis-3.12/makensis.exe"
+      - run: python tools/package_v3_release.py dist/DoubaoTypeless --output installer-test --compiler "${{ runner.temp }}/nsis/nsis-3.12/makensis.exe" --test-install
+      - run: python tools/verify_v3_installer.py installer-test --payload dist/DoubaoTypeless --compiler "${{ runner.temp }}/nsis/nsis-3.12/makensis.exe" --report evidence/installer.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-candidate-${{ github.sha }}
+          path: |
+            release/
+            evidence/
+      - uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          draft: true
           tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
           generate_release_notes: true
-          files: |
-            dist/DoubaoTypeless.exe
-            dist/DoubaoTypeless_win_portable.zip
+          files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -18,7 +18,7 @@ textarea{border:1px solid var(--line);border-radius:var(--radius-control);paddin
 @media(prefers-reduced-motion:no-preference){button{transition:background-color .12s,border-color .12s}}
 
 /* 编辑态占用视口，工具不挤成多行小按钮；与主Composer共用设计变量。 */
-body:has(.editor.show){overflow:hidden}.page:has(.editor.show){height:100dvh;min-height:0;max-width:650px}
+body:has(.editor.show){overflow:hidden}.page:has(.editor.show){height:var(--visible-height,100dvh);min-height:0;max-width:650px}
 .editor.show{height:100%;overflow:hidden}.editor>.head{flex:none;min-height:60px;padding:8px;gap:4px}.editor>.head b{font-size:13px}
 #stage{flex:1;min-height:160px;overflow:hidden;width:100%}.editor>.palette{flex:none;flex-wrap:nowrap;overflow-x:auto;padding:4px 8px;gap:4px}.editor>.palette button{flex-shrink:0;white-space:nowrap}
 .editor>.palette.extra.show{display:flex}.editor .swatch{width:44px;height:44px;min-width:44px;min-height:44px}
@@ -28,7 +28,8 @@ body:has(.editor.show){overflow:hidden}.page:has(.editor.show){height:100dvh;min
 
 #editorStatus{flex:none;font-size:12px;padding:8px 12px;background:var(--soft);margin:0}#editorStatus[hidden]{display:none}
 .icon-tool{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:52px;font-size:11px;line-height:1.25}.tools .icon-tool{flex-direction:row;gap:8px;font-size:14px}.icon-tool svg{flex:none}
-.canvas-text-panel{position:absolute;top:64px;left:12px;right:12px;z-index:5;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}.canvas-text-panel[hidden]{display:none}.canvas-text-panel textarea{display:block;width:100%;font-size:16px;min-height:70px;margin:8px 0}.canvas-text-panel>div{display:flex;justify-content:flex-end;gap:8px}.editor{position:relative}.editor>.head{position:relative;z-index:6;background:var(--surface)}
+.canvas-text-panel{flex:none;margin:4px 12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px}.canvas-text-panel[hidden]{display:none}.canvas-text-panel textarea{display:block;width:100%;font-size:16px;min-height:60px;margin:4px 0}.canvas-text-panel>div{display:flex;justify-content:flex-end;gap:8px}.editor{position:relative}.editor>.head{position:relative;z-index:6;background:var(--surface)}
+.compact-keyboard .editor:has(#canvasTextPanel:not([hidden]))>.palette,.compact-keyboard .editor:has(#canvasTextPanel:not([hidden]))>#captionToggle{display:none}.compact-keyboard #stage{min-height:40px}.compact-keyboard .editor>.head{min-height:48px}
 
 .undo-notice{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--soft);border-radius:var(--radius-control);padding:4px 8px;font-size:12px}.undo-notice[hidden]{display:none}.undo-notice button{background:transparent;color:var(--accent);font-weight:600}
 .sheet-toolbar{position:sticky;top:-16px;display:flex;justify-content:flex-end;background:var(--surface);z-index:1;padding:4px 0}.sheet-toolbar button{color:var(--accent);background:var(--soft)}
