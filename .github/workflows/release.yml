@@ -2,6 +2,7 @@ name: Release
 on:
   push:
     tags: ["v*"]
+    branches: ["v3/integrated-preview-20260922"]
   workflow_dispatch:
 permissions:
   contents: read

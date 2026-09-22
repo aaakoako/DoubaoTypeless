@@ -2,7 +2,7 @@ name: V3 preview tests
 
 on:
   push:
-    branches: ["v3/**", "!v3/assistant-runtime-safety"]
+    branches: ["v3/**", "!v3/assistant-runtime-safety", "!v3/integrated-preview-20260922"]
   pull_request:
     branches: ["v3/**"]
   workflow_dispatch:

@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: [main, master, "v3/integrated-preview-20260922"]
+    branches: [main, master]
   pull_request:
     branches: [main, master]
   workflow_call:
