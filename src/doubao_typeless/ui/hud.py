@@ -232,6 +232,7 @@ class HudController:
         self._check_button.setFocusPolicy(Qt.NoFocus)
         self._check_button.clicked.connect(lambda: self._on_expand and self._on_expand())
         self._note_button = QPushButton('附注已开')
+        self._note_button.setCheckable(True)
         from doubao_typeless.services.input_check import VOICE_NOTE
         self._note_button.setToolTip(VOICE_NOTE+'\n点击切换本段附注，不修改原稿。')
         self._note_button.setFocusPolicy(Qt.NoFocus)
@@ -498,6 +499,7 @@ class HudController:
         self._check_button.setToolTip(html.escape(details).replace('\n', '<br>'))
         self._note_button.setVisible(bool(result.get('note') or result.get('suppressed')))
         self._note_button.setText('附注已关' if result.get('suppressed') else '附注已开')
+        self._note_button.setChecked(bool(result.get('note')))
         self._note_button.setIcon(icon('note_off' if result.get('suppressed') else 'mic'))
         was_visible = not self._check_row.isHidden()
         self._check_row.setVisible(bool(summary))

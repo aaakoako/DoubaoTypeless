@@ -1,5 +1,10 @@
 """桌面、HUD、恢复/定位对话框共用组件语言；颜色由JSON生成。"""
 from doubao_typeless.ui.theme_generated import COLORS as C, METRICS as M
+from pathlib import Path
+import sys
+
+_root = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[3]))
+_checkmark = (_root / 'assets/checkmark.svg').as_posix()
 
 QSS = f"""
 QWidget {{ color:{C['ink']}; font-size:{M['text_size']}px; font-family: 'Microsoft YaHei UI','Microsoft YaHei','Noto Sans CJK SC','Segoe UI'; }}
@@ -38,7 +43,7 @@ QListWidget::item:selected {{ background:{C['soft']}; color:{C['ink']}; }}
 QListWidget::item:hover {{ background:{C['hover']}; }}
 QCheckBox {{ spacing:8px; background:transparent; padding:4px 0; }}
 QCheckBox::indicator {{ width:16px; height:16px; border:1px solid {C['line']}; border-radius:4px; background:{C['surface']}; }}
-QCheckBox::indicator:checked {{ background:{C['accent']}; border:3px solid {C['accent']}; }}
+QCheckBox::indicator:checked {{ background:{C['accent']}; border:1px solid {C['accent']}; image:url('{_checkmark}'); }}
 QCheckBox::indicator:hover {{ border-color:{C['accent']}; }}
 QScrollArea {{ background:transparent; border:0; }}
 QScrollArea > QWidget, QScrollArea > QWidget > QWidget, QTabWidget > QStackedWidget {{ background:{C['bg']}; }}

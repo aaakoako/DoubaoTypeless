@@ -13,7 +13,9 @@ from doubao_typeless.ui.desktop import apply_ui_font
 
 
 @pytest.fixture(autouse=True)
-def production_font(pair):
+def production_font(pair,monkeypatch):
+    # Exercise real settings/widgets without registering OS-wide hotkeys.
+    monkeypatch.setattr(pair[0],'apply_hotkeys',lambda *args,**kwargs:[])
     # The offscreen Qt plugin on Windows does not enumerate system fonts.
     from PySide6.QtGui import QFontDatabase
     if not QFontDatabase.families() and os.name == 'nt':
