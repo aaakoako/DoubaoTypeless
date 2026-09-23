@@ -8,6 +8,7 @@ from __future__ import annotations
 import ctypes
 import sys
 from typing import Callable
+from doubao_typeless.platform.windows.input_activity import INJECTION_MARKER
 
 # Windows ABI 的 LONG/DWORD 始终32位，不能使用 Linux上的 c_long 代替。
 DWORD, WORD, LONG = ctypes.c_uint32, ctypes.c_uint16, ctypes.c_int32
@@ -50,7 +51,7 @@ class InputInjectionError(OSError):
 def _key(vk: int, up: bool = False) -> INPUT:
     value = INPUT()
     value.type = 1  # INPUT_KEYBOARD
-    value.data.ki = KEYBDINPUT(vk, 0, KEYUP if up else 0, 0, 0)
+    value.data.ki = KEYBDINPUT(vk, 0, KEYUP if up else 0, 0, INJECTION_MARKER)
     return value
 
 

@@ -43,7 +43,7 @@ def _serve(pipe) -> None:
                     result = discover_direct(int(args['hwnd']), int(args['pid']), args.get('remembered'))
                 elif op == 'resume_composer':
                     from doubao_typeless.adapters.cursor_windows import resume_composer_direct
-                    result = resume_composer_direct(args.get("anchor"), args["expected"])
+                    result = resume_composer_direct(args.get("anchor"), args["expected"], args.get('input_stamp'))
                 elif op == 'attachments':
                     from doubao_typeless.adapters.cursor_windows import _probe_uia_direct
                     result = _probe_uia_direct(args.get("anchor"))

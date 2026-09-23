@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "product_goal": "完成可公开发行的 0.5.2 修订版，保留真实设备验证边界。",
+  "product_goal": "完成可公开发行的0.5.3修订版，保留真实设备验证边界。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "0.5.0已撤回；0.5.1正式构建在焦点变化后立即重试场景失败，未发布。已确定性复现并修复队列终态通知提前问题，准备0.5.2。",
+  "working_tree": "0.5.0已撤回；0.5.1/0.5.2正式构建未通过，均未发行。0.5.3加入外部输入来源计数及有限scope恢复，故障测试隔离到独立runner并保留超时诊断。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
   "last_completed_slice": "STABLE_0_5_0_PUBLISHED",
-  "active_slice": "RETRY_READY_0_5_2",
-  "next_action": "运行0.5.2完整测试、原生图文/升级验证、依赖审计及下载校验；全部通过后公开发行。",
+  "active_slice": "INPUT_ORIGIN_0_5_3",
+  "next_action": "等待0.5.3固定源码全量、原生图文/升级、真实hook分类、依赖审计及下载校验。通过后再合入和发行，不跳过失败项。",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -304,5 +304,25 @@
     "repair": "Defer terminal UI until queue is ready; show local BUSY without replay; preserve original browser assertions.",
     "counterfactual": "Disabling when_ready makes immediate retry regression fail with BUSY.",
     "independent_review": "No new blocker; frozen-browser validation remains required."
+  },
+  "failed_0_5_2_stable": {
+    "source_sha": "f8cc2ff2732bda620ed759e2142d44c3633e460c",
+    "run": 35904234414,
+    "published": false,
+    "failures": [
+      "Retarget fixture powershell launch timed out at original20s limit",
+      "two images pasted, text stopped with TARGET_CHANGED; immediate-retry case passed"
+    ],
+    "candidate_run": 35903305997,
+    "candidate_failure": "initial good_Setup.exe fixture timed out at60s; other native checks including browser14 passed",
+    "independent_upgrade_diagnostic": {
+      "run": 35906340222,
+      "source": "70c5ca6",
+      "clean_windows_machines": 2,
+      "both_passed": true,
+      "limits_unchanged": true,
+      "timeout_root_cause": "not established"
+    },
+    "repair": "input source counter excludes only own tagged events; same-container bounded refocus with external-input guard; no paste replay; isolated mandatory recovery job with diagnostics"
   }
 }

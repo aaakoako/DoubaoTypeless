@@ -9,8 +9,24 @@ permissions:
 jobs:
   validate:
     uses: ./.github/workflows/ci.yml
+  upgrade-recovery:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install Pillow==12.3.0
+      - run: python tools/fetch_nsis.py "${{ runner.temp }}/nsis"
+      - run: python tools/verify_upgrade_failure.py --compiler "${{ runner.temp }}/nsis/nsis-3.12/makensis.exe" --report evidence/upgrade-failures.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: upgrade-recovery-${{ github.sha }}
+          path: evidence/
   package:
-    needs: validate
+    needs: [validate, upgrade-recovery]
     runs-on: windows-latest
     permissions:
       contents: write
@@ -49,6 +65,10 @@ jobs:
           New-Item -ItemType Directory -Force evidence | Out-Null
           python -m pip_audit --format json --output evidence/installed-dependency-audit.json
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/download-artifact@v4
+        with:
+          name: upgrade-recovery-${{ github.sha }}
+          path: evidence/
       - run: python -m PyInstaller --noconfirm packaging/v3_release.spec
       - run: python tools/verify_candidate_startup.py dist/DoubaoTypeless/DoubaoTypeless.exe --report evidence/startup.json
       - run: python tools/verify_candidate_text.py dist/DoubaoTypeless/DoubaoTypeless.exe --report evidence/text.json
@@ -57,8 +77,6 @@ jobs:
       - run: python tools/package_v3_release.py dist/DoubaoTypeless --output release --compiler "${{ runner.temp }}/nsis/nsis-3.12/makensis.exe"
       - run: python tools/package_v3_release.py dist/DoubaoTypeless --output installer-test --compiler "${{ runner.temp }}/nsis/nsis-3.12/makensis.exe" --test-install
       - run: python tools/verify_v3_installer.py installer-test --payload dist/DoubaoTypeless --compiler "${{ runner.temp }}/nsis/nsis-3.12/makensis.exe" --report evidence/installer.json
-      - run: python tools/verify_upgrade_failure.py --compiler "${{ runner.temp }}/nsis/nsis-3.12/makensis.exe" --report evidence/upgrade-failures.json
-        if: ${{ !cancelled() && hashFiles('installer-test/*_Setup.exe') != '' }}
       - run: python -m pip install cryptography==46.0.7
         if: ${{ !cancelled() && hashFiles('installer-test/*_Setup.exe') != '' }}
       - name: Published 0.4.2 full upgrade and restart

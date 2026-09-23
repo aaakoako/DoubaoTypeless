@@ -178,10 +178,12 @@ def observe_image(baseline=None, *, timeout_s=0.25, cancelled=None) -> str:
         time.sleep(.1)
 
 
-def resume_composer_direct(anchor, expected):
+def resume_composer_direct(anchor, expected, input_stamp=None):
     """图片自动聚焦附件后，只恢复原容器内的原输入控件；不按文字或坐标猜。"""
     from doubao_typeless.platform.windows.focus import automation,runtime_id,_read_target_direct
     if win32gui is None or not anchor or len(expected)<7:return None
+    import win32api
+    if input_stamp is None or win32api.GetLastInputInfo()!=input_stamp:return None
     report=_probe_uia_direct(anchor)
     if not same_composer_scope(anchor,report):return None
     with automation() as uia:
@@ -193,6 +195,8 @@ def resume_composer_direct(anchor, expected):
         if container is None:return None
         node=_element_by_id(uia,container,expected[5])
         if node is None:return None
+        # Recheck after potentially slow UIA traversal, just before SetFocus.
+        if win32api.GetLastInputInfo()!=input_stamp:return None
         node.SetFocus()
     actual=_read_target_direct()
     return list(actual) if tuple(actual.runtime_id)==tuple(expected[5]) and actual.kind=="composer" else None
