@@ -58,6 +58,12 @@ def test_reading_selection_survives_append_and_pauses_idle(hud):
     assert not hud._timer.isActive()
 
 
+def test_first_show_completes_tail_before_deferred_timers(hud):
+    hud.show_receiving('网络线程文字'*120)
+    bar=hud._body.verticalScrollBar()
+    assert bar.maximum()>0 and bar.value()==bar.maximum()
+
+
 def test_late_document_layout_follows_tail_but_keeps_manual_reading(hud):
     hud.show_receiving('长文内容\n' * 80);QTest.qWait(30)
     bar = hud._body.verticalScrollBar()

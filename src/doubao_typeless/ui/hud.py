@@ -748,6 +748,11 @@ class HudController:
         self._latest.setVisible(reading)
         self._place()
         self._widget.show()
+        # First show lays out QTextEdit while _updating is still true, so its
+        # range notifications deliberately do nothing. Complete the initial
+        # tail position synchronously; the queued pass only handles later layout.
+        if not reading and self._follow_tail:
+            scroll.setValue(scroll.maximum())
         self._updating = False
         from PySide6.QtCore import QTimer
         # 第一次show后QTextDocument可能再计算一次边距；只在仍然追尾时校正。
