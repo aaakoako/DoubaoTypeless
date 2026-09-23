@@ -702,6 +702,13 @@ class HudController:
         if self._body.textCursor().hasSelection() or self._body.verticalScrollBar().isSliderDown():
             self._follow_tail = False
             self._latest.show()
+            # Reading freezes content/scroll, not visibility. A selected HUD
+            # hidden by expanded review must still return after locating a field.
+            bar = self._body.verticalScrollBar()
+            position = bar.value()
+            self._place()
+            self._widget.show()
+            bar.setValue(position)
             self._pause_or_resume_idle()
             return
         self._updating = True

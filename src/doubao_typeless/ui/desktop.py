@@ -1352,8 +1352,14 @@ class DesktopShell:
             QTimer.singleShot(0, host, self.app.capture_region)
         elif event == "composer_located":
             def reveal_target():
+                from doubao_typeless.app import _log
                 self.review.widget.hide()
                 self.app.hud.operation_event("composer_located")
+                hud=self.app.hud
+                _log(f'[v3.locator] stage=ui_ready review={self.review.widget.isVisible()} '
+                     f'hud={hud._widget.isVisible()} surfaces={len(hud._foreground_surfaces)} '
+                     f'selection={hud._body.textCursor().hasSelection()} '
+                     f'slider_down={hud._body.verticalScrollBar().isSliderDown()}')
             QTimer.singleShot(0, host, reveal_target)
         elif event == "composer_pick":
             candidates=list(_kw.get("candidates") or [])

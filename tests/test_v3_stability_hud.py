@@ -98,3 +98,21 @@ def test_copy_during_pending_insert_is_disabled_to_avoid_manual_double_paste(hud
     assert not hud._copy.isEnabled()
     hud.operation_event('delivery_failed',error_code='PHONE_OFFLINE')
     assert hud._copy.isEnabled()
+
+
+@pytest.mark.parametrize('reading', ['selection', 'slider'])
+def test_hidden_reading_hud_returns_after_location_without_losing_reading(hud,reading):
+    hud.show_receiving('需要保留阅读位置的正文\n'*80)
+    QTest.qWait(20)
+    bar=hud._body.verticalScrollBar()
+    bar.setValue(bar.maximum()//2)
+    if reading=='selection':hud._body.selectAll()
+    else:bar.setSliderDown(True)
+    before=(hud._body.toPlainText(),hud._body.textCursor().selectedText(),bar.value())
+    hud.dismiss()
+    assert not hud._widget.isVisible()
+    hud.operation_event('composer_located')
+    assert hud._widget.isVisible() and '已定位输入框' in hud._status.text()
+    assert (hud._body.toPlainText(),hud._body.textCursor().selectedText(),bar.value())==before
+    assert not hud._follow_tail
+    bar.setSliderDown(False)

@@ -248,6 +248,7 @@ class V3App:
         from doubao_typeless.platform.windows.composer_locator import locate_current
         from doubao_typeless.platform.windows.focus import FocusSnapshot, restore_target
         self._notify_ui("composer_locating")
+        _log('[v3.locator] stage=start')
         try:
             before = self._read_focus()
             result = locate_current(self._saved_target)
@@ -272,9 +273,11 @@ class V3App:
                 self._notify_ui("delivery_failed", error_code="TARGET_CHANGED")
                 return {"status": "changed"}
             if not restore_target(target):
+                _log('[v3.locator] stage=restore_refused')
                 self._notify_ui("delivery_failed", error_code="NEEDS_TARGET")
                 return {"status": "focus_failed"}
             self._saved_target = target
+            _log('[v3.locator] stage=restored')
             self._notify_ui("composer_located")
             return {"status": "located", "reason": result["reason"]}
         except Exception as exc:
@@ -450,6 +453,7 @@ class V3App:
         if event in {'delivery_failed', 'delivery_complete', 'recovery_available', 'composer_located'}:
             if self._commands.when_ready(lambda: self._notify_ui(event, **kwargs)):
                 return
+        if event == 'composer_located':_log('[v3.locator] stage=ready_notification')
         # 状态首先进入真正的HUD，托盘提示只是补充；未知结果不能伪装成成功。
         if event in {"sync_wait", "delivery_start", "delivery_failed", "delivery_complete", "composer_locating", "composer_located", "delivery_progress", "recovery_available", "command_rejected"}:
             self._last_delivery_status = {"event": event, **kwargs}
