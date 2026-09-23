@@ -166,14 +166,18 @@ class HudController:
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(8)
         expand = QPushButton("展开")
+        from doubao_typeless.ui.icons import icon, ToneBadge
+        expand.setIcon(icon('expand'))
         expand.setFixedHeight(32)
         expand.clicked.connect(lambda: self._on_expand and self._on_expand())
         self._expand = expand
         copy = QPushButton("复制")
+        copy.setIcon(icon('copy'))
         copy.setFixedHeight(32)
         copy.clicked.connect(lambda: self._on_copy and self._on_copy())
         self._copy = copy
         btn = QPushButton("插入并复制")
+        btn.setIcon(icon('insert','#ffffff'))
         btn.setObjectName("DTInsertAction")
         btn.setProperty("role", "primary")
         btn.setAccessibleName("插入并复制")
@@ -183,6 +187,7 @@ class HudController:
         row.addWidget(expand, 0)
         row.addWidget(copy, 0)
         self._recover = QPushButton("恢复")
+        self._recover.setIcon(icon('back'))
         self._recover.setFocusPolicy(Qt.NoFocus)
         self._recover.setToolTip("查看已插入的部分，再决定如何继续")
         self._recover.clicked.connect(lambda: self._on_recover and self._on_recover())
@@ -226,10 +231,14 @@ class HudController:
         self._check_button.setObjectName('DTInputCheck')
         self._check_button.setFocusPolicy(Qt.NoFocus)
         self._check_button.clicked.connect(lambda: self._on_expand and self._on_expand())
-        self._note_button = QPushButton('不附说明')
+        self._note_button = QPushButton('附注已开')
+        from doubao_typeless.services.input_check import VOICE_NOTE
+        self._note_button.setToolTip(VOICE_NOTE+'\n点击切换本段附注，不修改原稿。')
         self._note_button.setFocusPolicy(Qt.NoFocus)
         self._note_button.clicked.connect(lambda: self._on_toggle_note and self._on_toggle_note())
         check_layout.addWidget(self._check_button, 1)
+        self._tone_badge = ToneBadge()
+        check_layout.addWidget(self._tone_badge)
         check_layout.addWidget(self._note_button)
         self._check_row = check_row
         check_row.hide()
@@ -476,16 +485,20 @@ class HudController:
         if self._check_row is None:return
         from doubao_typeless.services.input_check import presentation
         summary, details = presentation(result)
-        signature = (summary, details, result.get('note'), result.get('suppressed'))
+        signature = (summary, details, result.get('note'), result.get('suppressed'), result.get('tone'))
         if signature == self._check_signature:return
         self._check_signature = signature
         from PySide6.QtCore import Qt
-        available = 235 if result.get('note') or result.get('suppressed') else 330
+        from doubao_typeless.ui.icons import icon, judgment_icon
+        available = 160 if result.get('note') or result.get('suppressed') else 240
+        self._check_button.setIcon(icon(judgment_icon(result)))
+        self._tone_badge.set_tone(result.get('tone',''))
         self._check_button.setText(self._check_button.fontMetrics().elidedText(summary, Qt.ElideRight, available))
         import html
         self._check_button.setToolTip(html.escape(details).replace('\n', '<br>'))
         self._note_button.setVisible(bool(result.get('note') or result.get('suppressed')))
-        self._note_button.setText('附上说明' if result.get('suppressed') else '不附说明')
+        self._note_button.setText('附注已关' if result.get('suppressed') else '附注已开')
+        self._note_button.setIcon(icon('note_off' if result.get('suppressed') else 'mic'))
         was_visible = not self._check_row.isHidden()
         self._check_row.setVisible(bool(summary))
         if self._widget.isVisible() and was_visible != bool(summary):

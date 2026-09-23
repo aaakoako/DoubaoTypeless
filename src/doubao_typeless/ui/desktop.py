@@ -238,6 +238,11 @@ class ReviewPanel:
         back = QPushButton("返回浮窗")
         back.clicked.connect(self.return_to_hud)
         self.btn_back = back
+        from doubao_typeless.ui.icons import icon
+        for button, name in ((terms_btn,'inspect'),(suggest,'edit'),(locate,'target'),
+                             (copy,'copy'),(back,'back')):
+            button.setIcon(icon(name))
+        insert.setIcon(icon('insert','#ffffff'))
         row.addWidget(back)
         row.addWidget(copy)
         row.addWidget(insert)

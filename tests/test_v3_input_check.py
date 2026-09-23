@@ -56,7 +56,7 @@ def test_uncertainty_not_reported_as_clean():
     req, spans = make_request('不确定内容')
     result = parse_response(response(req, confidence=.2), req, spans)
     assert result['inconclusive'] and not result['suspected_transcription']
-    assert '无法可靠判断' in presentation(result)[0]
+    assert '暂无法判断' in presentation(result)[0]
 
 
 def test_disabled_missing_key_and_long_text_never_call_transport():

@@ -33,10 +33,13 @@ def test_settings_save_inspection_and_nonblocking_visible_controls(pair,monkeypa
     a.hud.start();a.hud.show_receiving(a.review_text())
     QTest.qWait(1200)
     try:
-        assert '疑似转写错误' in a.hud._check_button.text()
+        assert '处待留意' in a.hud._check_button.text()
+        assert a.hud._tone_badge.label.text()=='急切'
+        assert not a.hud._check_button.icon().isNull()
         assert a.hud._insert.isEnabled() and not a.hud._note_button.isHidden()
         review.show();QTest.qWait(300)
-        assert VOICE_NOTE in review.input_check_details.details.toPlainText()
+        assert '疑似转写错误' in review.input_check_details.details.toPlainText()
+        assert VOICE_NOTE in review.input_check_details.note.toolTip()
         assert review.editor.toPlainText()==a.review_text() and VOICE_NOTE not in a.review_text()
         review.input_check_details.note.click();QTest.qWait(300)
         assert not a.input_check.view(a.input_check_identity())['note']

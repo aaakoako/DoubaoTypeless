@@ -132,7 +132,7 @@ class InputCheck:
             if not text.strip():
                 self.result = {'status': 'empty'}; return
             if not self.options['jev_api_key']:
-                self.result = {'status': 'no_key', 'message': '输入检查：请先在设置中填写 Jev Key'}; return
+                self.result = {'status': 'no_key', 'message': '待配置 Key'}; return
             if self._busy or self.result['status'] != 'waiting' or self._now()-self._changed < .65:return
             self._busy = True; self.result = {'status': 'checking'}
             serial = self._serial; options = dict(self.options)
@@ -178,11 +178,9 @@ class InputCheck:
 def presentation(result):
     status = result.get('status')
     if status in {'disabled', 'empty'}:return '', ''
-    if status in {'waiting', 'checking'}:return '输入检查中…', '检查不影响复制和插入'
-    if status != 'ready':return result.get('message', '输入检查待就绪'), '可在常用设置配置 Jev'
+    if status in {'waiting', 'checking'}:return '检查中', '可直接复制或插入'
+    if status != 'ready':return ('待配置 Key' if status=='no_key' else '检查未完成'), result.get('message','可在常用设置配置 Jev')
     issues = result['issues']
-    summary = ' · '.join(dict.fromkeys(i['label'] for i in issues)) or ('暂无法可靠判断' if result.get('inconclusive') else '未发现明显表达问题')
-    if result.get('tone'):summary += ' · 语气：'+result['tone']
-    details = '\n'.join(f'{i["label"]}：{i["text"]}' for i in issues) or '仅为当前文字的辅助判断，不代表目标模型一定理解。'
-    if result.get('note'):details += '\n插入及复制时将附加：'+VOICE_NOTE
+    summary = f'{len(issues)} 处待留意' if issues else ('暂无法判断' if result.get('inconclusive') else '未见明显问题')
+    details = '\n'.join(f'{i["label"]}：{i["text"]}' for i in issues)
     return summary, details
