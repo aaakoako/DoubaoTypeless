@@ -157,6 +157,20 @@ def verify(payload, compiler, report):
             assert hashlib.sha256(original.read_bytes()).digest()==hashlib.sha256(package.read_bytes()).digest()
             assert (old/'config.json').read_bytes()==before_config and dictionary.read_bytes()==before_dictionary
             result.update(source_sha=source,legacy_data_unchanged=True,complete_entry_replaced=True,proxy_requests=proxy.calls)
+            # Readiness/registration precede installer exit. Wait until the
+            # installation transaction releases its named handle before testing
+            # a later user launch; otherwise error 3 correctly means still busy.
+            import win32event
+            deadline=time.monotonic()+15
+            while True:
+                try:
+                    mutex=win32event.OpenMutex(win32con.SYNCHRONIZE,False,r'Local\DoubaoTypeless Installer Test-Upgrade')
+                except Exception as exc:
+                    if getattr(exc,'winerror',None)==2:break
+                    raise
+                mutex.Close()
+                assert time.monotonic()<deadline,'Upgrade installer did not finish after readiness'
+                time.sleep(.1)
             # Reopening the replaced old shortcut must forward without reinstalling.
             identity=identify(env['DT_V3_PIPE'])
             assert identity['source_sha']==source and Path(identity['executable']).resolve()==new_exe.resolve()
@@ -167,6 +181,7 @@ def verify(payload, compiler, report):
             os.utime(marker,ns=(stamp,stamp))
             stamp=marker.stat().st_mtime_ns
             forwarded=subprocess.run([str(original)],cwd=old,env=env,timeout=60)
+            result.update(forward_exit_code=forwarded.returncode,payload_timestamp_preserved=marker.stat().st_mtime_ns==stamp)
             assert forwarded.returncode==0 and marker.stat().st_mtime_ns==stamp
             after=identify(env['DT_V3_PIPE'])
             assert after['pid']==identity['pid'] and after['source_sha']==source

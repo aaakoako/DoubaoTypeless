@@ -96,10 +96,20 @@ class DeliveryService:
             attempt.error_code = "NEEDS_TARGET"
             return attempt
         index = len(attempt.steps)
+        image_pasted = False
+
+        def target_ready():
+            if same_target(self._read_focus(), focus):
+                return True
+            # Upload UI can focus an attachment after the immediate post-paste
+            # check. Reuse the same scoped recovery at every remaining boundary;
+            # the native callback rejects new user input and another container.
+            return bool(image_pasted and self._resume_input
+                        and same_target(self._resume_input(focus), focus))
+
         for asset in assets:
             self._notify_progress("image", index+1, len(bundle.get("assets") or []))
-            current = self._read_focus()
-            if not same_target(current, focus):
+            if not target_ready():
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "TARGET_CHANGED"
                 return attempt
@@ -110,8 +120,7 @@ class DeliveryService:
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "MODIFIERS_HELD"
                 return attempt
-            current = self._read_focus()
-            if not same_target(current, focus):
+            if not target_ready():
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "TARGET_CHANGED"
                 return attempt
@@ -124,6 +133,7 @@ class DeliveryService:
                 attempt.error_code = "SHUTTING_DOWN"
                 return attempt
             self._paste()
+            image_pasted = True
             self._notify_progress("image_wait", index+1, len(bundle.get("assets") or []))
             evidence = "os_input_count"
             state = "injected"
@@ -145,7 +155,7 @@ class DeliveryService:
         text = bundle.get("text") or ""
         if text:
             self._notify_progress("text", len(assets), len(bundle.get("assets") or []))
-            if not same_target(self._read_focus(), focus):
+            if not target_ready():
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "TARGET_CHANGED"
                 return attempt
@@ -158,7 +168,7 @@ class DeliveryService:
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "MODIFIERS_HELD"
                 return attempt
-            if not same_target(self._read_focus(), focus):
+            if not target_ready():
                 attempt.result = "PARTIAL" if attempt.steps else "NO_STEPS"
                 attempt.error_code = "TARGET_CHANGED"
                 return attempt
