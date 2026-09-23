@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "product_goal": "沿用 MASTER_PLAN，保留原版插入并复制等体验，交付可实际体验的完整 Windows V3 发布前候选。",
+  "product_goal": "0.5.0 正式发行已交付，后续以已发布版本收集真实环境反馈。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "0.5.0 OpenRouter真实中文验证、独立接口与凭据配置、丰富语气及桌面手机动效完成；最终源码回归与发行包验证推进中。",
+  "working_tree": "正式源码aac1e51（与验证候选29a32ff同树）已发布v0.5.0；本次仅更新发行记录，不修改产品代码。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
-  "last_completed_slice": "FULL_PACKAGE_UPGRADE_AND_AUTOMATIC_RESTART",
-  "active_slice": "FINAL_0_5_0_RELEASE",
-  "next_action": "最终全量回归、固定提交云端发行验证、下载载荷校验；全部通过后按用户明确授权合入master并发布v0.5.0。真实Cursor与实体手机输入法仍标为未验证。",
+  "last_completed_slice": "STABLE_0_5_0_PUBLISHED",
+  "active_slice": "RELEASED_0_5_0",
+  "next_action": "收集0.5.0真实手机输入法、Cursor及多屏反馈，按具体问题修复后续版本；不要重复发布0.5.0。",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -33,9 +33,14 @@
   ],
   "last_commands": [
     {
-      "cmd": "Final local regression and evidence checker",
+      "cmd": "Stable tag release validation",
       "exit_code": 0,
-      "output": "630 pytest passed; 18 evidence checker tests passed; frontend TypeScript/Vite passed; live OpenRouter final 10/10 HTTP200; real Qt event loop displayed live furious response without pasting."
+      "output": "Windows 632 passed; Linux 623 passed, 9 skipped; 18 evidence tests; 7 native reports; 14 browser cases; official 0.4.2 complete upgrade/restart passed."
+    },
+    {
+      "cmd": "Downloaded stable artifact audit and local offscreen startup",
+      "exit_code": 0,
+      "output": "267 files/hashes/build source checked; normal startup/quit; API keys absent; public latest returns v0.5.0."
     }
   ],
   "cloud_evidence": {
@@ -67,19 +72,19 @@
     "release_ready": false
   },
   "open_defects": [
-    "真实 Codex/Cursor 图文插入与恢复未验收，前台许可待回复",
-    "实体手机输入法/软键盘/扫码及长后台、多屏拔插未实机验收",
-    "本次 browser fault 日志仍有 0x8001010d；同 PID 完成 14 场景并退出 0，保留调查项；历史偶发退出未凭现场证据确诊",
-    "独立实机验收及公开发布审批未完成",
-    "Vercel Key可查余额，但推理返回403 customer_verification_required，需用户在后台完成账户验证激活免费额度；真实Jev中文判断质量、延迟和费用未经实测。"
+    "实体手机输入法/软键盘/扫码及长后台、多屏拔插尚未完成当前正式包实机验收。",
+    "Cursor当前版本尚未完成真实图文验收；Codex连续图片与正文由用户确认上一候选已通过。",
+    "原生browser诊断仍出现0x8001010d；同PID完成14场景并正常退出。保留诊断观察项，未将其确诊为进程崩溃。"
   ],
   "independent_review": {
-    "status": "SOURCE_REVIEW_AND_UPGRADE_VALIDATION_COMPLETED_REAL_ACCEPTANCE_PENDING",
-    "release_ready": false,
-    "document": "docs/v3-delivery/RELEASE_0_5_1_ACCEPTANCE.md"
+    "status": "SOURCE_REVIEW_COMPLETE",
+    "reviewed_feature_sha": "807b934826325ae7218c30a30b73cce3690f5ff4",
+    "reviewed_scroll_sha": "29a32ffeef0e04ca1cfec1ce0d0198d681a2b003",
+    "document": "docs/v3-delivery/RELEASE_0_5_0_PUBLISHED.md",
+    "real_devices_reviewed": false
   },
-  "published": false,
-  "task_complete": false,
+  "published": true,
+  "task_complete": true,
   "integration_20260922": {
     "branch": "v3/integrated-preview-20260922",
     "base": "b32d2d536937d0fcad2c0e2ea76742d60fa47c42",
@@ -255,5 +260,36 @@
     "codex_desktop_image_then_text": "user reported successful on previous candidate",
     "cursor": "not verified",
     "physical_mobile_ime": "not verified"
+  },
+  "release_0_5_0": {
+    "version": "0.5.0",
+    "tag": "v0.5.0",
+    "published_at": "2026-09-23T17:38:19Z",
+    "url": "https://github.com/aaakoako/DoubaoTypeless/releases/tag/v0.5.0",
+    "source_sha": "aac1e51ab13e3107d0264ebb940b50f088f068c7",
+    "release_run": 35895043850,
+    "ci_run": 35894995695,
+    "candidate_run": 35893151277,
+    "local_startup": {
+      "test": "frozen-startup-and-graceful-exit",
+      "executable": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.0\\portable\\DoubaoTypeless\\DoubaoTypeless.exe",
+      "passed": true,
+      "insertion_tested": false,
+      "cursor_tested": false,
+      "phone_tested": false,
+      "pid": 34600,
+      "protocol_ready": true,
+      "quit_command_exit": 0,
+      "process_exit": 0
+    },
+    "manual_release_decision": "User explicitly authorized publishing after finishing this scope; exact-source validation and artifact verification completed.",
+    "real_target_acceptance": {
+      "codex_desktop_mixed_paste": "user confirmed prior candidate",
+      "cursor": "not verified",
+      "physical_mobile_ime": "not verified"
+    },
+    "files_verified": 267,
+    "upgrade_exe_sha256": "bc2e171e73180e419f02c0ffeb0b4fe88dabc59d31807a1c87e233eb29b09314",
+    "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.0"
   }
 }
