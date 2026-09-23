@@ -100,6 +100,8 @@ class V3App:
         from doubao_typeless.storage.settings_store import load_settings, save_settings
 
         stored = load_settings(self.data_dir)
+        from doubao_typeless.services.input_check import InputCheck
+        self.input_check = InputCheck(stored)
         self.byok = ByokService(
             endpoint=stored.get("byok_endpoint") or "",
             api_key=stored.get("byok_api_key") or "",
@@ -122,6 +124,7 @@ class V3App:
             is_locked=lambda: self._session_locked(), is_elevated=lambda: self._target_elevated())
         self._last_suggestion = None
         self.hud = HudController(
+            on_toggle_note=self.toggle_input_note,
             on_insert=self.request_insert,
             on_copy=self.copy_text,
             on_recover=lambda: self._notify_ui("recovery_ask"),
@@ -202,7 +205,7 @@ class V3App:
 
     def submit_delivery(self, intent: dict, bundle: dict):
         """正式网络与桌面入口共用，入队前已冻结当前版本。"""
-        return self._commands.submit(self.deliver_and_finish, dict(intent), copy.deepcopy(bundle))
+        return self._commands.submit(self.deliver_and_finish, dict(intent), self._with_input_note(copy.deepcopy(bundle)))
 
     def request_insert(self):
         """UI/热键非阻塞入口；总是返回Future，校验失败同样有明确结果。"""
@@ -339,6 +342,7 @@ class V3App:
             "TARGET_INSPECTION_TIMEOUT", "TARGET_INSPECTION_FAILED", "DELIVERY_FAILED"}:
             return payload
         try:
+            bundle = self._with_input_note(bundle)
             self.history.record(bundle, attempt_result="NO_STEPS")
             text = str(bundle.get("text") or "")
             assets = bundle.get("assets") or []
@@ -371,12 +375,14 @@ class V3App:
                 if not (current.text or current.assets):
                     raise ValueError("EMPTY_DRAFT")
                 bundle = freeze_bundle(current, bundle_id=str(uuid.uuid4()))
+                bundle['checked_text'] = current.text
                 bundle["source_text"] = self.draft.text
                 bundle["source_snapshot"] = bound
                 from doubao_typeless.core.bundle import canonical_manifest_hash
                 bundle["manifest_hash"] = canonical_manifest_hash(bundle)
             # Freeze before any focus scan; edits arriving during a scan are not
             # substituted into the user's action. Receipt binds the captured version.
+            bundle = self._with_input_note(bundle)
             self._restore_external_target()
             focus = self._read_focus()
             kind = getattr(focus, "kind", focus[6] if len(focus)>6 else "")
@@ -900,7 +906,26 @@ class V3App:
             self._notify_ui("recovery_available", progress=payload["progress"])
         return payload
 
+    def _with_input_note(self, bundle: dict) -> dict:
+        # Decorate the frozen delivery only. Source text/snapshot continue to
+        # identify the exact phone draft for rotation and restore.
+        if not bundle.get('input_note_frozen'):
+            identity = (bundle.get('draft_id'), bundle.get('epoch'), bundle.get('revision'),
+                        bundle.get('checked_text', bundle.get('source_text', bundle.get('text', ''))))
+            decorated = str(bundle.get('text') or '')
+            if identity == self.input_check_identity():
+                decorated = self.input_check.decorate(identity, decorated)
+            bundle = copy.deepcopy(bundle)
+            from doubao_typeless.core.bundle import canonical_manifest_hash, TEXT_UTF8_LIMIT
+            if len(decorated.encode('utf-8')) <= TEXT_UTF8_LIMIT:
+                bundle['text'] = decorated
+            bundle['input_note_frozen'] = True
+            bundle['manifest_hash'] = canonical_manifest_hash(bundle)
+        return bundle
+
     def deliver_and_finish(self, intent: dict, bundle: dict) -> dict:
+        if not intent.get('recovery_mode'):
+            bundle = self._with_input_note(bundle)
         # 仅收起可编辑详情以归还目标焦点，非激活HUD保持实际进度。
         self._notify_ui("delivery_start")
         self._notify_ui("hide_after_insert")
@@ -1108,8 +1133,22 @@ class V3App:
             self._save_draft()
         self._last_suggestion = None
 
+    def input_check_identity(self):
+        with self._state_lock:
+            return (self.draft.draft_id, self.draft.epoch, self.draft.revision, self.review_text())
+
+    def input_check_tick(self):
+        identity = self.input_check_identity()
+        self.input_check.observe(identity, identity[-1])
+        return self.input_check.view(identity)
+
+    def toggle_input_note(self):
+        self.input_check.toggle_note(self.input_check_identity())
+
     def copy_text(self, text: str | None = None) -> str:
         text = self.review_text() if text is None else text or ""
+        if text == self.review_text():
+            text = self.input_check.decorate(self.input_check_identity(), text)
         self._copied_text = text
         try:
             self._set_text(text)
@@ -1382,6 +1421,7 @@ class V3App:
         if not stopped:
             _log("[v3] 当前目标仍未返回，未强制结束；可稍后再退出")
             return False
+        self.input_check.close()
         await self.bridge.stop()
         from doubao_typeless.platform.windows.automation_host import close_host
         await asyncio.to_thread(close_host)

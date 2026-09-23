@@ -2,11 +2,11 @@
   "schema_version": 1,
   "product_goal": "沿用 MASTER_PLAN，保留原版插入并复制等体验，交付可实际体验的完整 Windows V3 发布前候选。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "0.5.1 fdfd829 固定候选已通过完整流水线及本地下载核验；文档提交不改变制品。",
+  "working_tree": "0.5.2 Jev输入辅助已实现，本地572项回归通过；新候选等待固定提交打包，0.5.1 fdfd829仍为上一份已核验制品。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
   "last_completed_slice": "FULL_PACKAGE_UPGRADE_AND_AUTOMATIC_RESTART",
-  "active_slice": "REAL_TARGET_AND_PHYSICAL_PHONE_ACCEPTANCE",
-  "next_action": "用户体验0.5.1 fdfd829；真实Codex/Cursor、实体手机及多屏验收仍待完成；保留0x8001010d调查项，不合并、不打tag、不公开发布。",
+  "active_slice": "JEV_INPUT_CHECK_CANDIDATE",
+  "next_action": "打包并核验0.5.2独立候选；用户配置Jev Key后实测中文判断质量与延迟；真实Codex/Cursor、实体手机及多屏验收仍待完成，不合并、不打tag、不公开发布。",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -20,7 +20,8 @@
     "用户明确操作电脑已有稿不依赖手机在线；重连回执只清理对应旧稿",
     "不自动弹出图文恢复窗口；失败可复制时提供手动粘贴退路；白板文字使用可退出的页面内编辑",
     "手机一键清空文字与图片，原稿原子备份可恢复；清空取消未发出的插入准备和旧异步结果，不撤回已贴入电脑的内容。",
-    "框架级整体替换，保留旧数据但不自动迁移；升级须完整下载校验、退出、部署并确认新版就绪，失败可恢复。"
+    "框架级整体替换，保留旧数据但不自动迁移；升级须完整下载校验、退出、部署并确认新版就绪，失败可恢复。",
+    "Jev可选疑似转写错误、歧义/缺项和语气判断；附注仅提示可能有误，不要求目标模型追问；异步检查不阻挡复制插入。"
   ],
   "implemented_this_batch": [
     "手机一键清空、原子备份、离线清空、旧回执与异步图片隔离",
@@ -79,7 +80,8 @@
     "真实 Codex/Cursor 图文插入与恢复未验收，前台许可待回复",
     "实体手机输入法/软键盘/扫码及长后台、多屏拔插未实机验收",
     "本次 browser fault 日志仍有 0x8001010d；同 PID 完成 14 场景并退出 0，保留调查项；历史偶发退出未凭现场证据确诊",
-    "独立实机验收及公开发布审批未完成"
+    "独立实机验收及公开发布审批未完成",
+    "尚未提供Jev Key；真实中文判断质量、延迟和费用未经实测。"
   ],
   "independent_review": {
     "status": "SOURCE_REVIEW_AND_UPGRADE_VALIDATION_COMPLETED_REAL_ACCEPTANCE_PENDING",

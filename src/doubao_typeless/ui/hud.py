@@ -31,12 +31,16 @@ class HudController:
         on_recover: Callable[[], None] | None = None,
         position: list | None = None,
         on_position: Callable | None = None,
+        on_toggle_note: Callable | None = None,
     ):
         self._on_insert = on_insert
         self._on_expand = on_expand
         self._on_copy = on_copy
         self._on_recover = on_recover
         self._on_position = on_position
+        self._on_toggle_note = on_toggle_note
+        self._check_row = None
+        self._check_signature = None
         self._saved_position = position
         self._user_positioned = False
         self._companions = []
@@ -211,6 +215,25 @@ class HudController:
         thumbs.hide()
         self._thumbs = thumbs
         layout.addWidget(thumbs, 0)
+        check_row = QWidget()
+        check_layout = QHBoxLayout(check_row)
+        check_layout.setContentsMargins(0, 0, 0, 0)
+        self._check_button = QPushButton('输入检查')
+        from PySide6.QtWidgets import QSizePolicy
+        self._check_button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self._check_button.setMinimumWidth(0)
+        self._check_button.setFixedHeight(32)
+        self._check_button.setObjectName('DTInputCheck')
+        self._check_button.setFocusPolicy(Qt.NoFocus)
+        self._check_button.clicked.connect(lambda: self._on_expand and self._on_expand())
+        self._note_button = QPushButton('不附说明')
+        self._note_button.setFocusPolicy(Qt.NoFocus)
+        self._note_button.clicked.connect(lambda: self._on_toggle_note and self._on_toggle_note())
+        check_layout.addWidget(self._check_button, 1)
+        check_layout.addWidget(self._note_button)
+        self._check_row = check_row
+        check_row.hide()
+        layout.addWidget(check_row)
         layout.addWidget(bar, 0)
         self._bar = bar
         w.hide()
@@ -449,6 +472,26 @@ class HudController:
             pass
         return max(TOKENS["min_text_h"], max_h)
 
+    def set_input_check(self, result):
+        if self._check_row is None:return
+        from doubao_typeless.services.input_check import presentation
+        summary, details = presentation(result)
+        signature = (summary, details, result.get('note'), result.get('suppressed'))
+        if signature == self._check_signature:return
+        self._check_signature = signature
+        from PySide6.QtCore import Qt
+        available = 235 if result.get('note') or result.get('suppressed') else 330
+        self._check_button.setText(self._check_button.fontMetrics().elidedText(summary, Qt.ElideRight, available))
+        import html
+        self._check_button.setToolTip(html.escape(details).replace('\n', '<br>'))
+        self._note_button.setVisible(bool(result.get('note') or result.get('suppressed')))
+        self._note_button.setText('附上说明' if result.get('suppressed') else '不附说明')
+        was_visible = not self._check_row.isHidden()
+        self._check_row.setVisible(bool(summary))
+        if self._widget.isVisible() and was_visible != bool(summary):
+            self._widget.resize(self._widget.width(), min(self._max_height(), self._widget.height()+(40 if summary else -40)))
+        # Never reopen, steal focus, reset idle or rewrite the body on response.
+
     def _chrome_height(self) -> int:
         status_h = self._status.sizeHint().height() if getattr(self, "_status", None) else 18
         bar_h = self._bar.height() if getattr(self, "_bar", None) is not None else 40
@@ -462,7 +505,8 @@ class HudController:
                 spacing = max(layout.spacing(), 0) * 2
         except Exception:
             pass
-        return status_h + bar_h + margins + spacing + (68 if self.assets else 0)
+        check_h = 40 if self._check_row is not None and not self._check_row.isHidden() else 0
+        return status_h + bar_h + margins + spacing + (68 if self.assets else 0) + check_h
 
     def _text_height(self, text: str) -> int:
         try:

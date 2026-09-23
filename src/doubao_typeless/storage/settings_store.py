@@ -37,11 +37,16 @@ def load_settings(data_dir: Path) -> dict[str, Any]:
         "byok_temperature": "",
         "byok_timeout": "",
         "byok_prompt": "",
+        "jev_enabled": False,
+        "jev_api_key": "",
+        "jev_emotion": True,
+        "jev_voice_note": False,
     }
     path = settings_path(data_dir)
     if not path.is_file():
         out = dict(defaults)
         out["byok_api_key"] = get_secret(data_dir, "byok_api_key")
+        out["jev_api_key"] = get_secret(data_dir, "jev_api_key")
         return out
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -76,18 +81,26 @@ def load_settings(data_dir: Path) -> dict[str, Any]:
         stored_key = file_key
         _rewrite_without_secrets(path, data)
     out["byok_api_key"] = stored_key
+    out["jev_api_key"] = get_secret(data_dir, "jev_api_key")
+    if data.get('jev_api_key'):
+        if not out['jev_api_key']:
+            put_secret(data_dir, 'jev_api_key', str(data['jev_api_key']))
+            out['jev_api_key'] = str(data['jev_api_key'])
+        _rewrite_without_secrets(path, data)
     return out
 
 
 def _rewrite_without_secrets(path: Path, data: dict[str, Any]) -> None:
     cleaned = dict(data)
     cleaned["byok_api_key"] = ""
+    cleaned["jev_api_key"] = ""
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(cleaned, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     tmp.replace(path)
 
 
 ALLOWED = {
+    "jev_enabled", "jev_api_key", "jev_emotion", "jev_voice_note",
     "hud_position",
     "byok_endpoint",
     "byok_api_key",
@@ -119,8 +132,10 @@ def save_settings(data_dir: Path, payload: dict[str, Any]) -> None:
     if endpoint_authority(previous_endpoint) != endpoint_authority(new_endpoint) and new_key == previous_key:
         current["byok_api_key"] = ""
     put_secret(data_dir, "byok_api_key", str(current.get("byok_api_key") or ""))
+    put_secret(data_dir, "jev_api_key", str(current.get("jev_api_key") or ""))
     on_disk = dict(current)
     on_disk["byok_api_key"] = ""
+    on_disk["jev_api_key"] = ""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(on_disk, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

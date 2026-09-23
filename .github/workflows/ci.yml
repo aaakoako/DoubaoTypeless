@@ -18,6 +18,7 @@ jobs:
       QT_QPA_PLATFORM: offscreen
       PYTHONIOENCODING: utf-8
       DT_UI_EVIDENCE_DIR: ui-evidence
+      DT_JEV_UI_EVIDENCE_DIR: ui-evidence/jev
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

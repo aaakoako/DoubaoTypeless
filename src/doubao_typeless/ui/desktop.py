@@ -189,8 +189,12 @@ class ReviewPanel:
         self.image_row = QHBoxLayout()
         layout.addLayout(self.image_row)
         self.editor = QPlainTextEdit()
+        self.editor.setMinimumHeight(110)
         self.editor.textChanged.connect(self._mark_editing)
         layout.addWidget(self.editor, 1)
+        from doubao_typeless.ui.input_check import InputCheckDetails
+        self.input_check_details = InputCheckDetails(self.app, w)
+        layout.addWidget(self.input_check_details)
         row = QHBoxLayout()
         use_phone = QPushButton("采用手机版")
         use_phone.setObjectName("ghost")
@@ -664,6 +668,8 @@ class ClientWindow:
         self.byok_status.setObjectName("muted")
         self.byok_status.setWordWrap(True)
         sl.addRow(self.byok_status)
+        from doubao_typeless.ui.input_check import InputCheckSettings
+        self.jev_settings = InputCheckSettings(sl, stored, w)
         sl.addRow(QLabel("词库（仅本预览目录，一行 错词 -> 正确）"))
         self.vocab = QPlainTextEdit()
         self.vocab.setPlainText(load_vocab(app.data_dir))
@@ -763,6 +769,10 @@ class ClientWindow:
         self.timer = QTimer(w)
         self.timer.timeout.connect(self._tick_countdown)
         self.timer.start(1000)
+        self.input_check_timer = QTimer(w)
+        self.input_check_timer.setInterval(200)
+        self.input_check_timer.timeout.connect(lambda: self.app.hud.set_input_check(self.app.input_check_tick()))
+        self.input_check_timer.start()
         self.refresh()
 
     def _apply_provider(self, index: int) -> None:
@@ -1098,10 +1108,12 @@ class ClientWindow:
             "byok_temperature": self.byok_temperature.text().strip(),
             "byok_timeout": self.byok_timeout.text().strip(),
             "device_nicknames": nicks,
+            **self.jev_settings.values(),
         }
         save_settings(self.app.data_dir, payload)
         save_vocab(self.app.data_dir, self.vocab.toPlainText())
         stored = load_settings(self.app.data_dir)
+        self.app.input_check.configure(stored)
         self.app.byok.endpoint = stored["byok_endpoint"]
         self.app.byok.api_key = stored["byok_api_key"]
         self.app.byok.model = stored["byok_model"]
