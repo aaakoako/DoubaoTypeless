@@ -2,11 +2,11 @@
   "schema_version": 1,
   "product_goal": "0.5.0 正式发行已交付，后续以已发布版本收集真实环境反馈。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "正式源码aac1e51（与验证候选29a32ff同树）已发布v0.5.0；本次仅更新发行记录，不修改产品代码。",
+  "working_tree": "0.5.0短暂发布后因GitHub依赖扫描发现27项依赖告警撤回草稿，公开latest已恢复0.4.2；正在升级aiohttp/Pillow并验证0.5.1，不重写v0.5.0标签。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
   "last_completed_slice": "STABLE_0_5_0_PUBLISHED",
-  "active_slice": "RELEASED_0_5_0",
-  "next_action": "收集0.5.0真实手机输入法、Cursor及多屏反馈，按具体问题修复后续版本；不要重复发布0.5.0。",
+  "active_slice": "SECURITY_CORRECTION_0_5_1",
+  "next_action": "在正式运行依赖更新到aiohttp3.14.3/Pillow12.3.0后跑全量、依赖审计和完整发行验证，发布0.5.1修订版。",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -83,8 +83,8 @@
     "document": "docs/v3-delivery/RELEASE_0_5_0_PUBLISHED.md",
     "real_devices_reviewed": false
   },
-  "published": true,
-  "task_complete": true,
+  "published": false,
+  "task_complete": false,
   "integration_20260922": {
     "branch": "v3/integrated-preview-20260922",
     "base": "b32d2d536937d0fcad2c0e2ea76742d60fa47c42",
@@ -290,6 +290,8 @@
     },
     "files_verified": 267,
     "upgrade_exe_sha256": "bc2e171e73180e419f02c0ffeb0b4fe88dabc59d31807a1c87e233eb29b09314",
-    "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.0"
+    "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.0",
+    "withdrawn": true,
+    "withdrawal_reason": "Dependency advisories discovered after publication; latest reverted to v0.4.2; preserve tag history."
   }
 }
