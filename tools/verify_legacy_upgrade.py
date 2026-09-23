@@ -118,8 +118,20 @@ def verify(package, report):
             assert dialog,'Published 0.4.2 did not offer the fixture release'
             before_config=(old/'config.json').read_bytes();before_dictionary=dictionary.read_bytes()
             button=win32gui.GetDlgItem(dialog,6);assert button,'Missing native Yes button'
-            rect=win32gui.GetWindowRect(button);point=((rect[0]+rect[2])//2,(rect[1]+rect[3])//2)
-            win32gui.SetForegroundWindow(dialog);mouse=Controller();mouse.position=point;mouse.click(Button.left)
+            win32gui.SetForegroundWindow(dialog)
+            mouse=Controller();deadline=time.monotonic()+5;last=None
+            while time.monotonic()<deadline:
+                rect=win32gui.GetWindowRect(button)
+                point=((rect[0]+rect[2])//2,(rect[1]+rect[3])//2)
+                hit=win32gui.WindowFromPoint(point)
+                visible=win32gui.IsWindowVisible(button) and win32gui.IsWindowEnabled(button)
+                if visible and hit==button and rect==last and win32gui.GetForegroundWindow()==dialog:
+                    mouse.position=point;mouse.click(Button.left);break
+                last=rect;time.sleep(.1)
+            else:raise AssertionError('Legacy Yes button not stably visible and unobstructed')
+            deadline=time.monotonic()+5
+            while win32gui.IsWindow(dialog) and time.monotonic()<deadline:time.sleep(.1)
+            assert not win32gui.IsWindow(dialog),'Legacy confirmation did not close after physical click'
             result['native_update_confirmation_clicked']=True
             child.wait(timeout=50);result['old_process_exited']=True
             deadline=time.monotonic()+100
@@ -153,7 +165,12 @@ def verify(package, report):
             result['repeated_old_entry_forwards']=True
             ImageGrab.grab().save(report.parent/'legacy-upgrade-complete.png')
             result['passed']=True
+        except Exception as exc:
+            result.update(error_type=type(exc).__name__,error=str(exc))
+            ImageGrab.grab().save(report.parent/'legacy-upgrade-failed.png')
+            raise
         finally:
+            result['proxy_requests']=proxy.calls
             proxy.close()
             for name in ('update.log','debug.log'):
                 if (old/name).exists():shutil.copy2(old/name,report.parent/('legacy-'+name))
@@ -161,6 +178,23 @@ def verify(package, report):
             if new_exe:
                 subprocess.run([str(new_exe),'--quit'],env=env,timeout=20)
                 time.sleep(2)
+            # PyInstaller's outer process owns another process. On failure, stop
+            # only executables under this unique disposable test root, including
+            # the inner child, so cleanup never conceals the original exception.
+            import win32event
+            for _ in range(2):
+                for pid in win32process.EnumProcesses():
+                    handle=None
+                    try:
+                        handle=win32api.OpenProcess(win32con.PROCESS_QUERY_INFORMATION|win32con.PROCESS_VM_READ|
+                                                   win32con.PROCESS_TERMINATE|win32con.SYNCHRONIZE,False,pid)
+                        executable=Path(win32process.GetModuleFileNameEx(handle,0)).resolve()
+                        if executable.is_relative_to(root.resolve()):
+                            win32api.TerminateProcess(handle,1);win32event.WaitForSingleObject(handle,5000)
+                    except Exception:pass
+                    finally:
+                        if handle:handle.Close()
+                time.sleep(.2)
             if child.poll() is None:child.terminate();child.wait(10)
             if (install/'Uninstall.exe').exists():
                 subprocess.run([str(install/'Uninstall.exe'),'/S','_?='+str(install)],timeout=60)
