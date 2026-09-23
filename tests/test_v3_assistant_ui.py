@@ -68,6 +68,19 @@ def test_late_document_layout_follows_tail_but_keeps_manual_reading(hud):
     assert bar.value() == 20
 
 
+def test_cursor_visibility_after_range_change_does_not_leave_tail_margin(hud):
+    hud.show_receiving('长文内容\n'*80);QTest.qWait(30)
+    bar=hud._body.verticalScrollBar()
+    hud._body.document().setDocumentMargin(22)
+    # Windows QTextEdit may scroll to the final cursor before its bottom margin
+    # after notifying rangeChanged. Model that ordering, not a longer deadline.
+    bar.setValue(bar.maximum()-4);QTest.qWait(20)
+    assert bar.value()==bar.maximum()
+    hud._body.document().setDocumentMargin(30)
+    bar.setValue(20);QTest.qWait(20)
+    assert bar.value()==20, 'queued tail correction interrupted manual reading'
+
+
 def test_hud_shrinks_for_next_short_draft(hud):
     hud.show_receiving('long line '*400);QTest.qWait(20)
     old=hud._widget.height()

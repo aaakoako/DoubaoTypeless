@@ -565,7 +565,15 @@ class HudController:
             return
         bar = self._body.verticalScrollBar()
         if not bar.isSliderDown():
-            bar.setValue(maximum)
+            # QTextEdit can ensure the cursor is visible *after* rangeChanged,
+            # leaving the document's bottom margin below the viewport. Settle
+            # after that layout turn and recheck the user's current reading state.
+            from PySide6.QtCore import QTimer
+            def settle():
+                if (self._widget.isVisible() and self._follow_tail and not self._updating
+                        and not bar.isSliderDown() and not self._body.textCursor().hasSelection()):
+                    bar.setValue(bar.maximum())
+            QTimer.singleShot(0,self._widget,settle)
 
     def _scroll_changed(self, _value=0):
         if self._updating:
