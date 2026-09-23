@@ -205,6 +205,19 @@ async def exercise(child,data,result,report):
                 await target.goto(target_url)
                 phone=await phone_browser.new_page(viewport={'width':430,'height':850})
                 errors=[];phone.on('pageerror',lambda e:errors.append(str(e)))
+                pending_phone_requests = {}
+                phone_failures = []
+                phone_lifecycle = {'domcontentloaded': 0, 'load': 0}
+                phone.on('request', lambda r: pending_phone_requests.update(
+                    {r: {'method': r.method, 'path': urlparse(r.url).path, 'resource': r.resource_type}}))
+                phone.on('requestfinished', lambda r: pending_phone_requests.pop(r, None))
+                def request_failed(request):
+                    pending_phone_requests.pop(request, None)
+                    phone_failures.append({'path': urlparse(request.url).path,
+                        'failure': (request.failure or '').split(' ', 1)[0][:80]})
+                phone.on('requestfailed', request_failed)
+                for event in phone_lifecycle:
+                    phone.on(event, lambda name=event: phone_lifecycle.update({name: phone_lifecycle[name]+1}))
                 await phone.goto(base+'/?pair='+code)
                 await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
                 async with ClientSession() as http:
@@ -507,7 +520,20 @@ async def exercise(child,data,result,report):
                 await target.screenshot(path=str(report.with_suffix('.png')))
             except Exception:
                 # 只收集合成测试输入，保留真实DOM/剪贴板事件与可见错误，不重放插入。
+                result['pending_phone_requests'] = list(pending_phone_requests.values())[-20:]
+                result['phone_request_failures'] = phone_failures[-20:]
+                result['phone_lifecycle'] = phone_lifecycle
                 try:
+                    async with ClientSession() as http:
+                        async with http.get(base+'/v3/status', timeout=2) as response:
+                            result['bridge_http_status_at_failure'] = response.status
+                except Exception as health_error:
+                    result['bridge_health_error_type'] = type(health_error).__name__
+                try:
+                    result['phone_state'] = await phone.evaluate("""() => ({
+                        ready: document.readyState, editor: document.querySelector('#editor')?.classList.contains('show'),
+                        transfer: document.querySelector('#transferStatus')?.textContent,
+                        attachments: document.querySelectorAll('.attach-card').length})""")
                     result['observed']=await target.evaluate('''() => ({
                         active:document.activeElement?.id,
                         inputs:[...document.querySelectorAll('textarea,[contenteditable]')].map(e=>({
