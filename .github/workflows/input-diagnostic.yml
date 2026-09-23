@@ -1,0 +1,29 @@
+name: Windows injection marker diagnostic
+on:
+  push:
+    branches: [diagnostics/upgrade-fixture-20260924]
+permissions:
+  contents: read
+jobs:
+  marker:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: diagnostic
+      - uses: actions/checkout@v4
+        with:
+          ref: 23d2b7d71e65c3fe882454e27370c50950114d4e
+          path: production
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+      # stdlib only; never runs on the user's desktop.
+      - run: python diagnostic/tools/diagnose_input_markers.py --source production --report evidence/input-markers.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: input-markers-${{ github.sha }}
+          path: evidence/*.json
