@@ -200,14 +200,14 @@ async def exercise(child,data,result,report):
         async with async_playwright() as pw:
             browser=await pw.chromium.launch(headless=False,args=['--force-renderer-accessibility'])
             phone_browser=await pw.chromium.launch()
+            pending_phone_requests = {}
+            phone_failures = []
+            phone_lifecycle = {'domcontentloaded': 0, 'load': 0}
             try:
                 target=await browser.new_page(viewport={'width':1100,'height':850})
                 await target.goto(target_url)
                 phone=await phone_browser.new_page(viewport={'width':430,'height':850})
                 errors=[];phone.on('pageerror',lambda e:errors.append(str(e)))
-                pending_phone_requests = {}
-                phone_failures = []
-                phone_lifecycle = {'domcontentloaded': 0, 'load': 0}
                 phone.on('request', lambda r: pending_phone_requests.update(
                     {r: {'method': r.method, 'path': urlparse(r.url).path, 'resource': r.resource_type}}))
                 phone.on('requestfinished', lambda r: pending_phone_requests.pop(r, None))
