@@ -58,8 +58,7 @@ jobs:
         if: ${{ !cancelled() && hashFiles('installer-test/*_Setup.exe') != '' }}
         shell: pwsh
         run: |
-          $package = (Get-ChildItem installer-test/*_Setup.exe).FullName
-          python tools/verify_legacy_upgrade.py "$package" --report evidence/legacy-upgrade.json
+          python tools/verify_legacy_upgrade.py dist/DoubaoTypeless --compiler "${{ runner.temp }}/nsis/nsis-3.12/makensis.exe" --report evidence/legacy-upgrade.json
         timeout-minutes: 6
       - run: python tools/verify_candidate_browser.py dist/DoubaoTypeless/DoubaoTypeless.exe --report evidence/browser.json
         if: ${{ !cancelled() && hashFiles('dist/DoubaoTypeless/DoubaoTypeless.exe') != '' }}

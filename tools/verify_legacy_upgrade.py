@@ -68,7 +68,7 @@ class ReleaseProxy:
     def close(self):self.server.shutdown();self.server.server_close();self.thread.join()
 
 
-def verify(package, report):
+def verify(payload, compiler, report):
     if sys.platform!='win32' or os.environ.get('GITHUB_ACTIONS')!='true' or os.environ.get('RUNNER_ENVIRONMENT')!='github-hosted':
         raise RuntimeError('Published legacy GUI test requires disposable GitHub-hosted Windows; never occupy the user desktop')
     import win32gui,win32process,win32api,win32con,winreg
@@ -94,12 +94,21 @@ def verify(package, report):
         (old/'config.json').write_text(json.dumps(config),encoding='utf-8');(old/'data').mkdir()
         dictionary=old/'data/dictionary.txt';dictionary.write_text('legacy fixture -> kept\n',encoding='utf-8')
         (data/'settings.json').write_text(json.dumps({k:'<smoke-disabled>' for k in ('hotkey_insert','hotkey_recall','hotkey_expand','hotkey_capture')}),encoding='utf-8')
-        # The test installer name carries the target version; the runtime report verifies source identity.
-        version=package.name.split('_')[1]
+        info=json.loads((payload/'_internal/build-info.json').read_text(encoding='utf-8'))
+        version=info['version'];pipe='DT-LegacyUpgrade-'+uuid.uuid4().hex
+        package=root/f'DoubaoTypeless_{version}_legacy-test_Setup.exe'
+        # Scheduler launches do not inherit the test process environment. These
+        # compile-time overrides only exist in the TEST_INSTALL namespace.
+        subprocess.run([str(compiler),'/INPUTCHARSET','UTF8',f'/DVERSION={version}',
+            f'/DBUILD_ID={version}-{info["source_sha"][:8]}',f'/DSOURCE_SHA={info["source_sha"]}',
+            f'/DPAYLOAD={payload}',f'/DOUTPUT={package}','/DTEST_INSTALL',
+            f'/DTEST_INSTALL_ROOT={install}',f'/DTEST_INSTALL_DATA={data}',f'/DTEST_INSTALL_PIPE={pipe}',
+            str(Path(__file__).resolve().parents[1]/'packaging/windows-installer.nsi')],
+            check=True,stdout=subprocess.DEVNULL,timeout=180)
         proxy=ReleaseProxy(root,package,version)
         env={**os.environ,'HTTPS_PROXY':proxy.url,'HTTP_PROXY':proxy.url,'NO_PROXY':'127.0.0.1,localhost',
              'SSL_CERT_FILE':str(proxy.cert),'DT_GITHUB_MIRROR':'0','DT_V3_DATA_DIR':str(data),
-             'DT_V3_PIPE':'DT-LegacyUpgrade-'+uuid.uuid4().hex,'DT_UPGRADE_TEST_ROOT':str(install)}
+             'DT_V3_PIPE':pipe,'DT_UPGRADE_TEST_ROOT':str(install)}
         env.pop('DT_SKIP_AUTO_UPDATE_CHECK',None);env.pop('QT_QPA_PLATFORM',None)
         child=subprocess.Popen([str(original)],cwd=old,env=env)
         new_exe=None
@@ -202,5 +211,6 @@ def verify(package, report):
     return result
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('package',type=Path);p.add_argument('--report',type=Path,required=True)
-    args=p.parse_args();verify(args.package.resolve(),args.report.resolve())
+    p=argparse.ArgumentParser();p.add_argument('payload',type=Path)
+    p.add_argument('--compiler',type=Path,required=True);p.add_argument('--report',type=Path,required=True)
+    args=p.parse_args();verify(args.payload.resolve(),args.compiler.resolve(),args.report.resolve())

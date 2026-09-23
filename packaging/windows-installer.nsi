@@ -57,6 +57,13 @@ VIAddVersionKey "LegalCopyright" "DoubaoTypeless contributors"
 
 Function .onInit
 !ifdef TEST_INSTALL
+  # Published legacy updaters may use Task Scheduler, which discards inherited
+  # environment. Compile-only fixture paths keep that route isolated as well.
+!ifdef TEST_INSTALL_ROOT
+  StrCpy $INSTDIR "${TEST_INSTALL_ROOT}"
+  System::Call 'kernel32::SetEnvironmentVariableW(w "DT_V3_DATA_DIR", w "${TEST_INSTALL_DATA}")'
+  System::Call 'kernel32::SetEnvironmentVariableW(w "DT_V3_PIPE", w "${TEST_INSTALL_PIPE}")'
+!endif
   ReadEnvStr $0 DT_UPGRADE_TEST_ROOT
   ${If} $0 != ""
     StrCpy $INSTDIR $0
