@@ -10,7 +10,10 @@ import secrets
 import sys
 import threading
 
-INJECTION_MARKER = secrets.randbits(ctypes.sizeof(ctypes.c_void_p) * 8) or 1
+# Windows mouse injection can truncate extraInfo to 32 bits even in a 64-bit
+# process (native diagnostic 35908543979). Use a nonzero shared-width tag; do
+# not mask arbitrary external tags during comparison.
+INJECTION_MARKER = secrets.randbits(31) or 1
 
 
 def is_external_input(extra_info: int, injected: bool) -> bool:
