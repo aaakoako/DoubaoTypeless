@@ -2,11 +2,11 @@
   "schema_version": 1,
   "product_goal": "沿用 MASTER_PLAN，保留原版插入并复制等体验，交付可实际体验的完整 Windows V3 发布前候选。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "正在实现0.5.1完整升级；已交付b69f7bc仍是旧候选，不能混淆身份。",
+  "working_tree": "0.5.1 fdfd829 固定候选已通过完整流水线及本地下载核验；文档提交不改变制品。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
-  "last_completed_slice": "CODEX_SEQUENTIAL_PASTE_AND_PHONE_CLEAR",
-  "active_slice": "FULL_PACKAGE_UPGRADE_AND_AUTOMATIC_RESTART",
-  "next_action": "跑固定源全量回归与发布流水线，含原生失败恢复与官方0.4.2确认/下载/退出/替换/自动重启；用户已取消旧配置自动迁移前提。下载核验新候选，不发布。",
+  "last_completed_slice": "FULL_PACKAGE_UPGRADE_AND_AUTOMATIC_RESTART",
+  "active_slice": "REAL_TARGET_AND_PHYSICAL_PHONE_ACCEPTANCE",
+  "next_action": "用户体验0.5.1 fdfd829；真实Codex/Cursor、实体手机及多屏验收仍待完成；保留0x8001010d调查项，不合并、不打tag、不公开发布。",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -25,45 +25,52 @@
   "implemented_this_batch": [
     "手机一键清空、原子备份、离线清空、旧回执与异步图片隔离",
     "图片接收未知时继续正文；观察失败不取消粘贴，保持焦点保护和真实证据级别",
-    "9个正式页面清空回归、慢上传原生验证场景替换旧暂停契约"
+    "9个正式页面清空回归、慢上传原生验证场景替换旧暂停契约",
+    "完整原生升级入口，兼容0.4.2普通及计划任务启动；新版本校验下载与就绪确认",
+    "失败恢复、便携入口备份替换、重复旧入口转到同一新版进程",
+    "修复图片延迟聚焦附件时正文中止，复用原有受限焦点恢复，不等待上传完成"
   ],
   "last_commands": [
     {
       "cmd": "Fixed-source CI and release validation",
       "exit_code": 0,
-      "output": "Windows 525 passed; Linux 519 passed, 6 skipped; 18 evidence checks; TypeScript/Vite passed"
+      "output": "Windows 553 passed; Linux 544 passed, 9 skipped; 18 evidence checks; TypeScript/Vite passed"
     },
     {
-      "cmd": "Frozen native and installer validation",
+      "cmd": "Frozen/native/installer/published-0.4.2 upgrade",
       "exit_code": 0,
-      "output": "Five reports passed; 14 native browser cases including text before 15-second upload completes; insertion Enter 0; exit 0"
+      "output": "Seven reports passed; 14 native browser cases; official 0.4.2 download/exit/replace/restart/data preservation/old entry forwarding passed with controlled TLS release server"
     },
     {
-      "cmd": "Full downloaded candidate audit",
+      "cmd": "Downloaded candidate audit",
       "exit_code": 0,
-      "output": "264 files verified; setup/zip/executable hashes match; artifact 10707185260"
+      "output": "264 files and all package hashes/build identity verified; artifact 10753256869"
     }
   ],
   "cloud_evidence": {
-    "run_id": 35751219901,
-    "source_sha": "b69f7bc5a3f189f01339468202a3beebcd64f54a",
+    "run_id": 35866724399,
+    "ci_run_id": 35866732872,
+    "source_sha": "fdfd829bfe7dd9113f6952fd08a5bde3fca98e60",
     "conclusion": "success",
     "native_browser_cases": 14,
     "actual_screen_capture": true,
     "actual_codex_tested": false,
     "actual_cursor_tested": false,
     "actual_android_ime_tested": false,
-    "target_type": "independent Chromium test webpage"
+    "target_type": "independent Chromium test webpage",
+    "published_0_4_2_upgrade_tested": true,
+    "release_server": "local TLS fixture, child-only trust"
   },
   "candidate_artifact": {
-    "artifact_id": 10707185260,
-    "source_sha": "b69f7bc5a3f189f01339468202a3beebcd64f54a",
-    "version": "0.5.0",
+    "artifact_id": 10753256869,
+    "source_sha": "fdfd829bfe7dd9113f6952fd08a5bde3fca98e60",
+    "version": "0.5.1",
     "channel": "release-candidate",
-    "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.0-RC-b69f7bc",
-    "setup_sha256": "ddd72ce90f0dbe97fc5d559635c19c8830182994176d720664d1639b30456f8d",
-    "zip_sha256": "9d4b64f149a74009f250044d4d4f1d714f1467e8371c35286660df2848cc27c7",
-    "exe_sha256": "731fd3b50cc8921a94fa0ba1752ab9e48c5acccc2edab24755190cdb236cb9ae",
+    "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.1-RC-fdfd829",
+    "setup_sha256": "d57ceafcd482787a8e164183da7f99ababed09562ef4e5fd6581df3ce1eeb991",
+    "upgrade_exe_sha256": "d57ceafcd482787a8e164183da7f99ababed09562ef4e5fd6581df3ce1eeb991",
+    "zip_sha256": "84e9decb60cb3383b69e04356cbfaabdafc3082f2514d8b7f280936d0f4b997f",
+    "exe_sha256": "9a81e6c9216818e0393216a9f1a872e1ef4d2c003644b466d3d78de21759ca65",
     "files_verified": 264,
     "verified_after_download": true,
     "release_ready": false
@@ -75,9 +82,9 @@
     "独立实机验收及公开发布审批未完成"
   ],
   "independent_review": {
-    "status": "SOURCE_REVIEW_COMPLETED_REAL_ACCEPTANCE_PENDING",
+    "status": "SOURCE_REVIEW_AND_UPGRADE_VALIDATION_COMPLETED_REAL_ACCEPTANCE_PENDING",
     "release_ready": false,
-    "document": "docs/v3-delivery/RELEASE_0_5_0_ACCEPTANCE.md"
+    "document": "docs/v3-delivery/RELEASE_0_5_1_ACCEPTANCE.md"
   },
   "published": false,
   "task_complete": false,
@@ -198,5 +205,46 @@
       "verified_after_download": true,
       "original_zip_preserved": true
     }
+  },
+  "prior_0_5_0_candidate": {
+    "artifact": {
+      "artifact_id": 10707185260,
+      "source_sha": "b69f7bc5a3f189f01339468202a3beebcd64f54a",
+      "version": "0.5.0",
+      "channel": "release-candidate",
+      "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.0-RC-b69f7bc",
+      "setup_sha256": "ddd72ce90f0dbe97fc5d559635c19c8830182994176d720664d1639b30456f8d",
+      "zip_sha256": "9d4b64f149a74009f250044d4d4f1d714f1467e8371c35286660df2848cc27c7",
+      "exe_sha256": "731fd3b50cc8921a94fa0ba1752ab9e48c5acccc2edab24755190cdb236cb9ae",
+      "files_verified": 264,
+      "verified_after_download": true,
+      "release_ready": false
+    },
+    "cloud_evidence": {
+      "run_id": 35751219901,
+      "source_sha": "b69f7bc5a3f189f01339468202a3beebcd64f54a",
+      "conclusion": "success",
+      "native_browser_cases": 14,
+      "actual_screen_capture": true,
+      "actual_codex_tested": false,
+      "actual_cursor_tested": false,
+      "actual_android_ime_tested": false,
+      "target_type": "independent Chromium test webpage"
+    }
+  },
+  "upgrade_0_5_1": {
+    "status": "candidate_verified",
+    "document": "docs/v3-delivery/RELEASE_0_5_1_ACCEPTANCE.md",
+    "legacy_data_migration": false,
+    "published_legacy_exe_sha256": "e7108e29bc4deb0ab85b28b57605c9ff154031f66303ef1ca508bde1a1304240",
+    "native_reports": [
+      "startup",
+      "text",
+      "phone-primary",
+      "browser",
+      "installer",
+      "upgrade-failures",
+      "legacy-upgrade"
+    ]
   }
 }
