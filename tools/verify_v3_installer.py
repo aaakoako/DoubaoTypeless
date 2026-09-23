@@ -42,7 +42,9 @@ def verify(directory, payload, compiler, report):
         settings['byok_model']='upgrade-kept-model'
         (data/'settings.json').write_text(json.dumps(settings),encoding='utf-8')
         before={str(p.relative_to(data)):hashlib.sha256(p.read_bytes()).hexdigest() for p in data.rglob('*') if p.is_file()}
-        previous=root/'previous-test.exe'
+        # This fixture exercises ordinary setup, not the renamed legacy updater
+        # entry; the latter now intentionally triggers automatic launch.
+        previous=root/'previous-test_Setup.exe'
         subprocess.run([str(compiler.resolve()),'/INPUTCHARSET','UTF8','/DVERSION=0.4.9',
             f'/DPAYLOAD={payload.resolve()}',f'/DOUTPUT={previous}','/DTEST_INSTALL',
             str(ROOT/'packaging/windows-installer.nsi')],check=True,stdout=subprocess.DEVNULL)
