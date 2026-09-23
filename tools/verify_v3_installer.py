@@ -54,7 +54,7 @@ def verify(directory, payload, compiler, report):
             assert (install/'versions/0.4.9/DoubaoTypeless.exe').is_file()
             execute(installers[0].resolve(),'/S',f'/D={install}')
             info=json.loads((payload/'_internal/build-info.json').read_text())
-            exe=install/'versions'/info['version']/'DoubaoTypeless.exe'
+            exe=install/'versions'/(info['version']+'-'+info['source_sha'][:8])/'DoubaoTypeless.exe'
             assert exe.is_file() and (install/'versions/0.4.9/DoubaoTypeless.exe').is_file()
             result['previous_program_retained']=True
             result['installed_runtime']=smoke(exe,data,existing_data=True)
@@ -69,7 +69,7 @@ def verify(directory, payload, compiler, report):
             execute(install/'Uninstall.exe','/S',f'_?={install}')
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER,TEST_KEY) as key:
                 assert winreg.QueryValueEx(key,'InstallDir')[0]==str(newer)
-            newer_exe=newer/'versions'/info['version']/'DoubaoTypeless.exe'
+            newer_exe=newer/'versions'/(info['version']+'-'+info['source_sha'][:8])/'DoubaoTypeless.exe'
             assert newer_exe.is_file()
             with newer_exe.open('rb'):
                 locked=subprocess.run([str(newer/'Uninstall.exe'),'/S',f'_?={newer}'],timeout=120,creationflags=subprocess.CREATE_NO_WINDOW)

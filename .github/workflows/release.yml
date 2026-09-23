@@ -52,6 +52,14 @@ jobs:
       - run: python tools/package_v3_release.py dist/DoubaoTypeless --output release --compiler "${{ runner.temp }}/nsis/nsis-3.12/makensis.exe"
       - run: python tools/package_v3_release.py dist/DoubaoTypeless --output installer-test --compiler "${{ runner.temp }}/nsis/nsis-3.12/makensis.exe" --test-install
       - run: python tools/verify_v3_installer.py installer-test --payload dist/DoubaoTypeless --compiler "${{ runner.temp }}/nsis/nsis-3.12/makensis.exe" --report evidence/installer.json
+      - run: python tools/verify_upgrade_failure.py --compiler "${{ runner.temp }}/nsis/nsis-3.12/makensis.exe" --report evidence/upgrade-failures.json
+      - run: python -m pip install cryptography==46.0.7
+      - name: Published 0.4.2 full upgrade and restart
+        shell: pwsh
+        run: |
+          $package = (Get-ChildItem installer-test/*_Setup.exe).FullName
+          python tools/verify_legacy_upgrade.py "$package" --report evidence/legacy-upgrade.json
+        timeout-minutes: 6
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -699,7 +699,16 @@ class ClientWindow:
             from doubao_typeless.services.v3_update import DOWNLOAD_PAGE
             webbrowser.open(DOWNLOAD_PAGE)
         self.update_download.clicked.connect(open_download)
+        self.update_install = QPushButton("下载并重启更新")
+        self.update_install.setObjectName("primary")
+        self.update_install.hide()
+        self.update_install.clicked.connect(self.install_update)
+        self.update_cancel = QPushButton("取消下载")
+        self.update_cancel.hide()
+        self.update_cancel.clicked.connect(lambda: self._update_cancel.set())
         sl.addRow(self.update_status)
+        sl.addRow(self.update_install)
+        sl.addRow(self.update_cancel)
         sl.addRow(self.update_download)
         save = QPushButton("保存设置")
         save.setObjectName("primary")
@@ -805,7 +814,7 @@ class ClientWindow:
         if not self.update_button.isEnabled(): return
         self.update_button.setEnabled(False)
         self.update_status.setText("正在查询正式版本…")
-        self.update_status.show(); self.update_download.hide()
+        self.update_status.show(); self.update_download.hide(); self.update_install.hide()
         def work():
             def get_json(url):
                 import httpx
@@ -815,11 +824,69 @@ class ClientWindow:
             info = check_preview_update(get_json=get_json)
             def apply():
                 self.update_status.setText(info['message'])
+                self._update_package = info.get('package')
+                self.update_install.setVisible(bool(self._update_package))
                 self.update_download.show()
                 self.update_button.setEnabled(True)
             try: QTimer.singleShot(0, self.widget, apply)
             except RuntimeError: pass
         threading.Thread(target=work, daemon=True).start()
+
+    def install_update(self) -> None:
+        import threading
+        from PySide6.QtCore import QTimer
+        from PySide6.QtWidgets import QMessageBox
+        from doubao_typeless.services.v3_update import download_upgrade, start_upgrade
+        from doubao_typeless.ui.single_instance import pipe_name
+        package = getattr(self, '_update_package', None)
+        if not package or getattr(self, '_updating', False):return
+        if QMessageBox.question(self.widget, '更新 DoubaoTypeless',
+                f"下载并更新到 {package['version']}？下载完成后程序会正常退出并自动重启。\n"
+                "当前工作区会保留；不会自动迁移旧框架的数据。") != QMessageBox.Yes:
+            return
+        self._updating = True
+        self._update_cancel = threading.Event()
+        self.update_install.setEnabled(False);self.update_button.setEnabled(False)
+        self.update_cancel.show();self.update_status.setText('正在下载完整升级包…')
+        def post(fn):
+            try:QTimer.singleShot(0, self.widget, fn)
+            except RuntimeError:pass
+        def progress(done,total):
+            post(lambda:self.update_status.setText(f'正在下载升级包… {done*100//total}%'))
+        def work():
+            try:
+                path = download_upgrade(package,self.app.data_dir,progress=progress,cancelled=self._update_cancel.is_set)
+                if self._update_cancel.is_set():raise RuntimeError('下载已取消，当前版本未改变')
+                if not callable(getattr(self,'on_update_ready',None)):
+                    raise RuntimeError('当前窗口不能完成重启，请从完整客户端更新')
+                post(lambda:self.update_cancel.hide())
+                acceptance = start_upgrade(path,self.app.data_dir,pipe=pipe_name())
+                if self._update_cancel.is_set():
+                    acceptance.with_suffix('.cancel').write_text('cancel',encoding='ascii')
+                    raise RuntimeError('更新已取消，当前版本未改变')
+            except Exception as exc:
+                message=str(exc)
+                def failed():
+                    self._updating=False;self.update_cancel.hide()
+                    self.update_install.setEnabled(True);self.update_button.setEnabled(True)
+                    self.update_status.setText(message or '更新未完成，当前版本继续运行，请重试')
+                post(failed)
+                return
+            def ready():
+                import os
+                self._pending_upgrade_acceptance = acceptance
+                try:
+                    acceptance.write_text(str(os.getpid()),encoding='ascii')
+                except OSError:
+                    self._pending_upgrade_acceptance = None
+                    self._updating = False
+                    self.update_install.setEnabled(True);self.update_button.setEnabled(True)
+                    self.update_status.setText('无法确认升级交接，当前版本继续运行；请稍后重试')
+                    return
+                self.update_status.setText('升级程序已就绪，正在保存并退出；新版将自动打开…')
+                self.on_update_ready()
+            post(ready)
+        threading.Thread(target=work,daemon=True).start()
 
     def import_daily_vocab(self) -> None:
         from PySide6.QtWidgets import QFileDialog, QMessageBox
@@ -1157,6 +1224,7 @@ class DesktopShell:
         qt.setWindowIcon(app_icon())
         self.app = app
         self.client = ClientWindow(app, on_hide=self._explained_tray)
+        self.client.on_update_ready = self.quit
         self.review = ReviewPanel(app)
         self.tray = QSystemTrayIcon(app_icon())
         menu = QMenu()
@@ -1293,6 +1361,14 @@ class DesktopShell:
             except Exception:
                 stopped = False
             if stopped is False:
+                acceptance = getattr(self.client, '_pending_upgrade_acceptance', None)
+                if acceptance:
+                    acceptance.with_suffix('.cancel').write_text('cancel',encoding='ascii')
+                    self.client._pending_upgrade_acceptance = None
+                    self.client._updating = False
+                    self.client.update_install.setEnabled(True)
+                    self.client.update_button.setEnabled(True)
+                    self.client.update_status.setText('当前操作尚未结束，本次升级已撤销；稍后可重试')
                 self.tray.showMessage("暂未退出", "目标程序尚未返回，未强制终止。请稍后再点退出。")
                 return
             self.client._closing_for_quit = True
@@ -1341,6 +1417,8 @@ def run_desktop(argv: list[str] | None = None) -> int:
                 "程序不会结束旧进程，也不会覆盖其数据。")
             return 1
         if request_show():
+            from doubao_typeless.services.v3_update import acknowledge_update_launch
+            acknowledge_update_launch()
             return 0
 
     from doubao_typeless.app import V3App, set_log
@@ -1394,6 +1472,9 @@ def run_desktop(argv: list[str] | None = None) -> int:
             logger(f"[v3] 热键未启动: {exc}")
         shell.client.refresh()
         logger("[v3.lifecycle] desktop_event_loop_ready")
+        from PySide6.QtCore import QTimer
+        from doubao_typeless.services.v3_update import acknowledge_update_launch
+        QTimer.singleShot(0, shell.client.widget, acknowledge_update_launch)
         stored = load_settings(app.data_dir)
         if minimized or stored.get("start_minimized"):
             shell.tray.show()

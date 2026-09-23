@@ -1,7 +1,15 @@
-"""Preview update check. Opens the public download page; never replaces daily-use or this preview."""
+"""Release discovery and explicit, verified full-package upgrades."""
 from __future__ import annotations
 
 from typing import Any, Callable
+import hashlib
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import time
+import uuid
 
 try:
     from app_version import APP_VERSION, GITHUB_REPO_NAME, GITHUB_REPO_OWNER
@@ -60,6 +68,10 @@ def check_preview_update(*, get_json: Callable[[str], dict[str, Any]] | None = N
             out['update_available'] = latest > installed
             out['message'] = (f'发现正式版 {tag}，可打开下载页获取安装程序；不会自动替换。' if latest > installed
                               else f'当前 {current} 已是最新可用版本。')
+            if latest > installed:
+                out['package'] = release_package(body)
+                if out['package']:
+                    out['message'] = f'发现正式版 {tag}。下载完成后将退出并重启，新版会保留当前工作区。'
         else:
             out['message'] = '没有查到可比较的正式版本；可打开下载页，当前安装不变。'
         return out
@@ -68,3 +80,115 @@ def check_preview_update(*, get_json: Callable[[str], dict[str, Any]] | None = N
     elif tag:
         out["message"] = "公开标记与当前日用版本号相同。预览仍不会自动替换。"
     return out
+
+
+def release_package(release: dict) -> dict | None:
+    tag = str(release.get('tag_name', ''))
+    if not re.fullmatch(r'v?\d+\.\d+\.\d+', tag) or release.get('draft') or release.get('prerelease'):
+        return None
+    base = f'https://github.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/releases/download/{tag}/'
+    raw_assets = release.get('assets') or []
+    if not isinstance(raw_assets,list):return None
+    assets = [asset for asset in raw_assets if isinstance(asset,dict)]
+    package = next((a for a in assets if a.get('name') == 'DoubaoTypeless.exe'
+                    and a.get('browser_download_url') == base+'DoubaoTypeless.exe'), None)
+    sums = next((a for a in assets if a.get('name') == 'SHA256SUMS.txt'
+                 and a.get('browser_download_url') == base+'SHA256SUMS.txt'), None)
+    if not package or not isinstance(package.get('size'), int) or not 64 <= package['size'] <= 512*1024*1024:
+        return None
+    digest = str(package.get('digest') or '')
+    sha = digest[7:] if re.fullmatch(r'sha256:[0-9a-f]{64}', digest) else ''
+    if not sha and not sums:
+        return None
+    return {'version':tag.lstrip('v'), 'url':base+'DoubaoTypeless.exe', 'size':package['size'],
+            'sha256':sha, 'checksums_url':base+'SHA256SUMS.txt' if sums else ''}
+
+
+def download_upgrade(package: dict, data_dir: Path, *, progress=None, cancelled=None, client=None) -> Path:
+    """Only a complete hash-verified native package can leave the staging directory."""
+    import httpx
+    from contextlib import nullcontext
+    version = str(package.get('version', ''))
+    prefix = f'https://github.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/releases/download/'
+    if not re.fullmatch(r'\d+\.\d+\.\d+', version) or package.get('url') not in {
+        prefix+version+'/DoubaoTypeless.exe', prefix+'v'+version+'/DoubaoTypeless.exe'}:
+        raise ValueError('更新地址无效，请重新检查更新')
+    stage = Path(data_dir)/'updates'/uuid.uuid4().hex
+    stage.mkdir(parents=True)
+    part = stage/'download.part'
+    target = stage/'DoubaoTypeless.exe'
+    try:
+        with (nullcontext(client) if client else httpx.Client(follow_redirects=True, timeout=httpx.Timeout(30, connect=15))) as http:
+            expected = package.get('sha256') or ''
+            if not expected:
+                sums_url = str(package.get('checksums_url') or '')
+                if sums_url != str(package['url']).rsplit('/',1)[0]+'/SHA256SUMS.txt':
+                    raise ValueError('缺少更新校验信息')
+                with http.stream('GET', sums_url) as response:
+                    response.raise_for_status(); raw = bytearray()
+                    for chunk in response.iter_bytes():
+                        raw.extend(chunk)
+                        if len(raw)>32768: raise ValueError('更新校验信息过大')
+                hashes = re.findall(r'^([0-9a-f]{64})  DoubaoTypeless\.exe\s*$',raw.decode('utf-8'),re.M)
+                if len(hashes)!=1:raise ValueError('没有找到完整升级包的校验值')
+                expected = hashes[0]
+            if not re.fullmatch(r'[0-9a-f]{64}', expected):raise ValueError('更新校验值无效')
+            total = int(package['size']); done = 0; digest = hashlib.sha256()
+            with http.stream('GET', package['url']) as response:
+                response.raise_for_status()
+                with part.open('xb') as output:
+                    for chunk in response.iter_bytes(128*1024):
+                        if cancelled and cancelled():raise RuntimeError('下载已取消，当前版本未改变')
+                        done += len(chunk)
+                        if done>total:raise ValueError('下载大小与发布信息不一致')
+                        output.write(chunk);digest.update(chunk)
+                        if progress:progress(done,total)
+                    output.flush();os.fsync(output.fileno())
+            if done!=total or digest.hexdigest()!=expected:
+                raise ValueError('下载不完整或校验失败，当前版本未改变，请重试')
+            with part.open('rb') as executable:
+                if executable.read(2)!=b'MZ':raise ValueError('下载内容不是 Windows 升级程序')
+            if cancelled and cancelled():raise RuntimeError('下载已取消，当前版本未改变')
+            part.replace(target)
+        return target
+    except BaseException:
+        part.unlink(missing_ok=True)
+        if not target.exists(): stage.rmdir()
+        raise
+
+
+def start_upgrade(package: Path, data_dir: Path, *, pipe: str) -> Path:
+    """Handoff must be acknowledged before asking the current application to quit."""
+    if sys.platform!='win32' or not getattr(sys,'frozen',False):
+        raise RuntimeError('请在 Windows 打包版本中执行更新')
+    package = package.resolve(strict=True)
+    handoff = package.parent/('handoff-'+uuid.uuid4().hex+'.ready')
+    env = {**os.environ, 'PYINSTALLER_RESET_ENVIRONMENT':'1', 'DT_V3_DATA_DIR':str(data_dir.resolve()),
+           'DT_V3_PIPE':pipe, 'DT_UPGRADE_HANDOFF':str(handoff),
+           'DT_UPGRADE_PREVIOUS':str(Path(sys.executable).resolve())}
+    flags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+    child = subprocess.Popen([str(package),'/UPDATE',f'/WAITPID={os.getpid()}'],env=env,
+                             close_fds=True,creationflags=flags)
+    deadline = time.monotonic()+15
+    while time.monotonic()<deadline:
+        if handoff.is_file() and handoff.read_text(encoding='ascii').strip()==str(os.getpid()):
+            # The Qt callback must authorize this specific attempt before quit.
+            # If it never runs, the helper expires without modifying anything.
+            return handoff.with_suffix('.accept')
+        if child.poll() is not None:break
+        time.sleep(.1)
+    handoff.with_suffix('.cancel').write_text('cancel',encoding='ascii')
+    raise RuntimeError('升级程序未就绪，本次升级已撤销，当前版本继续运行；请稍后重试')
+
+
+def acknowledge_update_launch() -> None:
+    """Called only after HTTP, native control and the Qt event loop are ready."""
+    raw = os.environ.pop('DT_UPDATE_READY_FILE','')
+    if not raw:return
+    from doubao_typeless.build_info import build_info
+    path = Path(raw)
+    # Receipts are installer-owned unique files, never arbitrary user documents.
+    if not re.fullmatch(r'\.update-ready-[0-9a-f]{32}',path.name):return
+    temporary = path.with_suffix('.tmp')
+    temporary.write_text(build_info()['source_sha'],encoding='ascii')
+    temporary.replace(path)

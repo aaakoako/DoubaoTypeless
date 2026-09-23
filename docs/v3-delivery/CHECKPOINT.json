@@ -2,11 +2,11 @@
   "schema_version": 1,
   "product_goal": "沿用 MASTER_PLAN，保留原版插入并复制等体验，交付可实际体验的完整 Windows V3 发布前候选。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "已交付制品仍为 b69f7bc5a3f189f01339468202a3beebcd64f54a；本轮遗留更新器修复尚未打包。旧版完整升级仍阻断发布，详见 LEGACY_UPGRADE_AUDIT.md。",
+  "working_tree": "正在实现0.5.1完整升级；已交付b69f7bc仍是旧候选，不能混淆身份。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
   "last_completed_slice": "CODEX_SEQUENTIAL_PASTE_AND_PHONE_CLEAR",
-  "active_slice": "LEGACY_0_4_2_UPGRADE_COMPATIBILITY",
-  "next_action": "打通旧客户端到安装器的过渡、旧配置/词库/历史导入及启动/自启动接续；必须用真实已发布 0.4.2 验证。继续保留真实 Codex/手机验收项，无 merge/tag/公开 Release。",
+  "active_slice": "FULL_PACKAGE_UPGRADE_AND_AUTOMATIC_RESTART",
+  "next_action": "跑固定源全量回归与发布流水线，含原生失败恢复与官方0.4.2确认/下载/退出/替换/自动重启；用户已取消旧配置自动迁移前提。下载核验新候选，不发布。",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -19,7 +19,8 @@
     "未完成浮窗可拖动并保存位置、切换应用常驻置顶，展开可返回；设置与浮窗并存",
     "用户明确操作电脑已有稿不依赖手机在线；重连回执只清理对应旧稿",
     "不自动弹出图文恢复窗口；失败可复制时提供手动粘贴退路；白板文字使用可退出的页面内编辑",
-    "手机一键清空文字与图片，原稿原子备份可恢复；清空取消未发出的插入准备和旧异步结果，不撤回已贴入电脑的内容。"
+    "手机一键清空文字与图片，原稿原子备份可恢复；清空取消未发出的插入准备和旧异步结果，不撤回已贴入电脑的内容。",
+    "框架级整体替换，保留旧数据但不自动迁移；升级须完整下载校验、退出、部署并确认新版就绪，失败可恢复。"
   ],
   "implemented_this_batch": [
     "手机一键清空、原子备份、离线清空、旧回执与异步图片隔离",

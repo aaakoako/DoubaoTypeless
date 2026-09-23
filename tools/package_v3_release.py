@@ -29,10 +29,16 @@ def package(payload, output, compiler, test=False):
     prefix=f'DoubaoTypeless_{version}_win_x64'
     if test: prefix+='-installer-test'
     installer=output/(prefix+'_Setup.exe')
-    args=[str(compiler),'/INPUTCHARSET','UTF8',f'/DVERSION={version}',f'/DPAYLOAD={payload.resolve()}',f'/DOUTPUT={installer.resolve()}']
+    args=[str(compiler),'/INPUTCHARSET','UTF8',f'/DVERSION={version}',
+          f'/DBUILD_ID={version}-{info["source_sha"][:8]}', f'/DSOURCE_SHA={info["source_sha"]}',
+          f'/DPAYLOAD={payload.resolve()}',f'/DOUTPUT={installer.resolve()}']
     if test: args.append('/DTEST_INSTALL')
     subprocess.run([*args,str(ROOT/'packaging/windows-installer.nsi')],check=True,cwd=ROOT)
     if not test:
+        # Same native payload supports both an installer UI and the filename
+        # used by 0.4.2's single-file updater. Either EXE is safe when renamed.
+        legacy_entry=output/'DoubaoTypeless.exe'
+        shutil.copy2(installer,legacy_entry)
         make_manifest(payload,info['source_sha'],output/(prefix+'_files.json'))
         archive=output/(prefix+'_portable.zip')
         with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
@@ -41,7 +47,7 @@ def package(payload, output, compiler, test=False):
         with zipfile.ZipFile(archive) as z:
             assert z.testzip() is None
         (output/'SHA256SUMS.txt').write_text('\n'.join(
-            hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name for p in [installer,archive])+'\n',encoding='utf-8')
+            hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name for p in [installer,legacy_entry,archive])+'\n',encoding='utf-8')
     return installer
 
 if __name__=='__main__':
