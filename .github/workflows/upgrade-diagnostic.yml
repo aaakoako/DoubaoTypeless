@@ -1,0 +1,32 @@
+name: Isolated upgrade fixture diagnostic
+on:
+  push:
+    branches: [diagnostics/upgrade-fixture-20260924]
+permissions:
+  contents: read
+jobs:
+  fixture:
+    strategy:
+      fail-fast: false
+      matrix:
+        round: [1, 2]
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install Pillow==12.3.0
+      # fetch_nsis uses only stdlib and checks the pinned archive SHA.
+      - run: python tools/fetch_nsis.py "${{ runner.temp }}/nsis"
+      # Each matrix round has a fresh machine/registry, without installer pre-tests.
+      - name: Run original assertions with timeout evidence
+        run: python tools/verify_upgrade_failure.py --compiler "${{ runner.temp }}/nsis/nsis-3.12/makensis.exe" --report evidence/upgrade-failures.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: upgrade-diagnostic-${{ matrix.round }}-${{ github.sha }}
+          path: |
+            evidence/*.json
+            evidence/*.png
