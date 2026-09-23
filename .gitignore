@@ -4,7 +4,7 @@ __pycache__/
 *.so
 .Python
 build/
-dist/
+/dist/
 *.egg-info/
 .eggs/
 *.egg
@@ -21,7 +21,9 @@ CLAUDE.md
 # 工具与 IDE（个人环境不上传）
 .vscode/
 .idea/
-.cursor/
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
 
 # 系统垃圾文件
 Thumbs.db
@@ -38,6 +40,30 @@ debug.log
 doubao_diagnostics_*.json
 
 # PyInstaller / 杂项
+/dist/
+web/node_modules/
+docs/evidence/v3-soak/assets/
+docs/evidence/v3-soak/soak.sqlite
+docs/evidence/v3-ci/junit.xml
+docs/evidence/v3-idle/data/
+docs/evidence/v3-s4/data/
+docs/evidence/v3-s5/data/
+docs/evidence/v3-s5-pack/dist/
+docs/evidence/v3-s5-pack/smoke-data/
+docs/evidence/v3-s5-pack/smoke-data-ui/
+docs/evidence/v3-s5-pack/smoke-data-review/
+docs/evidence/v3-native-pack/smoke-data/
+docs/evidence/v3-native-pack/*-screen.png
+docs/evidence/v3-native-pack/hud-top.png
+docs/evidence/v3-native-pack/hud-bottom.png
+docs/evidence/v3-native-pack/*-print.png
+docs/evidence/v3-native-pack/*-screen.png
+docs/evidence/v3-native-pack/hud-hwnd.png
+docs/evidence/v3-native-pack/client-hwnd.png
+docs/evidence/v3-native-pack/hud-src-grab.png
+docs/evidence/v3-native-pack/new-exe.sha256.txt
+docs/evidence/v3-native-pack/pack.log
+docs/evidence/v3-s5-pack/*.zip
 opus.dll
 *.spec.bak
 _DoubaoTypeless_update.bat
@@ -57,3 +83,13 @@ data/dict_suggestions_pending.json
 # 本地归档：二进制与凭据备份（默认不上传）
 archive/legacy_pc_asr/
 archive/scratch/
+
+# V3 设计包解压缓存与隔离运行时（禁止提交日用/临时目录）
+_v3_spec_extract/
+preview-v3-00/
+
+# Local rendering output; curated evidence is tracked separately
+/qt-shots/
+/build-info.json
+/release/
+/installer-test/

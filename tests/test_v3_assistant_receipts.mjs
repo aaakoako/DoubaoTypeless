@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {receiptMatches, applyRotated, applyReady, buildDraftUpdate} from '../web/src/sync.js';
+const make=()=>({draft_id:'D',epoch:'E',revision:5,text:'说明',assets:[{id:'localA',asset_id:'A',status:'ready',render_revision:2,caption:'按钮右移'}],conflict:null});
+const archive=(s)=>({draft_id:s.draft_id,epoch:s.epoch,revision:s.revision,text:'说明\n\n图1：按钮右移',source_text:s.text,asset_refs:s.assets.map(a=>a.asset_id),assets:structuredClone(s.assets)});
+const event=(s)=>({type:'draft.rotated',rotated:true,result:'CONFIRMED',archived:archive(s),draft_id:'D',epoch:'NEW',revision:6});
+let count=0;
+function test(name,f){f(); count++;}
+test('caption uses original text',()=>{const s=make();assert.equal(applyRotated(s,event(s)),'cleared');});
+test('unuploaded new image survives',()=>{const s=make(),e=event(s);s.assets.push({id:'B',status:'queued'});assert.equal(applyRotated(s,e),'kept');});
+test('editing old id survives',()=>{const s=make(),e=event(s);s.assets[0].status='editing';assert.equal(applyRotated(s,e),'kept');});
+test('new rendered version survives',()=>{const s=make(),e=event(s);s.assets[0].render_revision++;assert.equal(applyRotated(s,e),'kept');});
+test('changed caption survives',()=>{const s=make(),e=event(s);s.assets[0].caption='改成左移';assert.equal(applyRotated(s,e),'kept');});
+test('removed attachment does not match old receipt',()=>{const s=make(),e=event(s);s.assets=[];assert.equal(applyRotated(s,e),'kept');});
+test('order matters',()=>{const s=make();s.assets.push({...s.assets[0],id:'B',asset_id:'B'});const e=event(s);s.assets.reverse();assert.equal(applyRotated(s,e),'kept');});
+test('unknown image without archive retained',()=>{const s=make();s.text='';assert.equal(applyRotated(s,{rotated:false,result:'UNKNOWN'}),'kept');assert.equal(s.assets.length,1);});
+test('duplicate receipt cannot clear next input',()=>{const s=make(),e=event(s);assert.equal(applyRotated(s,e),'cleared');s.text='new';assert.equal(applyRotated(s,e),'kept');});
+test('local editing increments version before upload',()=>{const s=make();s.assets.push({id:'new',status:'editing'});const m=buildDraftUpdate(s);assert.equal(s.revision,6);assert.equal(m.asset_documents[1].status,'editing');assert.deepEqual(m.asset_refs,['A']);});
+test('same epoch newer server content conflicts',()=>{const s=make();const before=structuredClone(s);assert.equal(applyReady(s,{draft_id:'D',epoch:'E',revision:9,text:'server B',asset_refs:[]}),'conflict');assert.equal(s.text,before.text);assert.equal(s.revision,before.revision);});
+test('new server identity does not rewrite local identity',()=>{const s=make();assert.equal(applyReady(s,{draft_id:'D2',epoch:'E2',revision:10,text:'new'}),'conflict');assert.equal(s.draft_id,'D');assert.equal(s.epoch,'E');});
+console.log(JSON.stringify({suite:'assistant-source-receipts',passed:count}));

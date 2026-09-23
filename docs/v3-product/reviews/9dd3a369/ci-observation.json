@@ -1,0 +1,14 @@
+{
+  "source": "GitHub connector actions run and job logs",
+  "head_sha": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
+  "run_id": 35323737872,
+  "job_id": 105531882445,
+  "event": "push",
+  "conclusion": "failure",
+  "command": "python -m pytest -q",
+  "exit_code": 2,
+  "collection_errors": 6,
+  "reason": "ModuleNotFoundError: No module named 'PIL'",
+  "after_step_no_release_side_effects": "skipped",
+  "independently_reran_this_workflow": false
+}

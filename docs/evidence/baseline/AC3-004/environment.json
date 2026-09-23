@@ -1,0 +1,13 @@
+{
+  "os": "Windows-11-10.0.26200-SP0",
+  "python": "3.13.2 (tags/v3.13.2:4f8bb39, Feb  4 2025, 15:23:48) [MSC v.1942 64 bit (AMD64)]",
+  "cwd": "G:\\DoubaoTypeless\\DoubaoTypeless",
+  "branch": "v3/00-baseline",
+  "head": "e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5",
+  "review_sha": "e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5",
+  "head_matches_review_commit_object": true,
+  "reset_used": false,
+  "isolated_worktree": "G:\\DoubaoTypeless\\preview-v3-00",
+  "isolated_worktree_exists": true,
+  "started_at": "2026-09-18T05:23:25.190784+00:00"
+}

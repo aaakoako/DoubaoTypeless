@@ -1,0 +1,259 @@
+{
+  "schema_version": 1,
+  "product_goal": "沿用 MASTER_PLAN，保留原版插入并复制等体验，交付可实际体验的完整 Windows V3 发布前候选。",
+  "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
+  "working_tree": "0.5.0 OpenRouter真实中文验证、独立接口与凭据配置、丰富语气及桌面手机动效完成；最终源码回归与发行包验证推进中。",
+  "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
+  "last_completed_slice": "FULL_PACKAGE_UPGRADE_AND_AUTOMATIC_RESTART",
+  "active_slice": "FINAL_0_5_0_RELEASE",
+  "next_action": "最终全量回归、固定提交云端发行验证、下载载荷校验；全部通过后按用户明确授权合入master并发布v0.5.0。真实Cursor与实体手机输入法仍标为未验证。",
+  "accepted_requirements": [
+    "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
+    "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
+    "桌面、HUD、手机与弹框共用蓝紫/雾蓝灰设计语言，非绿色主色，无凸起导航阴影",
+    "新建白板须明确保存；取消恢复原成品或移除未保存白板；容量错误不丢画布不开始上传",
+    "按手机顺序逐图再正文，不因图片上传或接收证据缺失阻塞后续粘贴；逐步验证目标，缺证据仍记录UNKNOWN。",
+    "用户新增独立手机发送：电脑默认关闭授权；用户检查电脑后在手机单独确认 Enter 或 Ctrl+Enter",
+    "插入/同步/重连/恢复不自动发Enter；发送票据绑定来源、图文、目标、权限、时限并至多执行一次",
+    "用户已授权本轮完成后合入master并发布0.5.0；不覆盖日用数据、不强制结束用户进程",
+    "未完成浮窗可拖动并保存位置、切换应用常驻置顶，展开可返回；设置与浮窗并存",
+    "用户明确操作电脑已有稿不依赖手机在线；重连回执只清理对应旧稿",
+    "不自动弹出图文恢复窗口；失败可复制时提供手动粘贴退路；白板文字使用可退出的页面内编辑",
+    "手机一键清空文字与图片，原稿原子备份可恢复；清空取消未发出的插入准备和旧异步结果，不撤回已贴入电脑的内容。",
+    "框架级整体替换，保留旧数据但不自动迁移；升级须完整下载校验、退出、部署并确认新版就绪，失败可恢复。",
+    "Jev可选疑似转写错误、歧义/缺项和语气判断；附注仅提示可能有误，不要求目标模型追问；异步检查不阻挡复制插入。"
+  ],
+  "implemented_this_batch": [
+    "手机一键清空、原子备份、离线清空、旧回执与异步图片隔离",
+    "图片接收未知时继续正文；观察失败不取消粘贴，保持焦点保护和真实证据级别",
+    "9个正式页面清空回归、慢上传原生验证场景替换旧暂停契约",
+    "完整原生升级入口，兼容0.4.2普通及计划任务启动；新版本校验下载与就绪确认",
+    "失败恢复、便携入口备份替换、重复旧入口转到同一新版进程",
+    "修复图片延迟聚焦附件时正文中止，复用原有受限焦点恢复，不等待上传完成"
+  ],
+  "last_commands": [
+    {
+      "cmd": "Final local regression and evidence checker",
+      "exit_code": 0,
+      "output": "630 pytest passed; 18 evidence checker tests passed; frontend TypeScript/Vite passed; live OpenRouter final 10/10 HTTP200; real Qt event loop displayed live furious response without pasting."
+    }
+  ],
+  "cloud_evidence": {
+    "run_id": 35866724399,
+    "ci_run_id": 35866732872,
+    "source_sha": "fdfd829bfe7dd9113f6952fd08a5bde3fca98e60",
+    "conclusion": "success",
+    "native_browser_cases": 14,
+    "actual_screen_capture": true,
+    "actual_codex_tested": false,
+    "actual_cursor_tested": false,
+    "actual_android_ime_tested": false,
+    "target_type": "independent Chromium test webpage",
+    "published_0_4_2_upgrade_tested": true,
+    "release_server": "local TLS fixture, child-only trust"
+  },
+  "candidate_artifact": {
+    "artifact_id": 10753256869,
+    "source_sha": "fdfd829bfe7dd9113f6952fd08a5bde3fca98e60",
+    "version": "0.5.1",
+    "channel": "release-candidate",
+    "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.1-RC-fdfd829",
+    "setup_sha256": "d57ceafcd482787a8e164183da7f99ababed09562ef4e5fd6581df3ce1eeb991",
+    "upgrade_exe_sha256": "d57ceafcd482787a8e164183da7f99ababed09562ef4e5fd6581df3ce1eeb991",
+    "zip_sha256": "84e9decb60cb3383b69e04356cbfaabdafc3082f2514d8b7f280936d0f4b997f",
+    "exe_sha256": "9a81e6c9216818e0393216a9f1a872e1ef4d2c003644b466d3d78de21759ca65",
+    "files_verified": 264,
+    "verified_after_download": true,
+    "release_ready": false
+  },
+  "open_defects": [
+    "真实 Codex/Cursor 图文插入与恢复未验收，前台许可待回复",
+    "实体手机输入法/软键盘/扫码及长后台、多屏拔插未实机验收",
+    "本次 browser fault 日志仍有 0x8001010d；同 PID 完成 14 场景并退出 0，保留调查项；历史偶发退出未凭现场证据确诊",
+    "独立实机验收及公开发布审批未完成",
+    "Vercel Key可查余额，但推理返回403 customer_verification_required，需用户在后台完成账户验证激活免费额度；真实Jev中文判断质量、延迟和费用未经实测。"
+  ],
+  "independent_review": {
+    "status": "SOURCE_REVIEW_AND_UPGRADE_VALIDATION_COMPLETED_REAL_ACCEPTANCE_PENDING",
+    "release_ready": false,
+    "document": "docs/v3-delivery/RELEASE_0_5_1_ACCEPTANCE.md"
+  },
+  "published": false,
+  "task_complete": false,
+  "integration_20260922": {
+    "branch": "v3/integrated-preview-20260922",
+    "base": "b32d2d536937d0fcad2c0e2ea76742d60fa47c42",
+    "status": "private_trial_package_ready",
+    "document": "docs/v3-delivery/INTEGRATED_PREVIEW_20260922.md",
+    "prior_evidence_is_not_current_package_evidence": true,
+    "product_source_sha": "d969f8f2166fb570680eb786d6c89aa7de0aedf3",
+    "tests": "491 passed; TypeScript and Vite build passed",
+    "frozen": "offscreen isolated Windows desktop: HTTP ready, acknowledged IPC quit, exit 0; no real input",
+    "package": {
+      "source_sha": "d969f8f2166fb570680eb786d6c89aa7de0aedf3",
+      "filename": "DoubaoTypeless_Integrated_d969f8f.zip",
+      "bytes": 81182200,
+      "sha256": "1f55fe07276ff2661ab0676992796f6ae106bea11b300288038aa340c571d5f5",
+      "release_ready": false
+    }
+  },
+  "interaction_repair_20260922": {
+    "branch": "v3/integrated-preview-20260922",
+    "product_source_sha": "d5f978b66fc21f10aa3d601b942d1e153c35db90",
+    "status": "private_trial_package_ready",
+    "document": "docs/v3-delivery/INTERACTION_REPAIR_20260922.md",
+    "tests": "495 passed; TypeScript and Vite production build passed",
+    "frozen": "isolated Windows desktop/offscreen: HTTP ready, acknowledged IPC quit, exit 0, no forced stop; real_input_tested=false",
+    "independent_review": "Read-only source review; visible edited draft copy mismatch found and fixed with regression. Not real GUI acceptance.",
+    "delivery_root": "G:\\AgentStorage\\Deliveries\\typeless-interaction-repair-20260922",
+    "package": {
+      "source_sha": "d5f978b66fc21f10aa3d601b942d1e153c35db90",
+      "filename": "DoubaoTypeless_Interaction_d5f978b.zip",
+      "bytes": 81229295,
+      "sha256": "1d2c30f5b71c5bd028083f3dfc6bae5f4e1c66098ac59f156a985816a7de8278",
+      "files_verified": 943,
+      "release_ready": false
+    },
+    "unverified": [
+      "real Codex/Cursor focus and attachment insertion",
+      "physical phone IME and soft keyboard",
+      "real multi-monitor drag and long-running use"
+    ]
+  },
+  "usability_20260922": {
+    "product_source_sha": "dfa48cf4f2bac75b87b294c20d84d448de4a4895",
+    "document": "docs/v3-delivery/USABILITY_20260922.md",
+    "status": "private_trial_package_ready",
+    "tests": "501 passed; TypeScript and production build passed",
+    "frozen": "isolated desktop; no inherited data/IPC environment; CLI data and instance flags; HTTP/IPC quit/exit0 passed; no real input",
+    "delivery_root": "G:\\AgentStorage\\Deliveries\\typeless-usability-20260922",
+    "package": {
+      "source_sha": "dfa48cf4f2bac75b87b294c20d84d448de4a4895",
+      "filename": "DoubaoTypeless_Usability_dfa48cf.zip",
+      "bytes": 81222479,
+      "sha256": "663f793b1419dd77ab54057366b6e18e886108e5c9412601a15efdfc654034b8",
+      "files_verified": 942,
+      "release_ready": false
+    },
+    "real_product_acceptance": false
+  },
+  "release_preparation_20260922": {
+    "version": "0.5.0",
+    "branch": "v3/integrated-preview-20260922",
+    "status": "candidate_verified_real_acceptance_pending",
+    "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.0-RC-ae75cf3",
+    "real_target_acceptance": false,
+    "foreground_permission": "pending",
+    "public_release": false,
+    "source_sha": "ae75cf32957af27d13c0490af388afe0f108713c",
+    "run_id": 35705371132,
+    "document": "docs/v3-delivery/RELEASE_0_5_0_ACCEPTANCE.md"
+  },
+  "historical_pre_release_evidence_20260921": {
+    "last_commands": [
+      {
+        "cmd": "Full Linux pytest from fixed product SHA",
+        "exit_code": 0,
+        "output": "478 passed, 5 Windows-only skipped; 0 failed/errors. Four actual Chromium production editor transaction cases passed."
+      },
+      {
+        "cmd": "Full Windows pytest from fixed product SHA",
+        "exit_code": 0,
+        "output": "483 passed; 0 failed/errors/skipped"
+      },
+      {
+        "cmd": "Actual frozen startup, legacy three text inserts, phone-primary three text inserts, production-page/native browser scenarios",
+        "exit_code": 0,
+        "output": "Four reports passed; 13 browser cases passed. Insertion Enter events 0; two separately confirmed sending events; page errors 0; process exit 0."
+      },
+      {
+        "cmd": "Downloaded artifact independent audit",
+        "exit_code": 0,
+        "output": "262-file set/length/SHA-256 verified; build-info matches actual EXE reports; original inner ZIP bytes preserved"
+      }
+    ],
+    "cloud_evidence": {
+      "run_id": 35523383176,
+      "trigger_sha": "d47b239757100043f65109f45fc69e98d849cd12",
+      "source_sha": "aec0ee81bcd3274000a8799df54ef57cadfab8b3",
+      "conclusion": "success",
+      "native_browser_cases": 13,
+      "three_images_one_click": true,
+      "desktop_button_tested": true,
+      "independent_enter_and_ctrl_enter_tested": true,
+      "actual_cursor_tested": false,
+      "actual_android_ime_tested": false,
+      "target_type": "independent Chromium test webpage, not production ChatGPT or Cursor"
+    },
+    "candidate_artifact": {
+      "artifact_id": 10609123727,
+      "source_sha": "aec0ee81bcd3274000a8799df54ef57cadfab8b3",
+      "filename": "DoubaoTypeless_V3_Composer_aec0ee8.zip",
+      "zip_bytes": 65195942,
+      "zip_sha256": "2ecec7133cf24bf890ea969d0b519d2b5f7f82ca41b6e4a1578e9f08a3106788",
+      "exe_sha256": "76c3989630dc2c82235c805c0364f8b8cd47bdba2e4ec80368c89e347feec862",
+      "outer_artifact_sha256": "61124f5acb9bb3a9f4fd6afb893de7eadf4d3952a98d110210c6c75fc3bd85ff",
+      "files_verified": 262,
+      "verified_after_download": true,
+      "original_zip_preserved": true
+    }
+  },
+  "prior_0_5_0_candidate": {
+    "artifact": {
+      "artifact_id": 10707185260,
+      "source_sha": "b69f7bc5a3f189f01339468202a3beebcd64f54a",
+      "version": "0.5.0",
+      "channel": "release-candidate",
+      "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.0-RC-b69f7bc",
+      "setup_sha256": "ddd72ce90f0dbe97fc5d559635c19c8830182994176d720664d1639b30456f8d",
+      "zip_sha256": "9d4b64f149a74009f250044d4d4f1d714f1467e8371c35286660df2848cc27c7",
+      "exe_sha256": "731fd3b50cc8921a94fa0ba1752ab9e48c5acccc2edab24755190cdb236cb9ae",
+      "files_verified": 264,
+      "verified_after_download": true,
+      "release_ready": false
+    },
+    "cloud_evidence": {
+      "run_id": 35751219901,
+      "source_sha": "b69f7bc5a3f189f01339468202a3beebcd64f54a",
+      "conclusion": "success",
+      "native_browser_cases": 14,
+      "actual_screen_capture": true,
+      "actual_codex_tested": false,
+      "actual_cursor_tested": false,
+      "actual_android_ime_tested": false,
+      "target_type": "independent Chromium test webpage"
+    }
+  },
+  "upgrade_0_5_1": {
+    "status": "candidate_verified",
+    "document": "docs/v3-delivery/RELEASE_0_5_1_ACCEPTANCE.md",
+    "legacy_data_migration": false,
+    "published_legacy_exe_sha256": "e7108e29bc4deb0ab85b28b57605c9ff154031f66303ef1ca508bde1a1304240",
+    "native_reports": [
+      "startup",
+      "text",
+      "phone-primary",
+      "browser",
+      "installer",
+      "upgrade-failures",
+      "legacy-upgrade"
+    ]
+  },
+  "jev_live": {
+    "provider": "openrouter",
+    "actual_model": "typesafe/jev-1.13-20260917",
+    "synthetic_cases_final": 10,
+    "http_successes": 10,
+    "latency_seconds": [
+      1.329,
+      1.505
+    ],
+    "cost_usd": 0.000492576,
+    "population_accuracy_verified": false
+  },
+  "user_acceptance": {
+    "codex_desktop_image_then_text": "user reported successful on previous candidate",
+    "cursor": "not verified",
+    "physical_mobile_ime": "not verified"
+  }
+}

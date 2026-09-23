@@ -1,0 +1,58 @@
+{
+  "started_at": "2026-09-18T11:27:02.281776+00:00",
+  "sample": "第一段原文仍保留回改\n第二段还在当前稿",
+  "error": null,
+  "cursor_claimed": false,
+  "android_claimed": false,
+  "prototype_used": false,
+  "pair_posts": [
+    "{\"code\":\"Y5h-Yf5VKKc\"}"
+  ],
+  "draft_text": "第一段原文仍保留回改\n第二段还在当前稿",
+  "hud_visible_flag": true,
+  "hud_titles": [
+    "DT-V3-HUD"
+  ],
+  "focus_after_sync": [
+    "TkTopLevel",
+    "DT-S1-TextTarget"
+  ],
+  "target_focused": true,
+  "focus_before_insert": [
+    "TkTopLevel",
+    "DT-S1-TextTarget"
+  ],
+  "target_state": {
+    "title": "DT-S1-TextTarget",
+    "text": "第一段原文仍保留回改\n第二段还在当前稿",
+    "has_focus": true
+  },
+  "enter_count": 0,
+  "attempt": {
+    "attempt_id": "8fbc0b0c-976b-4065-9ba1-35f0dd46df92",
+    "intent_id": "dc933b89-b7f4-48cf-bcfc-62b77dfb099b",
+    "bundle_id": "6219a510-32ae-47d3-a013-9d430fa84d4d",
+    "adapter_id": "generic_text",
+    "result": "UNKNOWN",
+    "steps": [
+      {
+        "index": 0,
+        "kind": "text",
+        "asset_id": null,
+        "state": "unknown",
+        "evidence": "none"
+      }
+    ]
+  },
+  "gates": {
+    "production_frontend_text": true,
+    "pair_only_code": true,
+    "hud_shown": true,
+    "target_has_text": true,
+    "zero_enter": true,
+    "hud_not_foreground": true,
+    "not_cursor": true
+  },
+  "ok": true,
+  "observation_note": "generic_text adapter 返回 UNKNOWN 是诚实结果；目标控件 DT-S1-TextTarget 的 text 已独立读出且等于当前稿。不是 Cursor，不是产品窗 FileTarget。"
+}

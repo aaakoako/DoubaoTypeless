@@ -1,0 +1,18 @@
+---
+description: DoubaoTypeless V3 complete delivery, evidence and resumption rules
+alwaysApply: true
+---
+# V3完整交付（流程补丁，不是新产品设计）
+
+- 先读 `docs/v3-delivery/START_HERE.md` 与当前 `CHECKPOINT.json`；首次接管读执行契约，再按当前切片读取V3原规格/源码/验收。
+- 最终目标是R01-R10全部接通且可发布的Windows候选，不是只做V3-00、只修审计问题、只补96条状态。
+- 只在已授权隔离工作区推进；不reset、不清除用户改动、不动日用数据；merge/tag/Release/覆盖安装需另行明确批准。
+- 一次聚焦一个可实测切片。完成、回归并记录后，继续下一个依赖满足的切片，不为每卡索要“继续”。
+- 输入只在活动中短暂显示HUD，平时无浮窗；手机单页Composer与共用编辑器；白板本轮完成。
+- 先图后文，不发Enter；身份不明拒绝远端插入；召回保留当前稿，UNKNOWN需恢复选择。
+- 测试生产前端真实生成的请求，不给它偷偷补字段；不能拿模拟Target证明Cursor已通过。
+- 状态区分实现、接通、已验证；缺设备仅阻塞相关验证，已有代码缺陷是FAIL，不是BLOCKED_NATIVE。
+- 不改验收期望/严重性/冻结目录来换绿灯。SOURCE事实不能冒充NATIVE/E2E PASS。
+- 源码/依赖/构建输入变化后，重新取得对应证据；候选结果绑定固定SHA和实际包哈希。
+- 规则只是提示，CI和独立复核必须另外接入；格式检查通过不等于产品通过。
+- 上下文/会话结束前更新CHECKPOINT，下一次“继续V3”从这里恢复；不能许诺无人执行时仍在后台开发。

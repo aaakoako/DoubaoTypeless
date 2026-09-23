@@ -1,0 +1,60 @@
+{
+  "review_date": "2026-09-19",
+  "review_sha": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
+  "methods": [
+    "GitHub connected read-only source and commit comparisons",
+    "GitHub Actions job log read",
+    "prior supplied specs read through Files",
+    "local LF/CRLF and Git blob hash calculation"
+  ],
+  "not_performed": [
+    "No current Windows EXE run or actual binary hash verification",
+    "No real Android/Doubao/Cursor test",
+    "No full clone or full local repo pytest",
+    "No remote repository modifications",
+    "No new current native screenshot pixel inspection"
+  ],
+  "ci": {
+    "run_id": 35421285278,
+    "job_id": 105839348585,
+    "head_sha": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
+    "frontend_typecheck": "success",
+    "frontend_build": "success",
+    "evidence_checker_selftests": 18,
+    "pytest": {
+      "failed": 5,
+      "passed": 108,
+      "skipped": 3,
+      "exit_code": 1
+    },
+    "windows_pack": "skipped",
+    "observation_source": "GitHub.fetch_workflow_job_logs (remote log, not locally rerun)",
+    "failures": [
+      "dictionary LF/CRLF snapshot mismatch",
+      "Linux import ctypes.windll at top level",
+      "missing PySide6 in recovery dialog test",
+      "missing PySide6 in local IPC test",
+      "recovery test expected paste but list empty; needs platform-aware reproduction"
+    ]
+  },
+  "dictionary_probe": {
+    "verified_git_blob": "3202354060f4e2e32b1e9d62a9e9afb2178f4c3d",
+    "lf_sha256": "791f10962386775442dbf3f677a450b42270f00ff1924c38691eecca741aa067",
+    "crlf_sha256": "8fcb2b8c9faeaed91fa3f24b140cae7c9a060bc76a1875e924d504c1475b420b",
+    "conclusion": "CI dictionary hashes match different newline encodings. Does NOT establish daily-use data modification."
+  },
+  "head_vs_runtime_source": {
+    "runtime_sha": "cc777d0ad9b28688f9f74e112ac99591b5221b75",
+    "head_sha": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
+    "changed_paths": [
+      "docs/evidence/v3-d2/pack.json",
+      "docs/v3-delivery/CHECKPOINT.json"
+    ],
+    "conclusion": "Only those docs changed; distinct SHA alone is not stale runtime evidence."
+  },
+  "artifact_reported_only": {
+    "exe_sha256": "d5aceb632946e1c78a5de27f147610b5939be6227a16cf539c9b6b911a4b8246",
+    "source": "repository CHECKPOINT",
+    "verified_binary": false
+  }
+}

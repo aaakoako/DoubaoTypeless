@@ -1,0 +1,54 @@
+{
+  "review_conclusion": "REQUEST_CHANGES",
+  "not_only_missing_devices": true,
+  "source_sha_reviewed": "9dd3a369f1b566d0fdc548cee3af934523e9b8db",
+  "counterexamples": [
+    {
+      "id": "public-pairing-challenge",
+      "cards": ["AC3-017"],
+      "observed_before": "GET /v3/pair called new_pairing_challenge() and returned the secret to any LAN client",
+      "old_pass_evidence": "tests/test_v3_core_services.py::test_pairing_mismatch_and_insert_grant",
+      "old_evidence_scope": "AuthService mismatch/nonce only; did not hit HTTP GET"
+    },
+    {
+      "id": "remote-self-grant",
+      "cards": ["AC3-019", "AC3-080"],
+      "observed_before": "POST /v3/pair honored allow_insert default True from the phone JSON",
+      "old_pass_evidence": "tests/test_v3_runtime.py::test_capture_requires_grant",
+      "old_evidence_scope": "in-process grant table; HTTP body could still self-promote insert/capture"
+    },
+    {
+      "id": "unauth-ws-draft",
+      "cards": ["AC3-017"],
+      "observed_before": "WS draft.update and bundle.commit applied without session.hello",
+      "old_pass_evidence": "test_bridge_protocol hello-then-update happy path",
+      "old_evidence_scope": "did not send draft.update before auth"
+    },
+    {
+      "id": "lock-fail-still-starts",
+      "cards": ["AC3-087"],
+      "observed_before": "V3App.start logged lock failure then still called bridge.start() and wrote pair.txt; main() started HUD/hotkeys before lock",
+      "old_pass_evidence": "tests/test_v3_remaining.py::test_instance_lock_does_not_kill_other",
+      "old_evidence_scope": "two InstanceLock objects; did not start V3App writers"
+    },
+    {
+      "id": "ci-missing-pillow",
+      "cards": ["AC3-085"],
+      "observed_before": "GitHub Actions run 35323737872 collected 6 errors: ModuleNotFoundError: No module named 'PIL'",
+      "files": [
+        "tests/test_v3_assets.py",
+        "tests/test_v3_bridge.py",
+        "tests/test_v3_capture.py",
+        "tests/test_v3_chunk_http.py",
+        "tests/test_v3_remaining.py",
+        "tests/test_v3_runtime.py"
+      ]
+    },
+    {
+      "id": "origin-host-untested",
+      "cards": ["AC3-020"],
+      "observed_before": "no Origin/Host/rate-limit implementation; PASS cited test_v3_bridge.py which only rejects key scripts",
+      "status_after": "FAIL remains; out of this batch's auth-isolation scope beyond pairing/WS/lock"
+    }
+  ]
+}

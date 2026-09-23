@@ -1,0 +1,47 @@
+{
+  "suite": "pocket-composer-v3-runtime",
+  "branch": "v3/00-baseline",
+  "pytest": {
+    "command": "python -m pytest -q",
+    "exit_code": 0,
+    "passed": 54
+  },
+  "preflight_v3": {
+    "command": "python tools/preflight_v3.py",
+    "exit_code": 0
+  },
+  "daily_use": {
+    "repo_config_json_written": false,
+    "data_dir": "%LOCALAPPDATA%\\DoubaoTypeless\\preview-v3",
+    "env": "DT_V3_DATA_DIR",
+    "merged_master": false,
+    "created_release": false
+  },
+  "prototype_marked_product_pass": false,
+  "enter_injected": false,
+  "network_messages_become_key_scripts": false,
+  "hud_sizes": {"text": [360, 88], "image": [360, 132]},
+  "cases": [
+    {"id": "AC3-001", "status": "PASS", "layer": "static"},
+    {"id": "AC3-002", "status": "BLOCKED_NATIVE", "layer": "Windows+phone", "note": "no real Android Doubao IME"},
+    {"id": "AC3-013", "status": "PASS", "layer": "unit"},
+    {"id": "AC3-020", "status": "PASS", "layer": "protocol"},
+    {"id": "AC3-029", "status": "PASS", "layer": "unit", "note": "idle hidden; 10min native still BLOCKED_NATIVE"},
+    {"id": "AC3-037", "status": "BLOCKED_NATIVE", "layer": "phone"},
+    {"id": "AC3-044", "status": "PASS", "layer": "unit", "note": "expiry/cancel/rate-limit; no HWND"},
+    {"id": "AC3-053", "status": "PASS", "layer": "static"},
+    {"id": "AC3-061", "status": "BLOCKED_NATIVE", "layer": "Windows", "note": "order implemented; Composer observe unknown"},
+    {"id": "AC3-066", "status": "PASS", "layer": "unit", "note": "text_only skips images"},
+    {"id": "AC3-067", "status": "PASS", "layer": "unit", "note": "UNKNOWN asks; no auto replay / Ctrl+A"},
+    {"id": "AC3-068", "status": "PASS", "layer": "unit", "note": "intent duplicate and busy"},
+    {"id": "AC3-073", "status": "PASS", "layer": "unit"},
+    {"id": "AC3-078", "status": "PASS", "layer": "unit", "note": "legacy Alt+Shift+I mapped to recall only"},
+    {"id": "AC3-080", "status": "PASS", "layer": "static+unit", "note": "capture optional at pairing"},
+    {"id": "AC3-083", "status": "PASS", "layer": "unit", "note": "200 freeze+intent rounds; 2h device soak BLOCKED_NATIVE"},
+    {"id": "AC3-085", "status": "NOT_RUN", "layer": "CI", "note": "preview-v3.yml pytest only; onedir spec present, not built"},
+    {"id": "AC3-087", "status": "PASS", "layer": "unit", "note": "pick_port skips occupied, does not kill"},
+    {"id": "AC3-089", "status": "BLOCKED_NATIVE", "layer": "device matrix"},
+    {"id": "AC3-093", "status": "PASS", "layer": "docs", "note": "preview-notes candidate; not a stable Release"},
+    {"id": "AC3-096", "status": "PASS", "layer": "git", "note": "isolated branch only"}
+  ]
+}

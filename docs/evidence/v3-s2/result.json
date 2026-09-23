@@ -1,0 +1,166 @@
+{
+  "started_at": "2026-09-19T03:28:30.098848+00:00",
+  "sample": "遮住保密区后只投成品，不要原图",
+  "source": {
+    "path": "G:\\AgentStorage\\Temp\\User\\dt-v3-s2-d2\\s2-source.png",
+    "sha256": "6a3edf37e6f05f4551c381c9e167d833e390c44e2a61907c96423572cf8206ba",
+    "bytes": 3762,
+    "width": 400,
+    "height": 300
+  },
+  "error": null,
+  "cursor_claimed": false,
+  "android_claimed": false,
+  "prototype_used": false,
+  "pixels": {
+    "has_image": true,
+    "delivered_sha": "b9dcbb66b2f30cb26f22b0e92aed1d9f619e4fbc99e43c9956778c78c394b9b7",
+    "source_sha": "6a3edf37e6f05f4551c381c9e167d833e390c44e2a61907c96423572cf8206ba",
+    "sha_differs": true,
+    "delivered_size": [
+      250,
+      220
+    ],
+    "source_size": [
+      400,
+      300
+    ],
+    "smaller_than_source": true,
+    "magenta_source": 7029,
+    "magenta_delivered": 0,
+    "secret_covered": true
+  },
+  "editor": {
+    "ok": true,
+    "crop": {
+      "x": 100,
+      "y": 40,
+      "w": 250,
+      "h": 220
+    },
+    "ops": 2
+  },
+  "upload_complete_ok": true,
+  "upload_meta": {
+    "asset_id": "26956775-fa1d-480d-a7e7-7bac72630ef6",
+    "render_revision": 1,
+    "sha256": "cf1361e5caf275483cf78923ed73394412f1e717b9869fbb52a00f339b09d029",
+    "mime": "image/png",
+    "bytes": 4821,
+    "width": 250,
+    "height": 220,
+    "role": "photo"
+  },
+  "pair_posts": [
+    "{\"code\":\"2BbDM5bWpUs\"}"
+  ],
+  "chunk_puts": 2,
+  "completes": 1,
+  "draft_text": "遮住保密区后只投成品，不要原图",
+  "draft_assets": [
+    {
+      "asset_id": "26956775-fa1d-480d-a7e7-7bac72630ef6",
+      "render_revision": 1,
+      "sha256": "cf1361e5caf275483cf78923ed73394412f1e717b9869fbb52a00f339b09d029",
+      "mime": "image/png",
+      "bytes": 4821,
+      "width": 250,
+      "height": 220,
+      "role": "photo"
+    }
+  ],
+  "last_bundle_assets": [
+    {
+      "asset_id": "26956775-fa1d-480d-a7e7-7bac72630ef6",
+      "render_revision": 1,
+      "sha256": "cf1361e5caf275483cf78923ed73394412f1e717b9869fbb52a00f339b09d029",
+      "mime": "image/png",
+      "bytes": 4821,
+      "width": 250,
+      "height": 220,
+      "role": "photo"
+    }
+  ],
+  "hud_visible_flag": true,
+  "hud_titles": [
+    "DT-V3-HUD"
+  ],
+  "focus_after_sync": [
+    "Chrome_WidgetWin_1",
+    "ChatGPT - 豆包浏览器"
+  ],
+  "target_focused": true,
+  "focus_before_insert": [
+    "TkTopLevel",
+    "DT-S2-PasteTarget"
+  ],
+  "target_state": {
+    "title": "DT-S2-PasteTarget",
+    "text": "遮住保密区后只投成品，不要原图",
+    "images": [
+      {
+        "sha256": "b9dcbb66b2f30cb26f22b0e92aed1d9f619e4fbc99e43c9956778c78c394b9b7",
+        "path": "G:\\AgentStorage\\Temp\\User\\dt-v3-s2-d2\\pasted\\1-b9dcbb66b2f3.png",
+        "width": 250,
+        "height": 220,
+        "bytes": 2342
+      }
+    ],
+    "events": [
+      {
+        "kind": "image",
+        "t": 1789788509.8347516,
+        "sha256": "b9dcbb66b2f30cb26f22b0e92aed1d9f619e4fbc99e43c9956778c78c394b9b7",
+        "width": 250,
+        "height": 220
+      },
+      {
+        "kind": "text",
+        "t": 1789788509.8744056,
+        "text": "遮住保密区后只投成品，不要原图"
+      }
+    ],
+    "has_focus": true
+  },
+  "enter_count": 0,
+  "attempt": {
+    "attempt_id": "943c8ed8-e33b-4091-be0e-4191aa77920e",
+    "intent_id": "1999132c-9c1f-4762-aa7a-2732da1d0724",
+    "bundle_id": "59d2b059-af35-4064-90aa-a37d04623353",
+    "adapter_id": "s2_paste_target",
+    "result": "CONFIRMED",
+    "steps": [
+      {
+        "index": 0,
+        "kind": "image",
+        "asset_id": "26956775-fa1d-480d-a7e7-7bac72630ef6",
+        "state": "observed",
+        "evidence": "target_attachment"
+      },
+      {
+        "index": 1,
+        "kind": "text",
+        "asset_id": null,
+        "state": "observed",
+        "evidence": "target_text"
+      }
+    ]
+  },
+  "gates": {
+    "production_frontend_text": true,
+    "pair_only_code": true,
+    "chunked_upload": true,
+    "draft_has_finished_asset": true,
+    "bundle_frozen": true,
+    "image_then_text": true,
+    "target_has_text": true,
+    "sha_not_source": true,
+    "secret_covered": true,
+    "cropped": true,
+    "zero_enter": true,
+    "hud_shown": true,
+    "not_cursor": true,
+    "adapter_not_cursor": true
+  },
+  "ok": true
+}

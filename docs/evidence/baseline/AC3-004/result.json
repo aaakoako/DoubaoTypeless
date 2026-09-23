@@ -1,0 +1,13 @@
+{
+  "case_id": "AC3-004",
+  "status": "PASS",
+  "observed": "sanitized fixtures used; daily-use config.json absent; AppData roaming exists=False local exists=False",
+  "expected": "真实Key/正文不进fixtures；旧日用目录保持原样",
+  "started_at": "2026-09-18T05:23:25.190784+00:00",
+  "commit_sha": "e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5",
+  "evidence_paths": [
+    "tests/fixtures/legacy/config.sanitized.json",
+    "tests/fixtures/legacy/dictionary.sample.txt",
+    "docs/evidence/baseline/AC3-004/daily-use-snapshot.json"
+  ]
+}

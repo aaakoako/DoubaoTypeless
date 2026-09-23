@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:doubaotypeless:v3:intent",
+  "title": "User-authorized insert intent v3",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol",
+    "intent_id",
+    "bundle_id",
+    "manifest_hash",
+    "session_id",
+    "session_nonce",
+    "trigger",
+    "recovery_mode"
+  ],
+  "properties": {
+    "protocol": {
+      "const": 3
+    },
+    "intent_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "bundle_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "manifest_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "session_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "session_nonce": {
+      "type": "string",
+      "minLength": 32,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "trigger": {
+      "enum": [
+        "phone_click",
+        "desktop_hotkey",
+        "desktop_click"
+      ]
+    },
+    "recovery_mode": {
+      "enum": [
+        "full",
+        "text_only",
+        "remaining_verified"
+      ]
+    }
+  }
+}

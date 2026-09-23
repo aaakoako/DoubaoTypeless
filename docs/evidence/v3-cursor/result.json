@@ -1,0 +1,30 @@
+{
+  "case_id": "AC3-006",
+  "started_at": "2026-09-18T07:59:22.239318+00:00",
+  "cursor_windows": [
+    {
+      "hwnd": 199492,
+      "title": "Cursor Agents",
+      "class_name": "Chrome_WidgetWin_1"
+    }
+  ],
+  "uia": {
+    "cursor_windows": [
+      {
+        "hwnd": 199492,
+        "title": "Cursor Agents",
+        "class_name": "Chrome_WidgetWin_1"
+      }
+    ],
+    "focus": null,
+    "composer_control": null,
+    "image_children": null,
+    "text_value": null,
+    "engine": null,
+    "error": "UIAutomationClient.CUIAutomation: (-2147221005, '无效的类字符串', None, None)"
+  },
+  "observe_image": "unknown",
+  "observe_text": "unknown",
+  "status": "BLOCKED_NATIVE",
+  "observed": "Cursor 在跑，但 UIA 未定位 Composer chatinput，附件观察仍为 unknown"
+}

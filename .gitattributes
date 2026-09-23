@@ -1,0 +1,7 @@
+# Vite templates and generated text must be identical on Windows and Linux.
+# Do not apply normalization to runtime user data or image assets.
+web/**/*.html text eol=lf
+web/**/*.ts text eol=lf
+web/**/*.js text eol=lf
+web/**/*.css text eol=lf
+web/**/*.json text eol=lf

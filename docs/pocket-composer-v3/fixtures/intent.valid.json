@@ -1,0 +1,10 @@
+{
+  "protocol": 3,
+  "intent_id": "00000000-0000-4000-8000-000000000006",
+  "bundle_id": "00000000-0000-4000-8000-000000000001",
+  "manifest_hash": "bccfa3c730f1195a03a7b207d994a2c29c7200d86474ce7e4d352566bf07214e",
+  "session_id": "00000000-0000-4000-8000-000000000007",
+  "session_nonce": "demo_nonce_only_not_a_credential_123456",
+  "trigger": "phone_click",
+  "recovery_mode": "full"
+}

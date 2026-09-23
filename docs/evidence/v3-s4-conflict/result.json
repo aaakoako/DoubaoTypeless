@@ -1,0 +1,19 @@
+{
+  "slice": "S4_conflict_session_quit",
+  "source_head_before": "3094f2ac156162a8f406980925ddffb48975dac8",
+  "status": "IMPLEMENTED",
+  "pytest": "130 passed, 1 skipped",
+  "fixed": [
+    "A12 apply_phone_update is the only phone draft writer; PC edit parks WS updates; take/keep are real; insert/commit from phone rejected while PC edits",
+    "A14 Qt timers use a receiver widget; stop() closes hotkeys and SQLite",
+    "A17 revoke closes the bound WebSocket; capture uses the requesting session; asset GET checks owner_session_id"
+  ],
+  "pack": {
+    "attempted": true,
+    "ok": false,
+    "reason": "live DoubaoTypelessV3Preview locks dist/_internal; did not taskkill",
+    "note": "A16 remains open until an unlocked rebuild"
+  },
+  "not_release": true,
+  "html_board_is_not_product": true
+}

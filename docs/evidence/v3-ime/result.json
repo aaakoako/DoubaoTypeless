@@ -1,0 +1,9 @@
+{
+  "case_id": "AC3-037/090",
+  "started_at": "2026-09-18T07:58:58.164554+00:00",
+  "adb": null,
+  "devices": [],
+  "ime": null,
+  "status": "BLOCKED_NATIVE",
+  "observed": "本机没有 adb，无法录制真机豆包输入法 composition"
+}

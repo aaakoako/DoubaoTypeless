@@ -1,0 +1,51 @@
+{
+  "started_at": "2026-09-19T03:28:18.227302+00:00",
+  "sample": "桌面批准后的正式前端文字\n第二行仍是当前稿",
+  "error": null,
+  "cursor_claimed": false,
+  "android_claimed": false,
+  "prototype_used": false,
+  "desktop_grant_insert": true,
+  "review_text": "桌面批准后的正式前端文字\n第二行仍是当前稿",
+  "window_url": "http://192.168.8.105:55849/",
+  "pair_posts": [
+    "{\"code\":\"oGukD18Z2gw\"}"
+  ],
+  "draft_text": "桌面批准后的正式前端文字\n第二行仍是当前稿",
+  "ws_seen": false,
+  "target_focused": true,
+  "target_state": {
+    "title": "DT-S1-TextTarget",
+    "text": "桌面批准后的正式前端文字\n第二行仍是当前稿",
+    "has_focus": true
+  },
+  "enter_count": 0,
+  "attempt": {
+    "attempt_id": "bbc01515-ea07-4eaf-9052-8828dba052f3",
+    "intent_id": "8e63dfc0-d586-4097-9e56-a56b63727ecf",
+    "bundle_id": "4d7828c1-cab5-4214-ba78-1dd929e5428f",
+    "adapter_id": "generic_text",
+    "result": "UNKNOWN",
+    "steps": [
+      {
+        "index": 0,
+        "kind": "text",
+        "asset_id": null,
+        "state": "unknown",
+        "evidence": "none"
+      }
+    ]
+  },
+  "settings_saved": true,
+  "gates": {
+    "production_frontend_text": true,
+    "pair_only_code": true,
+    "desktop_grant": true,
+    "review_has_text": true,
+    "target_has_text": true,
+    "zero_enter": true,
+    "settings_saved": true,
+    "not_cursor": true
+  },
+  "ok": true
+}

@@ -2,6 +2,22 @@
 
 This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
+## V3 产品交付（当前主任务）
+
+完整 V3 的唯一规范入口是 `docs/v3-product/START_HERE.md` 与 `docs/v3-product/MASTER_PLAN.md`。断点在 `docs/v3-delivery/CHECKPOINT.json`。旧 `docs/v3-delivery/` 只保留契约、检查器和证据。
+
+- 隔离分支开发；不 merge、不打 tag、不发布 Release、不覆盖日用 `config.json` / `data/`。
+- 目标是可发布的 Windows 候选：重构客户端和手机工作区，主路径为「看清/改字 → 插入并复制 → 收窗 → 手机新段落 → 上次可恢复」。
+- HTML `UI_BOARD.html` 是视觉辅助，不是原生客户端完成。
+- A01–A18 必须改代码；缺设备只阻塞对应验证。
+
+预览运行（隔离数据目录）：
+
+```bash
+$env:DT_V3_DATA_DIR="$env:LOCALAPPDATA\DoubaoTypeless\preview-v3"
+python -m doubao_typeless
+```
+
 ## Project Overview
 
 DoubaoTypeless is a Windows desktop tool that bridges mobile phone voice input to PC text insertion over WiFi. Users speak into their phone browser, text syncs to a PC review window, and after optional AI-powered correction, inserts at the system cursor position. Built with Python 3.11+, CustomTkinter, and aiohttp.

@@ -1,0 +1,25 @@
+{
+  "review_sha": "e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5",
+  "tracked_hashes": {
+    "data/dictionary.txt": "8fcb2b8c9faeaed91fa3f24b140cae7c9a060bc76a1875e924d504c1475b420b",
+    "AGENTS.md": "ae7aaf4e5f1ff68127703959b05af572790ef2f791d902a22aa843322f27ad3a",
+    "paths.py": "5e806733169cc09ed2716a77dbe1ae8d3fa46598b4b26d00eba5c96a25f6467c",
+    "config.py": "4a75e3c96bb547a248229d8c28ba8e8fd7f5d2a9a8fda1d0d9fdf26d1b42cfd6"
+  },
+  "must_remain_absent": [
+    "config.json",
+    "debug.log",
+    "data/review_history.json",
+    "data/learn_pending.json",
+    "data/learning_samples.jsonl",
+    "data/domain_terms.json",
+    "data/dict_suggestions_pending.json"
+  ],
+  "repo_config_exists": false,
+  "appdata": {
+    "roaming": "C:\\Users\\Administrator\\AppData\\Roaming\\DoubaoTypeless",
+    "roaming_exists": false,
+    "local": "C:\\Users\\Administrator\\AppData\\Local\\DoubaoTypeless",
+    "local_exists": false
+  }
+}

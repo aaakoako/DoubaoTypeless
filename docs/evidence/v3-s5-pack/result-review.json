@@ -1,0 +1,21 @@
+{
+  "slice": "S5_independent_review",
+  "source_head_before": "30b5b11bf77405f055fa7aae147a409e93f41d03",
+  "status": "IMPLEMENTED",
+  "pytest": "147 passed",
+  "fixed": [
+    "DT_V3_TARGET_STATE alone cannot enable the file observer or fake CONFIRMED",
+    "Check update opens the public download page and never replaces daily-use",
+    "Saving settings rebinds hotkeys; daily vocab import is read-only of the source",
+    "Review packet: GETTING_STARTED, MIGRATION, APPROVAL, SUPPORT"
+  ],
+  "pack": {
+    "console_exe_sha256": "fd06cfd510ea23ebb1a4c4f9051b87da8422252f5b3f86724d93df766c96f084",
+    "windowed_exe_sha256": "42dc749286afb551457abebe60aa2aafe20f3f3455a552393318a493d09063ba",
+    "smoke_quit": 0,
+    "release": false,
+    "signed": false
+  },
+  "independent_review": "WAITING",
+  "not_release": true
+}

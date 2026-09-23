@@ -1,0 +1,3 @@
+# v3-00 sanitized dictionary sample; no user body text
+by coding=vibe coding
+芥末奶=Gemini

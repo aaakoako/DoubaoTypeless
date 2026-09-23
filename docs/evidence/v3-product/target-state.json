@@ -1,0 +1,17 @@
+{
+  "images": [
+    {
+      "sha256": "7b96e8661dcc3bf90db8b2cb4fecc2e6637cae63a7f62d8b2cc764adc1e413d8",
+      "width": 160,
+      "height": 100
+    },
+    {
+      "sha256": "65bf51e7bc1bf473cc2a2c89cfd10b4c57c12e4cf6026cf7598d783c24003149",
+      "width": 160,
+      "height": 100
+    }
+  ],
+  "text": "BEFORE把按钮右移\nOpus 与 Image2\n",
+  "enter_count": 0,
+  "updated_at": 1789717267.0488718
+}

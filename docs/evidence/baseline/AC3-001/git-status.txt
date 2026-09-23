@@ -1,0 +1,8 @@
+## v3/00-baseline
+ M .gitignore
+?? docs/
+?? tests/fixtures/
+?? tests/test_v3_00_baseline.py
+?? tools/v3_00_freeze.py
+?? tools/v3_00_native_harness.py
+?? tools/v3_00_paste_target.py

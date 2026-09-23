@@ -1,0 +1,13 @@
+{
+  "slice": "REVIEW_8326BB4",
+  "status": "BUILT",
+  "source_head": "74600da87627b7b739df8326dba4b88774256f27",
+  "exe_sha256": "035fca0bc7945e45e2338c4ed481887e548b7aec09fbe4b3a8bd14542b1c0677",
+  "exe_bytes": 12696330,
+  "zip_sha256": "53bda5fb1c7a8f3a2bda3071f409e6e48d13c880d7bc0b12d2a9088ebe5db21a",
+  "webengine": false,
+  "release": false,
+  "signed": false,
+  "note": "Isolated onedir after review 8326bb4 remediations. Not RELEASE_READY. Not a GitHub Release.",
+  "rebuilt_for": "review_8326bb4_fixes"
+}

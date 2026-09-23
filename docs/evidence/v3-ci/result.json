@@ -1,0 +1,20 @@
+{
+  "card": "AC3-085",
+  "previous_run": 35323737872,
+  "previous_result": "FAILED collection: ModuleNotFoundError: No module named 'PIL' in 6 files",
+  "files": [
+    "tests/test_v3_assets.py",
+    "tests/test_v3_bridge.py",
+    "tests/test_v3_capture.py",
+    "tests/test_v3_chunk_http.py",
+    "tests/test_v3_remaining.py",
+    "tests/test_v3_runtime.py"
+  ],
+  "workflow_change": ".github/workflows/preview-v3.yml now pip installs Pillow",
+  "local_pytest": {
+    "cmd": "python -m pytest -q --tb=short",
+    "exit_code": 0,
+    "output": "81 passed in 0.91s"
+  },
+  "github_run_on_this_sha": "NOT_RUN"
+}

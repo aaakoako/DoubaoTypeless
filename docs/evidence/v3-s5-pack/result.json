@@ -1,0 +1,23 @@
+{
+  "slice": "S5_pack_and_visual",
+  "source_head_before": "ac92b249618e07134a9b35c15a48604a744c6d09",
+  "status": "IMPLEMENTED",
+  "pytest": "140 passed",
+  "fixed": [
+    "A16 rebuilt isolated onedir to docs/evidence/v3-s5-pack so the live dist/ preview lock was not overwritten or killed",
+    "A18 preview pipe/data/autostart names stay off daily-use; tests set DT_V3_PIPE; pick_port probes 0.0.0.0 like the server",
+    "HUD has 复制 plus 插入并复制; recent list uses human result labels; preview window title is 预览; generated DT icon"
+  ],
+  "pack": {
+    "ok": true,
+    "exe_sha256": "1bf29ff452495c3a1f3b0483834a3706b078e0019472ad83b522c586885a5f39",
+    "zip_sha256": "2a08aba77fa460966654eea52eeca9785567f060fa564adc5eccd145e45cfa6d",
+    "onedir_files": 891,
+    "smoke_port": "8767",
+    "smoke_quit": 0,
+    "release": false,
+    "signed": false
+  },
+  "not_release": true,
+  "html_board_is_not_product": true
+}

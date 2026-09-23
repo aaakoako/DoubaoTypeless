@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>Pocket Composer · 电脑设置</title>
+  <style>
+    body{font:15px/1.5 system-ui,sans-serif;max-width:560px;margin:24px auto;color:#202437}
+    label{display:block;margin:10px 0 4px}
+    input,button{font:inherit}
+    input[type=text],input[type=password]{width:100%;padding:8px;border:1px solid #DCE1EC;border-radius:8px;box-sizing:border-box}
+    button{margin-top:12px;margin-right:8px;background:#5B5CE2;color:#fff;border:0;border-radius:10px;padding:8px 14px}
+    button.ghost{background:#F1F3FA;color:#202437}
+    .muted{color:#687087;font-size:13px}
+    .card{border:1px solid #DCE1EC;border-radius:12px;padding:12px;margin:12px 0}
+    h2{font-size:16px;margin:20px 0 8px}
+  </style>
+</head>
+<body>
+  <h1>电脑设置</h1>
+  <p class="muted">三步上手：手机打开地址 → 输入配对码 → 在这里确认插入/截图。不配 API Key。拒绝截图仍可同步文字。Alt+I 插入，Alt+Shift+I 召回，不再同时绑定跳过纠错。</p>
+  <div id="sessions"></div>
+  <h2>快捷键</h2>
+  <p class="muted" id="hotkeyNote"></p>
+  <label>插入</label>
+  <input id="hotInsert" type="text" />
+  <label>召回</label>
+  <input id="hotRecall" type="text" />
+  <p class="muted" id="hotProbe"></p>
+  <button id="saveHot" type="button">保存热键（下次启动生效）</button>
+  <h2>可选 BYOK</h2>
+  <p class="muted">默认收起的旁路。测试连接只发短固定文本，不带当前草稿、图片或历史。</p>
+  <label>接口</label>
+  <input id="endpoint" type="text" placeholder="https://api.example/v1" />
+  <label>密钥（只存本机，失焦遮掩）</label>
+  <input id="apiKey" type="password" autocomplete="off" />
+  <p class="muted" id="redacted"></p>
+  <button id="save">保存密钥</button>
+  <button id="probe" type="button">测试连接</button>
+  <p id="probeOut" class="muted"></p>
+  <script>
+    let loadedEndpoint = "";
+    function hostOf(url) {
+      try { return new URL(url).hostname.toLowerCase(); } catch { return ""; }
+    }
+    async function load() {
+      const sessions = await (await fetch("/v3/sessions")).json();
+      const host = document.getElementById("sessions");
+      host.innerHTML = (sessions.items || []).map((s) => `
+        <div class="card" data-id="${s.session_id}">
+          <div>设备 ${s.device_id}</div>
+          <label><input type="checkbox" data-grant="allow_insert" ${s.allow_insert ? "checked" : ""}/> 允许插入</label>
+          <label><input type="checkbox" data-grant="allow_capture" ${s.allow_capture ? "checked" : ""}/> 允许截图</label>
+          <button data-save-grants>保存授权</button>
+          <button class="ghost" data-revoke>撤销设备</button>
+        </div>`).join("") || "<p class='muted'>还没有已配对设备。手机文字同步不需要插入权限。</p>";
+      host.querySelectorAll("[data-save-grants]").forEach((btn) => {
+        btn.onclick = async () => {
+          const card = btn.closest(".card");
+          const body = {
+            session_id: card.dataset.id,
+            allow_insert: card.querySelector('[data-grant="allow_insert"]').checked,
+            allow_capture: card.querySelector('[data-grant="allow_capture"]').checked,
+          };
+          await fetch("/v3/grants", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        };
+      });
+      host.querySelectorAll("[data-revoke]").forEach((btn) => {
+        btn.onclick = async () => {
+          if (!confirm("撤销后立即断开该设备，确定？")) return;
+          const card = btn.closest(".card");
+          await fetch("/v3/sessions/revoke", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_id: card.dataset.id }) });
+          load();
+        };
+      });
+      const byok = await (await fetch("/v3/byok")).json();
+      loadedEndpoint = byok.endpoint || "";
+      document.getElementById("endpoint").value = loadedEndpoint;
+      document.getElementById("redacted").textContent = byok.api_key_set ? `已保存 ${byok.redacted}` : "未配置密钥";
+      const hot = await (await fetch("/v3/hotkeys")).json();
+      document.getElementById("hotInsert").value = hot.insert || "";
+      document.getElementById("hotRecall").value = hot.recall || "";
+      document.getElementById("hotkeyNote").textContent = hot.note || "";
+      document.getElementById("hotProbe").textContent = "探测 " + JSON.stringify(hot.probe || {});
+    }
+    document.getElementById("saveHot").onclick = async () => {
+      const data = await (await fetch("/v3/hotkeys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hotkey_insert: document.getElementById("hotInsert").value,
+          hotkey_recall: document.getElementById("hotRecall").value,
+        }),
+      })).json();
+      document.getElementById("hotProbe").textContent = data.hint || "已保存，下次启动生效";
+    };
+    document.getElementById("save").onclick = async () => {
+      const next = document.getElementById("endpoint").value;
+      if (hostOf(next) && hostOf(loadedEndpoint) && hostOf(next) !== hostOf(loadedEndpoint) && !document.getElementById("apiKey").value) {
+        document.getElementById("redacted").textContent = "更换服务地址后，需重新授权密钥";
+        return;
+      }
+      const res = await fetch("/v3/byok", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: next,
+          api_key: document.getElementById("apiKey").value,
+        }),
+      });
+      const data = await res.json();
+      if (data.needs_reauth) {
+        document.getElementById("redacted").textContent = data.message;
+        return;
+      }
+      loadedEndpoint = next;
+      document.getElementById("redacted").textContent = data.redacted ? `已保存 ${data.redacted}` : "未配置密钥";
+      document.getElementById("apiKey").value = "";
+    };
+    document.getElementById("probe").onclick = async () => {
+      const data = await (await fetch("/v3/byok/probe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "probe" }),
+      })).json();
+      document.getElementById("probeOut").textContent = JSON.stringify({ status: data.status, reason: data.reason, message: data.message });
+    };
+    load();
+  </script>
+</body>
+</html>

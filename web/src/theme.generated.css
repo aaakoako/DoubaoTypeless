@@ -1,0 +1,28 @@
+/* Generated from assets/ui-theme.json. */
+:root {
+  --bg: #F6F7FB;
+  --surface: #FFFFFF;
+  --ink: #202437;
+  --muted: #687087;
+  --line: #DCE1EC;
+  --accent: #5B5CE2;
+  --accent-hover: #4B4BCB;
+  --accent-pressed: #3F3FB0;
+  --soft: #ECEEFF;
+  --hover: #E6E9F5;
+  --pressed: #DCE1F0;
+  --disabled: #EEF0F6;
+  --disabled-ink: #747D91;
+  --danger: #B42318;
+  --danger-soft: #FFF1F0;
+  --warning: #925C0B;
+  --warning-soft: #FFF5DF;
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --space-unit: 4px;
+  --control-height: 34px;
+  --touch-height: 44px;
+  --text-size: 13px;
+  --title-size: 20px;
+  color-scheme: light;
+}

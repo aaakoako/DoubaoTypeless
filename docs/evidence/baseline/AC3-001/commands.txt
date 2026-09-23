@@ -1,0 +1,60 @@
+[
+  {
+    "cmd": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "exit_code": 0,
+    "output": "e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5\n"
+  },
+  {
+    "cmd": [
+      "git",
+      "rev-parse",
+      "--abbrev-ref",
+      "HEAD"
+    ],
+    "exit_code": 0,
+    "output": "v3/00-baseline\n"
+  },
+  {
+    "cmd": [
+      "git",
+      "status",
+      "--short",
+      "--branch"
+    ],
+    "exit_code": 0,
+    "output": "## v3/00-baseline\n M .gitignore\n?? docs/\n?? tests/fixtures/\n?? tests/test_v3_00_baseline.py\n?? tools/v3_00_freeze.py\n?? tools/v3_00_native_harness.py\n?? tools/v3_00_paste_target.py\n"
+  },
+  {
+    "cmd": [
+      "git",
+      "worktree",
+      "list"
+    ],
+    "exit_code": 0,
+    "output": "G:/DoubaoTypeless/DoubaoTypeless  e6b5b08 [v3/00-baseline]\nG:/DoubaoTypeless/preview-v3-00   e6b5b08 (detached HEAD)\n"
+  },
+  {
+    "cmd": [
+      "git",
+      "diff",
+      "--name-status",
+      "e6b5b085d055d6f4306d486fb6d8e3cd5dfa84d5"
+    ],
+    "exit_code": 0,
+    "output": "M\t.gitignore\n"
+  },
+  {
+    "cmd": [
+      "git",
+      "ls-files",
+      "--others",
+      "--exclude-standard"
+    ],
+    "exit_code": 0,
+    "output": "docs/evidence/baseline/AC3-001/commands.txt\ndocs/evidence/baseline/AC3-001/diff-name-status-vs-review-sha.txt\ndocs/evidence/baseline/AC3-001/environment.json\ndocs/evidence/baseline/AC3-001/git-branch.txt\ndocs/evidence/baseline/AC3-001/git-rev-parse.txt\ndocs/evidence/baseline/AC3-001/git-status.txt\ndocs/evidence/baseline/AC3-001/git-worktree.txt\ndocs/evidence/baseline/AC3-001/result.json\ndocs/evidence/baseline/AC3-001/untracked.txt\ndocs/evidence/baseline/AC3-002/after-input.png\ndocs/evidence/baseline/AC3-002/after-insert.png\ndocs/evidence/baseline/AC3-002/app-stdout.txt\ndocs/evidence/baseline/AC3-002/environment.json\ndocs/evidence/baseline/AC3-002/events.json\ndocs/evidence/baseline/AC3-002/phone-html-status.txt\ndocs/evidence/baseline/AC3-002/result.json\ndocs/evidence/baseline/AC3-002/target-captured.txt\ndocs/evidence/baseline/AC3-003/environment.json\ndocs/evidence/baseline/AC3-003/hidden.png\ndocs/evidence/baseline/AC3-003/hotkey-migration.md\ndocs/evidence/baseline/AC3-003/idle.png\ndocs/evidence/baseline/AC3-003/input.png\ndocs/evidence/baseline/AC3-003/result.json\ndocs/evidence/baseline/AC3-004/daily-use-snapshot.json\ndocs/evidence/baseline/AC3-004/environment.json\ndocs/evidence/baseline/AC3-004/result.json\ndocs/evidence/baseline/agents-conflicts.md\ndocs/evidence/baseline/prototype-prerequisite.md\ndocs/pocket-composer-v3/COMPLETE_SPEC.md\ndocs/pocket-composer-v3/HANDBOOK.html\ndocs/pocket-composer-v3/MANIFEST.json\ndocs/pocket-composer-v3/README.md\ndocs/pocket-composer-v3/contracts/README.md\ndocs/pocket-composer-v3/contracts/attempt.schema.json\ndocs/pocket-composer-v3/contracts/bundle.schema.json\ndocs/pocket-composer-v3/contracts/intent.schema.json\ndocs/pocket-composer-v3/design/STATE_BOARDS.html\ndocs/pocket-composer-v3/design/idle.png\ndocs/pocket-composer-v3/design/markup.png\ndocs/pocket-composer-v3/design/overview.png\ndocs/pocket-composer-v3/design/phone-composer.png\ndocs/pocket-composer-v3/design/phone-dark.png\ndocs/pocket-composer-v3/design/phone-idle.png\ndocs/pocket-composer-v3/design/phone-markup.png\ndocs/pocket-composer-v3/design/phone-recovery.png\ndocs/pocket-composer-v3/design/phone-retry.png\ndocs/pocket-composer-v3/design/phone-text.png\ndocs/pocket-composer-v3/design/phone-whiteboard.png\ndocs/pocket-composer-v3/design/retry.png\ndocs/pocket-composer-v3/design/text.png\ndocs/pocket-composer-v3/design/tokens.json\ndocs/pocket-composer-v3/design/whiteboard.png\ndocs/pocket-composer-v3/evidence/DELIVERY_STATUS.md\ndocs/pocket-composer-v3/evidence/contracts-report.json\ndocs/pocket-composer-v3/evidence/contrast-report.json\ndocs/pocket-composer-v3/evidence/handoff-report.json\ndocs/pocket-composer-v3/evidence/prototype-report.json\ndocs/pocket-composer-v3/fixtures/acceptance.json\ndocs/pocket-composer-v3/fixtures/attempt.valid.json\ndocs/pocket-composer-v3/fixtures/bundle.valid.json\ndocs/pocket-composer-v3/fixtures/intent.valid.json\ndocs/pocket-composer-v3/fixtures/manifest.canonical.json\ndocs/pocket-composer-v3/fixtures/sample.png\ndocs/pocket-composer-v3/fixtures/tasks.json\ndocs/pocket-composer-v3/prototype/README.md\ndocs/pocket-composer-v3/prototype/index.html\ndocs/pocket-composer-v3/spec/00_PRODUCT.md\ndocs/pocket-composer-v3/spec/01_UX_AND_VISUAL.md\ndocs/pocket-composer-v3/spec/02_MOBILE_EDITOR.md\ndocs/pocket-composer-v3/spec/03_INSERT_AND_RECOVERY.md\ndocs/pocket-composer-v3/spec/04_ARCHITECTURE_AND_PROTOCOL.md\ndocs/pocket-composer-v3/spec/05_SECURITY_PERFORMANCE_MIGRATION.md\ndocs/pocket-composer-v3/spec/06_IMPLEMENTATION_TASKS.md\ndocs/pocket-composer-v3/spec/07_VALIDATION.md\ndocs/pocket-composer-v3/spec/08_AI_HANDOFF.md\ndocs/pocket-composer-v3/spec/09_BASELINE_AND_SOURCES.md\ndocs/pocket-composer-v3/spec/10_COMPONENT_DETAILS.md\ndocs/pocket-composer-v3/tasks/V3-00.md\ndocs/pocket-composer-v3/tasks/V3-01.md\ndocs/pocket-composer-v3/tasks/V3-02.md\ndocs/pocket-composer-v3/tasks/V3-03.md\ndocs/pocket-composer-v3/tasks/V3-04.md\ndocs/pocket-composer-v3/tasks/V3-05.md\ndocs/pocket-composer-v3/tasks/V3-06.md\ndocs/pocket-composer-v3/tasks/V3-07.md\ndocs/pocket-composer-v3/tasks/V3-08.md\ndocs/pocket-composer-v3/tasks/V3-09.md\ndocs/pocket-composer-v3/tasks/V3-10.md\ndocs/pocket-composer-v3/tasks/V3-11.md\ndocs/pocket-composer-v3/tasks/V3-12.md\ndocs/pocket-composer-v3/tasks/V3-13.md\ndocs/pocket-composer-v3/tasks/V3-14.md\ndocs/pocket-composer-v3/tasks/V3-15.md\ndocs/pocket-composer-v3/tasks/V3-16.md\ndocs/pocket-composer-v3/tasks/V3-17.md\ndocs/pocket-composer-v3/tasks/V3-18.md\ndocs/pocket-composer-v3/tasks/V3-19.md\ndocs/pocket-composer-v3/tasks/V3-20.md\ndocs/pocket-composer-v3/tasks/V3-21.md\ndocs/pocket-composer-v3/tasks/V3-22.md\ndocs/pocket-composer-v3/tasks/V3-23.md\ndocs/pocket-composer-v3/tools/check_contracts.py\ndocs/pocket-composer-v3/tools/check_handoff.py\ndocs/pocket-composer-v3/tools/check_prototype.py\ndocs/pocket-composer-v3/tools/render_previews.py\ntests/fixtures/legacy/config.sanitized.json\ntests/fixtures/legacy/dictionary.sample.txt\ntests/test_v3_00_baseline.py\ntools/v3_00_freeze.py\ntools/v3_00_native_harness.py\ntools/v3_00_paste_target.py\n"
+  }
+]

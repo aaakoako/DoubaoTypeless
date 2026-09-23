@@ -1,0 +1,56 @@
+{
+  "kind": "documentation_handoff_not_application",
+  "review_sha": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
+  "files": [
+    {
+      "path": "COVERAGE.json",
+      "bytes": 78466,
+      "sha256": "76c1d6930dac5bd2faf8e2fdc9f99eb6e739942c38317406b3207588ca2676ef"
+    },
+    {
+      "path": "GROK_PROMPT.md",
+      "bytes": 4623,
+      "sha256": "39f10127296228525e160c422b2cc8d5c3ee63de6cd75169c04d2236beb5cbaf"
+    },
+    {
+      "path": "MASTER_PLAN.md",
+      "bytes": 71901,
+      "sha256": "91e199e27404f289a8f234c5fa2d048d5111d3db0ef4829a7527cc4c362a7ab6"
+    },
+    {
+      "path": "READABLE_PLAN.html",
+      "bytes": 82548,
+      "sha256": "99e461d48d423c6f8d6eda81800720a43407ba02c2465f55143442c18c303f96"
+    },
+    {
+      "path": "START_HERE.md",
+      "bytes": 2970,
+      "sha256": "22cd5a8f28a1530283c7ae3dfde10a4857b19a59237487b11908351f168f816b"
+    },
+    {
+      "path": "UI_BOARD.html",
+      "bytes": 27968,
+      "sha256": "14d387a4c8a79400a8f2483d02e2b0866d167381792f25540077a87a6cb39a15"
+    },
+    {
+      "path": "UI_REFERENCE.png",
+      "bytes": 206005,
+      "sha256": "74e0a239bf25e6a204f27804369a131d5ce956c55532b2c79ec6749638cef24b"
+    },
+    {
+      "path": "evidence/HANDOFF_CHECK.json",
+      "bytes": 1576,
+      "sha256": "157fe3ac72a680aa0c81b28fee356bbf1efd731d33dad38a6972cbdb0ddf0d64"
+    },
+    {
+      "path": "evidence/REVIEW_INDEX.json",
+      "bytes": 21912,
+      "sha256": "3e3980941316873b39ea366f12c89b5ad5a37cb651c05414e8bd2cb43c5b3acb"
+    },
+    {
+      "path": "evidence/REVIEW_OBSERVATIONS.json",
+      "bytes": 2301,
+      "sha256": "cd55c0459f98580c7c0a6416b4f66e38999956f6783e5c0a9c01001630d7fae3"
+    }
+  ]
+}

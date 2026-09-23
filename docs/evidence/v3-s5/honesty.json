@@ -1,0 +1,51 @@
+{
+  "note": "S5 诚实快照。不修改冻结验收目录。BLOCKED/NOT_RUN/WAITING 必须保留。",
+  "independent_review": "WAITING",
+  "release_ready": false,
+  "s5_updates": {
+    "AC3-085": {
+      "status": "NOT_RUN",
+      "reason": "preview-v3.yml 现为先 pytest 再 Windows onedir；本 SHA 的 GitHub Actions 尚未跑绿"
+    },
+    "AC3-086": {
+      "status": "PASS",
+      "layer_limit": "automated inspect-only",
+      "reason": "脱敏旧配置失败后再读，不写原文件，start_learn 恒为 false，不把 Key 拷进 preview settings"
+    },
+    "AC3-087": {
+      "status": "PASS",
+      "layer_limit": "two V3 preview instances",
+      "reason": "同数据目录第二实例退出且不强杀；不同目录可并存；默认避开 8765。与日用进程热键碰撞仍需实机观察"
+    },
+    "AC3-088": {
+      "status": "PASS",
+      "layer_limit": "local artifact",
+      "reason": "checksums.txt 绑定 git SHA 与 exe 哈希；无 WebEngine。不是 CI artifact 云端 PASS"
+    },
+    "AC3-092": {
+      "status": "PASS",
+      "layer_limit": "automated",
+      "reason": "过期 pairing/nonce、未知 asset_ref、重连不自动插入。真机乱序断线矩阵仍 BLOCKED"
+    },
+    "AC3-093": {
+      "status": "NOT_RUN",
+      "reason": "材料已写：exe、checksums、限制、回退。人工打开 ZIP 的验收未签"
+    },
+    "AC3-094": {
+      "status": "PASS",
+      "layer_limit": "trace table in preview-notes",
+      "reason": "R01–R10 有证据指针；R11 标明后置"
+    },
+    "AC3-096": {
+      "status": "PASS",
+      "reason": "preview workflow 无 tag/Release；release.yml 仍仅 v* tag。本次未 merge、未打 tag、未发 Release、未覆盖日用目录"
+    }
+  },
+  "still_blocked_or_waiting": [
+    "AC3-006 Cursor 图后文",
+    "AC3-008 Cursor 附件可观察性",
+    "AC3-061 已验证 Composer",
+    "真机 Android/豆包",
+    "S2/S5 独立复核"
+  ]
+}

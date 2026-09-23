@@ -1,0 +1,16 @@
+{
+  "captured_at": "2026-09-19T03:30:14.311930+00:00",
+  "launcher": "G:\\DoubaoTypeless\\DoubaoTypeless\\dist\\DoubaoTypelessV3Preview\\DoubaoTypelessV3Preview.exe",
+  "used_exe": true,
+  "pre_quit_code": 1,
+  "status_protocol": 3,
+  "second_exit": 0,
+  "first_still_serving_after_second": true,
+  "quit_exit": 0,
+  "first_exit_after_quit": 0,
+  "http_down_after_quit": true,
+  "taskkill_used": false,
+  "file_log": true,
+  "settings_path_isolated": "G:\\AgentStorage\\Temp\\User\\dt-v3-life\\data\\settings.json",
+  "ok": true
+}

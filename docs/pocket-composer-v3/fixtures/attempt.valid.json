@@ -1,0 +1,23 @@
+{
+  "attempt_id": "00000000-0000-4000-8000-000000000008",
+  "intent_id": "00000000-0000-4000-8000-000000000006",
+  "bundle_id": "00000000-0000-4000-8000-000000000001",
+  "adapter_id": "demo-only",
+  "result": "CONFIRMED",
+  "steps": [
+    {
+      "index": 0,
+      "kind": "image",
+      "asset_id": "00000000-0000-4000-8000-000000000005",
+      "state": "observed",
+      "evidence": "target_attachment"
+    },
+    {
+      "index": 1,
+      "kind": "text",
+      "asset_id": null,
+      "state": "observed",
+      "evidence": "target_text"
+    }
+  ]
+}

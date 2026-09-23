@@ -1,0 +1,34 @@
+{
+  "slice": "D1_desktop_entry",
+  "engineering_preview": true,
+  "desktop_product_complete": false,
+  "waiting_independent_review_only": false,
+  "console_false_only": false,
+  "ordinary_user_must_not": [
+    "open pc.html",
+    "read pair.txt",
+    "edit JSON",
+    "set DT_V3_DATA_DIR"
+  ],
+  "implemented_in_source": [
+    "ClientWindow 560x600 live QR/URL/pairing from running V3Bridge",
+    "grants/revoke on AuthService",
+    "settings save to isolated settings.json including BYOK",
+    "ReviewPanel editable text; phone updates stashed while editing",
+    "RecoveryDialog full/text_only/cancel",
+    "close hides to tray; QLocalServer DoubaoTypelessV3Preview wake",
+    "file log under data_dir/logs/v3.log",
+    "startup errors QMessageBox",
+    "autostart Run value DoubaoTypelessV3Preview not daily DoubaoTypeless"
+  ],
+  "not_yet": [
+    "this working tree packed as the double-click onedir",
+    "user pack console=False (kept True until packed GUI is proven)",
+    "two-process wake captured against a rebuilt EXE",
+    "phone/image/whiteboard/BYOK re-verified from this GUI",
+    "independent review"
+  ],
+  "screenshots": "python tools/v3_d1_desktop.py against live V3App, not HTML prototype",
+  "pytest": "116 passed",
+  "head_at_record": "55d03cc965652c3a8e019174d9d8463575446acc plus uncommitted D1"
+}

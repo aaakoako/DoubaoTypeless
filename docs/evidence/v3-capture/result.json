@@ -1,0 +1,50 @@
+{
+  "case_id": "AC3-042/043/044",
+  "status": "PASS",
+  "observed": {
+    "image_size": [
+      360,
+      240
+    ],
+    "center_pixel": [
+      225,
+      29,
+      72
+    ],
+    "dpr": 2.0,
+    "bbox": [
+      1740,
+      912,
+      2100,
+      1152
+    ],
+    "qt_geo": [
+      870,
+      456,
+      180,
+      120
+    ],
+    "monitors": [
+      {
+        "scope": "primary",
+        "left": 0,
+        "top": 0,
+        "width": 3840,
+        "height": 2160
+      }
+    ],
+    "primary": [
+      0,
+      0,
+      3840,
+      2160
+    ],
+    "cancel_no_grab": true,
+    "hud_hidden_before_grab": true
+  },
+  "expected": "region pixels match swatch; cancel adds no image; HUD hidden",
+  "started_at": "2026-09-18T07:58:58.968622+00:00",
+  "evidence_paths": [
+    "docs/evidence/v3-capture/region-swatch.png"
+  ]
+}

@@ -1,0 +1,2146 @@
+{
+  "schema_version": 1,
+  "purpose": "定义与映射，不是产品PASS报告",
+  "review_sha": "4eb8c4454a879e6b7ce11cf47e1bb0bfdba93b9a",
+  "original_source": "conversation attachment DoubaoTypeless_PocketComposer_v3.zip / fixtures/acceptance.json",
+  "original_sha256": "abb1f2a53059b3c4457ef82a5a627c9ecd362c443a6b900df06807fac2176ecc",
+  "source_case_count": 96,
+  "ux_case_count": 24,
+  "original_cases": [
+    {
+      "id": "AC3-001",
+      "original_definition": {
+        "id": "AC3-001",
+        "task": "V3-00",
+        "title": "固定SHA",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "记录git rev-parse HEAD、git status、旧版配置目录与分支；对比审查SHA",
+        "expected": "不reset、不覆盖未提交改动；基线差异逐文件列出",
+        "layer": "静态",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S0",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-002",
+      "original_definition": {
+        "id": "AC3-002",
+        "task": "V3-00",
+        "title": "旧文字闭环",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "旧版本无Key输入中文/换行/英文术语并Alt+I",
+        "expected": "完整记录旧版实际结果，已知失败不能填通过",
+        "layer": "Windows+手机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-003",
+      "original_definition": {
+        "id": "AC3-003",
+        "task": "V3-00",
+        "title": "旧行为证据",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "记录旧版空闲窗口、输入窗口、关闭窗口及热键行为",
+        "expected": "录像/截图能说明输入才显示的习惯；旧Alt+Shift+I局部跳过纠错语义已记入迁移",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-004",
+      "original_definition": {
+        "id": "AC3-004",
+        "task": "V3-00",
+        "title": "隔离数据",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "使用脱敏样例运行旧测试与配置读取",
+        "expected": "真实Key/正文不进fixtures；旧日用目录保持原样",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S0",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-005",
+      "original_definition": {
+        "id": "AC3-005",
+        "task": "V3-01",
+        "title": "非激活窗口",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "打开文本编辑器输入，收到样板消息显示360×88 HUD",
+        "expected": "原键盘焦点不变；HUD隐藏不删除文字",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-006",
+      "original_definition": {
+        "id": "AC3-006",
+        "task": "V3-01",
+        "title": "真实图后文",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "目标Cursor中依次放入两张不同测试图片和两行文字",
+        "expected": "附件实际可见且顺序正确；不按Enter；记录Cursor版本/所选图像模型",
+        "layer": "Windows",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-007",
+      "original_definition": {
+        "id": "AC3-007",
+        "task": "V3-01",
+        "title": "同进程错焦点",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "焦点切到Cursor代码区或终端，再触发插入",
+        "expected": "不因进程名相同而当Composer，不能发键到代码区",
+        "layer": "Windows",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-008",
+      "original_definition": {
+        "id": "AC3-008",
+        "task": "V3-01",
+        "title": "图片就绪可观察性",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "慢网络/附件加载中探测UIA可见结构",
+        "expected": "列出可验证字段；看不到则UNKNOWN并阻塞全自动能力通过",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-009",
+      "original_definition": {
+        "id": "AC3-009",
+        "task": "V3-02",
+        "title": "中文组词",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "豆包语音输入且尾句自动回改，穿插普通键盘",
+        "expected": "无重复、无截尾、不抢输入法麦克风",
+        "layer": "真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-010",
+      "original_definition": {
+        "id": "AC3-010",
+        "task": "V3-02",
+        "title": "一指绘画两指平移",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "画一笔后用两指平移捏合再画",
+        "expected": "无额外墨点；变换后的笔画命中位置准确",
+        "layer": "真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-011",
+      "original_definition": {
+        "id": "AC3-011",
+        "task": "V3-02",
+        "title": "键盘挤压",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "打开文字抽屉、弹键盘、收起并旋转屏幕",
+        "expected": "完成/撤销按钮可达，画布不重置，不丢已有笔画",
+        "layer": "真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-012",
+      "original_definition": {
+        "id": "AC3-012",
+        "task": "V3-02",
+        "title": "原生资源样板",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "锁定Python/Qt与前端依赖，生成一个可启动样板包",
+        "expected": "只声明样板通过，保存包体和空闲资源，不扩大到全项目已完成",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-013",
+      "original_definition": {
+        "id": "AC3-013",
+        "task": "V3-03",
+        "title": "快照冻结",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "提交稿r3后将当前稿改成r4并修改图片顺序",
+        "expected": "Attempt仍只读取r3图文；r4未被污染",
+        "layer": "自动",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-014",
+      "original_definition": {
+        "id": "AC3-014",
+        "task": "V3-03",
+        "title": "同版冲突",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "发送同draft+epoch+revision但不同hash的两份内容",
+        "expected": "拒绝冲突并要求重同步，不覆盖已ACK版本",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-015",
+      "original_definition": {
+        "id": "AC3-015",
+        "task": "V3-03",
+        "title": "精确保留文本",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "输入前导空格、尾换行、emoji与混合中英文",
+        "expected": "序列化往返逐字一致，不trim/NFKC",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-016",
+      "original_definition": {
+        "id": "AC3-016",
+        "task": "V3-03",
+        "title": "清空版本隔离",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "投递r3后手机已继续到r4，再送r3归档回执",
+        "expected": "r4保留；只归档匹配r3，其他设备不清空",
+        "layer": "自动",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": "第4.3：匹配版本新稿与UNKNOWN纯文字非破坏性轮换；接收证据不改。",
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-017",
+      "original_definition": {
+        "id": "AC3-017",
+        "task": "V3-04",
+        "title": "未配对拒绝",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "未鉴权访问WS、图片下载、截图、插入端点",
+        "expected": "均拒绝；不计为连接设备，不执行任何平台操作",
+        "layer": "自动",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S0",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-018",
+      "original_definition": {
+        "id": "AC3-018",
+        "task": "V3-04",
+        "title": "挑战过期撤销",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "复用已消费挑战、过期token、撤销手机后继续发消息",
+        "expected": "均失效；电脑状态和手机可操作提示一致",
+        "layer": "自动",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S0",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-019",
+      "original_definition": {
+        "id": "AC3-019",
+        "task": "V3-04",
+        "title": "权限分离",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "仅同步权限手机发送capture.request或insert.intent",
+        "expected": "拒绝，不能默认提升为截图/按键权限",
+        "layer": "自动",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S0",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-020",
+      "original_definition": {
+        "id": "AC3-020",
+        "task": "V3-04",
+        "title": "跨站与限流",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "伪造Origin/Host、空Origin非受信客户端、突发超限消息",
+        "expected": "按协议拒绝/节流，无shell/路径/按键任意执行入口",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S0",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-021",
+      "original_definition": {
+        "id": "AC3-021",
+        "task": "V3-05",
+        "title": "大图断点续传",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "上传4MiB图到一半断开再恢复",
+        "expected": "只补缺块，SHA256吻合后ready；不重复资产",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-022",
+      "original_definition": {
+        "id": "AC3-022",
+        "task": "V3-05",
+        "title": "恶意或超限资源",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "文件扩展名伪装、错误哈希、超20MiB、超48MP、路径穿越名",
+        "expected": "拒绝并删除临时残留；没有内存失控/任意路径写入",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-023",
+      "original_definition": {
+        "id": "AC3-023",
+        "task": "V3-05",
+        "title": "磁盘满",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "模拟fsync/rename/DB提交失败",
+        "expected": "无durable ACK，手机仍保留素材，可重试",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-024",
+      "original_definition": {
+        "id": "AC3-024",
+        "task": "V3-05",
+        "title": "版本与GC",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "旧render迟到且新图在Attempt中，同时执行清理",
+        "expected": "旧图不替换新图，有引用图不被删除",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-025",
+      "original_definition": {
+        "id": "AC3-025",
+        "task": "V3-06",
+        "title": "ACK真实语义",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "阻断服务端落地但保留WebSocket send成功",
+        "expected": "手机不能显示电脑已收到",
+        "layer": "自动",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": "第4.3/5.1：保存、完成和新稿分别ACK；所有入口统一通知。",
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-026",
+      "original_definition": {
+        "id": "AC3-026",
+        "task": "V3-06",
+        "title": "重连最新快照",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "断线输入和画图后重连，注入重复乱序消息",
+        "expected": "最终新版本一致，旧intent/capture不执行",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-027",
+      "original_definition": {
+        "id": "AC3-027",
+        "task": "V3-06",
+        "title": "尾字提交",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "输入后80ms内马上点插入",
+        "expected": "最终快照含最后一字，不能只读上次防抖值",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-028",
+      "original_definition": {
+        "id": "AC3-028",
+        "task": "V3-06",
+        "title": "IME与活动分离",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "心跳、旧消息重播与真实editor.activity混合",
+        "expected": "心跳不唤HUD；编辑活动最多2s一次且不算资产已保存",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-029",
+      "original_definition": {
+        "id": "AC3-029",
+        "task": "V3-07",
+        "title": "空闲无窗口",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "冷启完成和连接手机后静置10分钟",
+        "expected": "无HUD/吸附球/桌面卡片；不因心跳唤醒",
+        "layer": "Windows",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": "第3.2：idle无HUD，但主动窗口正常存在；不沿用固定两行。",
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-030",
+      "original_definition": {
+        "id": "AC3-030",
+        "task": "V3-07",
+        "title": "生命周期",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "文字变动→显示→6秒静置→隐藏；图文插入完成",
+        "expected": "尺寸遵守360×88/132；结果900ms隐藏；草稿仍可召回",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": "第3.2/4.3：bounded autoheight、开始投递收窗、结果隐藏和非破坏性轮换。",
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-031",
+      "original_definition": {
+        "id": "AC3-031",
+        "task": "V3-07",
+        "title": "Esc归属",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "HUD显示但编辑器有焦点，按Esc",
+        "expected": "外部编辑器收到Esc；本工具不全局吞键",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-032",
+      "original_definition": {
+        "id": "AC3-032",
+        "task": "V3-07",
+        "title": "DPI与全屏",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "100/150/200%DPI、多屏断开、全屏程序输入",
+        "expected": "位置在工作区内，不自动挡全屏；明确热键可召回",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-033",
+      "original_definition": {
+        "id": "AC3-033",
+        "task": "V3-08",
+        "title": "热键连按",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "长按Alt+I触发系统repeat直到松开",
+        "expected": "只生成一次Attempt，释放后新动作才被接受",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-034",
+      "original_definition": {
+        "id": "AC3-034",
+        "task": "V3-08",
+        "title": "修饰键释放",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "按Alt+Shift+I保持Alt/Shift未松",
+        "expected": "等待释放再Ctrl+V，无菜单快捷键误触",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-035",
+      "original_definition": {
+        "id": "AC3-035",
+        "task": "V3-08",
+        "title": "权限与锁屏",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "目标提升权限、锁屏或窗口消失",
+        "expected": "安全停止；不自动提权，不丢稿",
+        "layer": "Windows",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-036",
+      "original_definition": {
+        "id": "AC3-036",
+        "task": "V3-08",
+        "title": "剪贴板干扰",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "复制中途让其他程序改剪贴板/占用剪贴板",
+        "expected": "检测后停止/有限重试，不覆写用户新内容，不无限等待",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-037",
+      "original_definition": {
+        "id": "AC3-037",
+        "task": "V3-09",
+        "title": "纯文字零负担",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "新用户不配Key只语音输入并按电脑热键",
+        "expected": "无必须打包/发送页面，无空附件占位栏",
+        "layer": "真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": "第3.5/4：默认插入并复制，普通串行下一段无额外确认。",
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-038",
+      "original_definition": {
+        "id": "AC3-038",
+        "task": "V3-09",
+        "title": "图序与删除",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "加入3图，拖动排序、左右移动、删除并撤销",
+        "expected": "预览与投递顺序一致；撤销恢复原图序",
+        "layer": "自动+真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-039",
+      "original_definition": {
+        "id": "AC3-039",
+        "task": "V3-09",
+        "title": "手机按钮语义",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "空内容、失联、上传中、已同步分别点主按钮",
+        "expected": "禁用/准备/请求行为符合规范，不离线排队按键",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-040",
+      "original_definition": {
+        "id": "AC3-040",
+        "task": "V3-09",
+        "title": "适配窄屏",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "360/390/430px宽以及键盘打开测试",
+        "expected": "44px命中区域、主按钮不被遮挡、无整页水平溢出",
+        "layer": "真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-041",
+      "original_definition": {
+        "id": "AC3-041",
+        "task": "V3-10",
+        "title": "手机截电脑",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "首次批准显示器1，此后手机点截电脑",
+        "expected": "只有指定显示器当前帧进入手机，不截全部屏幕",
+        "layer": "Windows+真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-042",
+      "original_definition": {
+        "id": "AC3-042",
+        "task": "V3-10",
+        "title": "区域截图",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "热键区域选择后取消一次再完成一次",
+        "expected": "取消无新图片；完成正确区域，HUD不出现在截图",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-043",
+      "original_definition": {
+        "id": "AC3-043",
+        "task": "V3-10",
+        "title": "DPI坐标",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "不同DPI屏幕跨边界选区/负坐标显示器",
+        "expected": "像素范围与选择一致，无缩放错位",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-044",
+      "original_definition": {
+        "id": "AC3-044",
+        "task": "V3-10",
+        "title": "过期隐私",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "锁屏、权限撤销、过期request、快速连点",
+        "expected": "拒绝/限流；无周期截图，恢复前台不补拍",
+        "layer": "自动+Windows",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-045",
+      "original_definition": {
+        "id": "AC3-045",
+        "task": "V3-11",
+        "title": "方向与类型",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "导入手机竖图EXIF方向、PNG透明图、未支持HEIC/SVG",
+        "expected": "方向正确；未支持明确拒绝，不空白图误成功",
+        "layer": "真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-046",
+      "original_definition": {
+        "id": "AC3-046",
+        "task": "V3-11",
+        "title": "裁剪后标注",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "先在图四角画标记，再裁剪中央、缩放和继续画",
+        "expected": "导出只含所选范围，坐标不漂移",
+        "layer": "自动+真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-047",
+      "original_definition": {
+        "id": "AC3-047",
+        "task": "V3-11",
+        "title": "可逆裁剪",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "应用裁剪→撤销→恢复全图→再次裁剪",
+        "expected": "源图不被覆盖，历史操作一致",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-048",
+      "original_definition": {
+        "id": "AC3-048",
+        "task": "V3-11",
+        "title": "触控手柄",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "手机手指拖四角和四边，最小选区与边界",
+        "expected": "44px命中；选区不超图；取消恢复进入前矩形",
+        "layer": "真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-049",
+      "original_definition": {
+        "id": "AC3-049",
+        "task": "V3-12",
+        "title": "三种笔刷",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "同图绘圆头笔、记号笔、荧光笔并导出",
+        "expected": "线宽/不透明度符合，荧光笔一笔内部不叠加变黑",
+        "layer": "真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-050",
+      "original_definition": {
+        "id": "AC3-050",
+        "task": "V3-12",
+        "title": "几何与橡皮",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "箭头、矩形、椭圆、文字、编号→移动→橡皮→撤销",
+        "expected": "底图不被擦除；对象可恢复；文字中文正常",
+        "layer": "自动+真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-051",
+      "original_definition": {
+        "id": "AC3-051",
+        "task": "V3-12",
+        "title": "指针取消",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "绘画中第二指加入/系统pointercancel/离开边界",
+        "expected": "无幽灵笔画，无卡死；下次单指仍能画",
+        "layer": "自动+真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-052",
+      "original_definition": {
+        "id": "AC3-052",
+        "task": "V3-12",
+        "title": "撤销重做",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "连续50步混合绘画裁剪删除，撤销重做，新画一笔",
+        "expected": "新分支清redo，不清现有图；达到预算只丢旧Undo能力",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-053",
+      "original_definition": {
+        "id": "AC3-053",
+        "task": "V3-13",
+        "title": "白板起稿",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "新建横版/竖版/方形，添图形与语音说明",
+        "expected": "无项目选择页，空白白板不能加附件",
+        "layer": "真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-054",
+      "original_definition": {
+        "id": "AC3-054",
+        "task": "V3-13",
+        "title": "组件可编辑",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "放按钮/容器/文本线/图片占位，拖动和改标题",
+        "expected": "组件是可改对象，不是不可编辑整张图片",
+        "layer": "自动+真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-055",
+      "original_definition": {
+        "id": "AC3-055",
+        "task": "V3-13",
+        "title": "辅助网格",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "网格开关、适配视图、导出",
+        "expected": "默认不导出网格，画布尺寸不随手机旋转改变",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-056",
+      "original_definition": {
+        "id": "AC3-056",
+        "task": "V3-13",
+        "title": "图文同稿",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "白板画完回主页面，与截图一起投递",
+        "expected": "两图顺序清晰，轻量白板属于首轮范围",
+        "layer": "Windows+真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-057",
+      "original_definition": {
+        "id": "AC3-057",
+        "task": "V3-14",
+        "title": "真实扁平导出",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "遮挡/裁剪含敏感测试词区域并解码导出文件",
+        "expected": "结果无被裁区域/原图层/EXIF；遮挡像素完全覆盖",
+        "layer": "自动",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-058",
+      "original_definition": {
+        "id": "AC3-058",
+        "task": "V3-14",
+        "title": "清晰度与限额",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "2560PNG、4096高清、大图>8MiB、合计>24MiB",
+        "expected": "不静默丢图，不覆盖原图；有缩图/拆分提示",
+        "layer": "真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-059",
+      "original_definition": {
+        "id": "AC3-059",
+        "task": "V3-14",
+        "title": "编号说明",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "两图各放①②，写说明，重排图序后生成说明",
+        "expected": "引用指向正确图片；没有注释不自动编造描述",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-060",
+      "original_definition": {
+        "id": "AC3-060",
+        "task": "V3-14",
+        "title": "导出失败保稿",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "取消导出/Worker失败/内存不足后返回编辑",
+        "expected": "源图与已完成操作还在，可降分辨率重试",
+        "layer": "自动+真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-061",
+      "original_definition": {
+        "id": "AC3-061",
+        "task": "V3-15",
+        "title": "按顺序发键",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "两个真实图+多行文字投到已验证Composer",
+        "expected": "图1确认→图2确认→文字，整个过程0次Enter",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-062",
+      "original_definition": {
+        "id": "AC3-062",
+        "task": "V3-15",
+        "title": "慢附件",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "故意延长目标附件加载、改变UI结构",
+        "expected": "不盲sleep后续贴；超时/不可观测返回UNKNOWN",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-063",
+      "original_definition": {
+        "id": "AC3-063",
+        "task": "V3-15",
+        "title": "中途换目标",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "贴完图1后点击其他应用",
+        "expected": "停止剩余图片和文字，不自动把新目标当原目标",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S2/S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-064",
+      "original_definition": {
+        "id": "AC3-064",
+        "task": "V3-15",
+        "title": "强制冻结",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "投递中手机继续改图和追加文本",
+        "expected": "本次仍是原Bundle，下一稿保留，不混图",
+        "layer": "自动+Windows",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S1",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-065",
+      "original_definition": {
+        "id": "AC3-065",
+        "task": "V3-16",
+        "title": "错焦点重试",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "在代码区第一次失败，点Composer按Alt+Shift+I",
+        "expected": "召回上次固定图文，以新目标完整重试",
+        "layer": "Windows",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-066",
+      "original_definition": {
+        "id": "AC3-066",
+        "task": "V3-16",
+        "title": "部分补贴",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "图片confirmed且文字尚未sent，同目标召回",
+        "expected": "提供只补文字，不再重复附件",
+        "layer": "自动+Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-067",
+      "original_definition": {
+        "id": "AC3-067",
+        "task": "V3-16",
+        "title": "未知恢复",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "在sent后崩溃重启；或更换输入文档再重试",
+        "expected": "不自动重放；显示恢复选择，不自动Ctrl+A/Delete",
+        "layer": "Windows",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-068",
+      "original_definition": {
+        "id": "AC3-068",
+        "task": "V3-16",
+        "title": "Intent幂等",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "同UUID重发、长按热键、BUSY时第二个intent、网络重连",
+        "expected": "不产生第二次发键；新用户重试需新intent",
+        "layer": "自动",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-069",
+      "original_definition": {
+        "id": "AC3-069",
+        "task": "V3-17",
+        "title": "上次不是当前",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "投递A后开始新草稿B，再召回上次",
+        "expected": "得到A的图文，B不丢不覆盖A",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-070",
+      "original_definition": {
+        "id": "AC3-070",
+        "task": "V3-17",
+        "title": "重启恢复",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "退出/崩溃后重启恢复未完成快照",
+        "expected": "图片真实字节仍在；缺图明确缺失，不造假成功",
+        "layer": "Windows",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-071",
+      "original_definition": {
+        "id": "AC3-071",
+        "task": "V3-17",
+        "title": "清理与删除",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "24h/20份/256MiB上限以及手动删除",
+        "expected": "无引用清理正确；活动包受保护，磁盘满停止新增",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-072",
+      "original_definition": {
+        "id": "AC3-072",
+        "task": "V3-17",
+        "title": "密钥库失败",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "模拟凭据库不可用、关闭磁盘历史、导出诊断",
+        "expected": "回到会话模式并说明；诊断无token/key/正文/图像",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S3",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-073",
+      "original_definition": {
+        "id": "AC3-073",
+        "task": "V3-18",
+        "title": "无Key完整可用",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "Key为空完成截图、画图、同步、投递、召回",
+        "expected": "所有核心功能可用，网络不自动请求模型",
+        "layer": "Windows+真机",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S4",
+      "explicit_override": "第3.3/5.4：所有核心无Key可用，有图的稿可只发送文字做可选辅助。",
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-074",
+      "original_definition": {
+        "id": "AC3-074",
+        "task": "V3-18",
+        "title": "API错误细分",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "mock 401/404/429/超时/TLS/格式错误",
+        "expected": "原文可插入；提示区别明确，无Key泄露",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S4",
+      "explicit_override": "第3.3/S4：真实配置model、共享异步transport和结构化错误。",
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-075",
+      "original_definition": {
+        "id": "AC3-075",
+        "task": "V3-18",
+        "title": "歧义术语",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "输入Midjourney、O pass、O PU S并配置候选",
+        "expected": "危险词仅提示；不因为用过一次就永久替换",
+        "layer": "自动",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S4",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-076",
+      "original_definition": {
+        "id": "AC3-076",
+        "task": "V3-18",
+        "title": "过期AI结果",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "发起AI后编辑/插入/切换草稿",
+        "expected": "旧返回不覆盖新文字；默认不上传图与历史",
+        "layer": "自动",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S4",
+      "explicit_override": "第3.3/4：完成时读取真实当前revision/epoch/hash，不比较调用前整数。",
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-077",
+      "original_definition": {
+        "id": "AC3-077",
+        "task": "V3-19",
+        "title": "三步上手",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "新用户扫码→输入测试→练习插入，不配API",
+        "expected": "引导后空闲无窗口，知道召回快捷键",
+        "layer": "Windows+真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S4",
+      "explicit_override": "第3.1/5.3：扫码零手输；练习可跳过且退出主页面。",
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-078",
+      "original_definition": {
+        "id": "AC3-078",
+        "task": "V3-19",
+        "title": "热键迁移",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "导入自定义旧快捷键，旧局部Alt+Shift+I跳过纠错",
+        "expected": "保留自定义；清楚说明新召回语义，不同时绑定两种动作",
+        "layer": "Windows",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S4",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-079",
+      "original_definition": {
+        "id": "AC3-079",
+        "task": "V3-19",
+        "title": "真冲突反馈",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "外部占用建议热键，再注册候选键位",
+        "expected": "失败提示改键，不把语法合法当注册成功",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S4",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-080",
+      "original_definition": {
+        "id": "AC3-080",
+        "task": "V3-19",
+        "title": "权限不诱导",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "拒绝截图或远程插入，仍使用手机文字同步",
+        "expected": "功能边界准确、可改授权，不要求全权限才能用",
+        "layer": "Windows+真机",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S4",
+      "explicit_override": "第5.3：短码仅备用待批准，长随机凭据不可人工截短。",
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-081",
+      "original_definition": {
+        "id": "AC3-081",
+        "task": "V3-20",
+        "title": "空闲预算",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "固定机器预热后采样10min/真实连接手机",
+        "expected": "报告CPU/P95/Private bytes，隐藏无rAF循环/持续截屏",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S5",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-082",
+      "original_definition": {
+        "id": "AC3-082",
+        "task": "V3-20",
+        "title": "画布重负载",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "真机2MP、200笔、缩放裁剪撤销导出",
+        "expected": "记录帧时间与导出；未达标按资源策略处理而非删笔画",
+        "layer": "真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S5",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-083",
+      "original_definition": {
+        "id": "AC3-083",
+        "task": "V3-20",
+        "title": "两小时200轮",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "连续语音、截屏、改图、重试、断连共200轮",
+        "expected": "无丢稿/错误清空/双重投递；逐轮留证据",
+        "layer": "Windows+真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S5",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-084",
+      "original_definition": {
+        "id": "AC3-084",
+        "task": "V3-20",
+        "title": "包体和首屏",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "产物统计前端首屏/懒加载、便携ZIP依赖",
+        "expected": "无WebEngine/开发依赖；预算超限列阻塞与剖析",
+        "layer": "构建",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S5",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-085",
+      "original_definition": {
+        "id": "AC3-085",
+        "task": "V3-21",
+        "title": "干净构建",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "Windows runner依赖锁定，先测试再打onedir",
+        "expected": "制品含网页/图标/许可证/版本；不触发稳定Release",
+        "layer": "CI",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S0/S5",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-086",
+      "original_definition": {
+        "id": "AC3-086",
+        "task": "V3-21",
+        "title": "迁移安全",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "脱敏旧配置迁移失败后重跑再回退",
+        "expected": "原文件未损，凭据迁移幂等，旧learn不自启动",
+        "layer": "自动+Windows",
+        "severity": "P0",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S5",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-087",
+      "original_definition": {
+        "id": "AC3-087",
+        "task": "V3-21",
+        "title": "双实例隔离",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "稳定版运行时启动候选",
+        "expected": "不强杀、不抢热键/端口且有说明",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S5",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-088",
+      "original_definition": {
+        "id": "AC3-088",
+        "task": "V3-21",
+        "title": "制品可追溯",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "记录SHA/依赖锁/测试日志/包hash/操作系统",
+        "expected": "从artifact能定位固定提交，没有本机临时资源依赖",
+        "layer": "CI",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S0/S5",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-089",
+      "original_definition": {
+        "id": "AC3-089",
+        "task": "V3-22",
+        "title": "目标版本矩阵",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "记录Cursor版本、模型、UI语言、权限、DPI、图片类型",
+        "expected": "逐组合PASS/FAIL/BLOCKED；不写泛泛支持所有Agent",
+        "layer": "Windows",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S5",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-090",
+      "original_definition": {
+        "id": "AC3-090",
+        "task": "V3-22",
+        "title": "移动矩阵",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "Android Chrome及用户实际浏览器+豆包；iOS Safari旁路检查",
+        "expected": "核心Android路径通过；iOS不虚标豆包相同能力",
+        "layer": "真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S5",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-091",
+      "original_definition": {
+        "id": "AC3-091",
+        "task": "V3-22",
+        "title": "视觉独立比对",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "原生HUD/手机各宽度与设计tokens、流程截图比对",
+        "expected": "非设计外壳当产品；按钮/尺寸/隐藏行为一致",
+        "layer": "Windows+真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S4",
+      "explicit_override": "第3：新平面全状态视觉、bounded HUD、图标、原生与手机对照。",
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-092",
+      "original_definition": {
+        "id": "AC3-092",
+        "task": "V3-22",
+        "title": "失败红队",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "乱序断线/过期intent/错误目标/删除图片/插入中退出",
+        "expected": "可复现结果和补救文案齐全，不隐藏高危失败",
+        "layer": "自动+真机",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S0/S5",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-093",
+      "original_definition": {
+        "id": "AC3-093",
+        "task": "V3-23",
+        "title": "候选交付完整",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "打开新ZIP查exe、校验值、限制、回退说明",
+        "expected": "明确未发布稳定版，用户能独立试用/退出/回退",
+        "layer": "人工",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S5",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-094",
+      "original_definition": {
+        "id": "AC3-094",
+        "task": "V3-23",
+        "title": "需求追溯",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "从R01–R11逐项追到任务/用例/实际证据",
+        "expected": "R01–R10无遗漏；R11明确后置不伪装已实现",
+        "layer": "人工",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S5",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-095",
+      "original_definition": {
+        "id": "AC3-095",
+        "task": "V3-23",
+        "title": "状态诚实",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "检查每条验收及实际命令结果",
+        "expected": "无证据项BLOCKED/NOT_RUN；不将原型通过当产品通过",
+        "layer": "人工",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S5",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "AC3-096",
+      "original_definition": {
+        "id": "AC3-096",
+        "task": "V3-23",
+        "title": "发布授权边界",
+        "preconditions": "在独立测试数据与固定提交下，按本卡前置任务准备环境；涉及平台时用实际设备，不用HTML原型替代。",
+        "steps": "检查分支、tag、release和日用目录差异",
+        "expected": "没有自动merge/tag/release或覆盖稳定安装",
+        "layer": "人工",
+        "severity": "P1",
+        "status": "NOT_RUN",
+        "evidence": []
+      },
+      "delivery_stage": "S5",
+      "explicit_override": null,
+      "new_product_result": "NOT_RUN",
+      "evidence": []
+    }
+  ],
+  "experience_cases": [
+    {
+      "id": "UX-01",
+      "title": "插入并复制结果",
+      "delivery_stage": "S1",
+      "expected": "从四入口插入本次文本，检查真实目标和系统剪贴板，文字逐字相等；不以按钮标签作证明。",
+      "maps_to": [
+        "AC3-015",
+        "AC3-036",
+        "AC3-037"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-02",
+      "title": "只复制不结束当前",
+      "delivery_stage": "S1",
+      "expected": "点击复制只改剪贴板，无发键，无清稿，无清图，当前编辑版本继续。",
+      "maps_to": [
+        "AC3-039"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-03",
+      "title": "连续A/B/C三段",
+      "delivery_stage": "S1",
+      "expected": "三次分别入框/复制，手机每次可新说，不能累计旧文重复，三段均可恢复。",
+      "maps_to": [
+        "AC3-016",
+        "AC3-030",
+        "AC3-037"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-04",
+      "title": "纯文UNKNOWN可恢复轮换",
+      "delivery_stage": "S1",
+      "expected": "真实平台已提交且目标未变，保存上一段再轮换；仍UNKNOWN，无自动重发；无平台提交不轮换。",
+      "maps_to": [
+        "AC3-016",
+        "AC3-025",
+        "AC3-067"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-05",
+      "title": "后到回执不吞新稿",
+      "delivery_stage": "S1",
+      "expected": "A插入时改B，A完成/重复/重连回执不删B，不截字符串前缀。",
+      "maps_to": [
+        "AC3-016",
+        "AC3-026",
+        "AC3-064"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-06",
+      "title": "长文自适应",
+      "delivery_stage": "S1",
+      "expected": "2行/10行/长段/代码自动增高至上限，底边稳定，全文可滚动，不缩小字体。",
+      "maps_to": [
+        "AC3-030",
+        "AC3-091"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-07",
+      "title": "阅读与主动编辑不消失",
+      "delivery_stage": "S1",
+      "expected": "向上阅读/选字/编辑期间停止追尾和隐藏；恢复自动态可按计时隐藏。",
+      "maps_to": [
+        "AC3-030",
+        "AC3-031"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-08",
+      "title": "电脑UI不是投递目标",
+      "delivery_stage": "S1",
+      "expected": "展开改字/恢复对话框后插入，最终目标为先前明确外部控件；本应用绝不能收到自己的投递。",
+      "maps_to": [
+        "AC3-005",
+        "AC3-007",
+        "AC3-065"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-09",
+      "title": "有图上传失败不静默遗漏",
+      "delivery_stage": "S2",
+      "expected": "人为令一图失败，仍在附件清单，主动作提示重试/移除，不直接过滤发文字。",
+      "maps_to": [
+        "AC3-021",
+        "AC3-039",
+        "AC3-060"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-10",
+      "title": "真实HTTP手机源",
+      "delivery_stage": "S2",
+      "expected": "非loopback HTTP生产页检查安全上下文API、same-origin GET及鉴权图像加载；不降低浏览器安全策略。",
+      "maps_to": [
+        "AC3-021",
+        "AC3-039",
+        "AC3-041"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-11",
+      "title": "三来源各一图",
+      "delivery_stage": "S2",
+      "expected": "相册/PC截图/白板各通过处理、传输、真实目标入框，依序后文字，不自动发送。",
+      "maps_to": [
+        "AC3-041",
+        "AC3-045",
+        "AC3-056",
+        "AC3-061"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-12",
+      "title": "成品与源图分离",
+      "delivery_stage": "S2",
+      "expected": "裁剪遮挡后只投选定成品，原图hash/像素不混入，重新编辑仍有源与scene。",
+      "maps_to": [
+        "AC3-047",
+        "AC3-057"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-13",
+      "title": "扫码零手输",
+      "delivery_stage": "S0/S4",
+      "expected": "首次扫码→电脑批准→可用；不再手抄长码；记住设备后正常恢复不重复整套引导。",
+      "maps_to": [
+        "AC3-018",
+        "AC3-077",
+        "AC3-080"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-14",
+      "title": "短码与撤销",
+      "delivery_stage": "S0",
+      "expected": "备用4位120秒/一次性/5次错限制及本机批准；撤销已连WS后不能改稿/读图/截图/插入。",
+      "maps_to": [
+        "AC3-017",
+        "AC3-018",
+        "AC3-019",
+        "AC3-020"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-15",
+      "title": "教程后置",
+      "delivery_stage": "S4",
+      "expected": "已完成用户连接页没有常驻练习框；帮助可打开上手练习且说明不是主目标验收。",
+      "maps_to": [
+        "AC3-077",
+        "AC3-091"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-16",
+      "title": "历史选择稳定且不覆盖",
+      "delivery_stage": "S3/S4",
+      "expected": "选择一条等3秒不消失；恢复历史A前保全非空B；重投保留manifest/attempt身份。",
+      "maps_to": [
+        "AC3-069",
+        "AC3-070",
+        "AC3-071"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-17",
+      "title": "图库与白板重新编辑",
+      "delivery_stage": "S3",
+      "expected": "多选两张，各自完成后可重新编辑首张scene，不只编辑最后一张或扁平结果。",
+      "maps_to": [
+        "AC3-038",
+        "AC3-047",
+        "AC3-052",
+        "AC3-056"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-18",
+      "title": "真实模型配置与不阻塞",
+      "delivery_stage": "S4",
+      "expected": "所选模型进入probe和术语请求；延迟8秒仍可滚动/取消/插入；返回局部建议可拒绝/撤回。",
+      "maps_to": [
+        "AC3-074",
+        "AC3-075",
+        "AC3-076"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-19",
+      "title": "Key与词库保留",
+      "delivery_stage": "S4",
+      "expected": "切服务商可恢复各自Key引用，不跨host泄漏；词库导入冲突预览，明文Key不在settings/诊断。",
+      "maps_to": [
+        "AC3-072",
+        "AC3-075",
+        "AC3-086"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-20",
+      "title": "同类目标切换与修饰键",
+      "delivery_stage": "S2/S3",
+      "expected": "Composer A→B或等待放键时切控件，未发送的余下内容停止；已发步骤不回退零步骤。",
+      "maps_to": [
+        "AC3-034",
+        "AC3-063",
+        "AC3-067"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-21",
+      "title": "四种启动退出",
+      "delivery_stage": "S4/S5",
+      "expected": "首次/手动/自启/重复启动均符合设置；真实点托盘退出；日志/热键/服务/DB有序收尾。",
+      "maps_to": [
+        "AC3-077",
+        "AC3-079",
+        "AC3-087"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-22",
+      "title": "无控制台完整包",
+      "delivery_stage": "S5",
+      "expected": "最终普通用户包无控制台，启动失败有图形反馈；ZIP与exe/资源manifest相符，无开发环境依赖。",
+      "maps_to": [
+        "AC3-084",
+        "AC3-085",
+        "AC3-088",
+        "AC3-093"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-23",
+      "title": "平面全状态与图标",
+      "delivery_stage": "S4/S5",
+      "expected": "连接/AI设置/长文HUD/手机各状态，无凸起导航按钮；图标16至256明暗可辨，焦点状态可用。",
+      "maps_to": [
+        "AC3-040",
+        "AC3-091"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    },
+    {
+      "id": "UX-24",
+      "title": "完整范围不以预览为终点",
+      "delivery_stage": "S5",
+      "expected": "41项取舍对齐、96项与本补充映射完整；无核心未实现项藏为环境阻塞；审批前只有完整候选可申请。",
+      "maps_to": [
+        "AC3-094",
+        "AC3-095",
+        "AC3-096"
+      ],
+      "status": "NOT_RUN",
+      "evidence": []
+    }
+  ]
+}

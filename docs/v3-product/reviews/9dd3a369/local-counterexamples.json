@@ -1,0 +1,72 @@
+[
+  {
+    "test": "test_control_source_git_blobs_match",
+    "outcome": "PASS_CONTROL",
+    "detail": ""
+  },
+  {
+    "test": "test_R01_unapproved_client_cannot_self_grant_capture_and_insert",
+    "outcome": "FAIL_EXPECTATION",
+    "detail": "AssertionError: Unapproved LAN client obtained both capture and insert permissions\nassert not True"
+  },
+  {
+    "test": "test_R02_unpaired_websocket_cannot_modify_draft",
+    "outcome": "FAIL_EXPECTATION",
+    "detail": "AssertionError: Unauthenticated write accepted: {'type': 'draft.ack', 'revision': 1, 'durable': True, 'hash': 'a013bff0be2278e30252b8cf90329c424db2e2f3dc58d1f2dd79ee974b5baa16'}\nassert 'unapproved change' == ''\n  \n  + unapproved change"
+  },
+  {
+    "test": "test_R03_real_phone_asset_refs_must_appear_in_frozen_bundle",
+    "outcome": "FAIL_EXPECTATION",
+    "detail": "AssertionError: Phone image refs are hashed but not resolved into bundle assets\nassert [] == ['processed-img']\n  \n  Right contains one more item: 'processed-img'\n  \n  Full diff:\n  + []\n  - [\n  -     'processed-img',\n  - ]"
+  },
+  {
+    "test": "test_R04_processed_screenshot_must_replace_raw_capture",
+    "outcome": "FAIL_EXPECTATION",
+    "detail": "AssertionError: Raw capture remains in outgoing bundle after processed ID is sent\nassert ['raw-private-screen'] == ['processed-redacted']\n  \n  At index 0 diff: 'raw-private-screen' != 'processed-redacted'\n  \n  Full diff:\n    [\n  -     'processed-redacted',\n  +     'raw-private-screen',\n    ]"
+  },
+  {
+    "test": "test_R05_same_type_different_target_must_stop_remaining_steps",
+    "outcome": "FAIL_EXPECTATION",
+    "detail": "AssertionError: Continued into another Composer: [('image', 10), ('paste', ('Composer_A', 'chatinput')), ('image', 10), ('paste', ('Composer_B', 'chatinput')), ('text', 'text'), ('paste', ('Composer_B', 'chatinput'))]; result=CONFIRMED\nassert (3 == 1)\n +  where 3 = len([('paste', ('Composer_A', 'chatinput')), ('paste', ('Composer_B', 'chatinput')), ('paste', ('Composer_B', 'chatinput'))])"
+  },
+  {
+    "test": "test_R06_modifier_failure_after_first_image_is_not_no_steps",
+    "outcome": "FAIL_EXPECTATION",
+    "detail": "AssertionError: First image already pasted, but outcome is NO_STEPS: [('image', 10), ('paste', ('ComposerPane', 'chatinput')), ('image', 10)]\nassert 'NO_STEPS' != 'NO_STEPS'\n +  where 'NO_STEPS' = Attempt(attempt_id='a', intent_id='i', bundle_id='b', adapter_id='cursor_windows', result='NO_STEPS', steps=[Step(index=0, kind='image', asset_id='image-0', state='observed', evidence='target_attachment')], error_code='MODIFIERS_HELD').result"
+  },
+  {
+    "test": "test_R07_focus_must_be_rechecked_after_waiting_for_modifiers",
+    "outcome": "FAIL_EXPECTATION",
+    "detail": "AssertionError: Paste went to target changed during modifier wait: [('image', 10), ('paste', ('Scintilla', 'code'))]\nassert not True\n +  where True = any(<generator object test_R07_focus_must_be_rechecked_after_waiting_for_modifiers.<locals>.<genexpr> at 0x7f70d3d75f20>)"
+  },
+  {
+    "test": "test_R08_alt_i_must_use_current_B_not_previous_A",
+    "outcome": "FAIL_EXPECTATION",
+    "detail": "AssertionError: Current draft B ignored, outgoing=[({'intent_id': 'cf400979-2372-4ec7-a842-853e52d56710', 'trigger': 'hotkey'}, {'protocol': 3, 'bundle_id': 'A', 'device_id': 'phone', 'draft_id': 'd', 'epoch': 'e', 'revision': 1, 'text': 'A', 'assets': [], 'auto_send': False, 'manifest_hash': '2635db6fcd02327aed00101686f4c6bac074f6bb16071ba34ed40e792158cf01'})]\nassert 'A' == 'B'\n  \n  - B\n  + A"
+  },
+  {
+    "test": "test_R09_unknown_previous_result_must_ask_instead_of_full_replay",
+    "outcome": "FAIL_EXPECTATION",
+    "detail": "AssertionError: Policy returned ask but caller proceeded with default full replay: [({'intent_id': '94974a7e-603f-4e11-9eab-721f696028a7', 'trigger': 'hotkey'}, {'protocol': 3, 'bundle_id': 'A', 'device_id': 'phone', 'draft_id': 'd', 'epoch': 'e', 'revision': 1, 'text': 'A', 'assets': [], 'auto_send': False, 'manifest_hash': '2635db6fcd02327aed00101686f4c6bac074f6bb16071ba34ed40e792158cf01'})]\nassert [({'intent_id...phone', ...})] == []\n  \n  Left contains one more item: ({'intent_id': '94974a7e-603f-4e11-9eab-721f696028a7', 'trigger': 'hotkey'}, {'assets': [], 'auto_send': False, 'bundle_id': 'A', 'device_id': 'phone', ...})\n  \n  Full diff:\n  - []\n  + [\n  +     (\n  +         {\n  +             'intent_id': '94974a7e-603f-4e11-9eab-721f696028a7',\n  +             'trigger': 'hotkey',\n  +         },\n  +         {\n  +             'assets': [],\n  +             'auto_send': False,\n  +             'bundle_id': 'A',\n  +             'device_id': 'phone',\n  +             'draft_id': 'd',\n  +             'epoch': 'e',\n  +             'manifest_hash': '2635db6fcd02327aed00101686f4c6bac074f6bb16071ba34ed40e792158cf01',\n  +             'protocol': 3,\n  +             'revision': 1,\n  +             'text': 'A',\n  +         },\n  +     ),\n  + ]"
+  },
+  {
+    "test": "test_R10_recall_hotkey_must_run_retry_after_no_steps",
+    "outcome": "FAIL_EXPECTATION",
+    "detail": "AssertionError: Recall merely displays HUD and assigns last_bundle; no retry is invoked\nassert 0 == 1\n +  where 0 = len([])\n +    where [] = <independent_review.V3App object at 0x7f70d3dd7110>.calls"
+  },
+  {
+    "test": "test_R11_network_thread_must_schedule_a_real_widget_update",
+    "outcome": "FAIL_EXPECTATION",
+    "detail": "AssertionError: Only Python flag changed (visible=True); widget.show was never reached\nassert []"
+  },
+  {
+    "test": "test_control_unknown_attachment_does_not_continue_to_text",
+    "outcome": "PASS_CONTROL",
+    "detail": ""
+  },
+  {
+    "test": "test_R12_default_one_mib_chunk_must_be_accepted_by_http_body_limit",
+    "outcome": "FAIL_EXPECTATION",
+    "detail": "AssertionError: Default 1 MiB chunk rejected before UploadService: HTTP 413, Maximum request body size 1048576 exceeded, actual body size 1048576\nassert 413 == 200"
+  }
+]

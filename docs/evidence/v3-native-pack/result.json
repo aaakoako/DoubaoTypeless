@@ -1,0 +1,82 @@
+{
+  "captured_at": "2026-09-19T13:20:22.354603+00:00",
+  "source_head": "464af849526a9fefb746846276dbc726305cf904",
+  "exe": "G:\\DoubaoTypeless\\DoubaoTypeless\\docs\\evidence\\v3-s5-pack\\dist\\DoubaoTypelessV3PreviewUI\\DoubaoTypelessV3PreviewUI.exe",
+  "exe_sha256": "4bae6609e4b5af5e6c8508b774bb7b023b4c0462dd43625e95f96ee9617ae00f",
+  "pipe": "DoubaoTypelessV3Preview-native-pixels",
+  "port": 8767,
+  "long_chars": 904,
+  "windows_idle": [],
+  "windows_long": [
+    {
+      "title": "DT-V3-HUD",
+      "class": "Qt6112QWindowToolSaveBits",
+      "hwnd": 16584200,
+      "left": 760,
+      "top": 366,
+      "right": 1160,
+      "bottom": 666,
+      "width": 400,
+      "height": 300
+    },
+    {
+      "title": "DoubaoTypeless 预览",
+      "class": "Qt6112QWindowIcon",
+      "hwnd": 42667600,
+      "left": 674,
+      "top": 187,
+      "right": 1247,
+      "bottom": 823,
+      "width": 573,
+      "height": 636
+    }
+  ],
+  "hud": {
+    "title": "DT-V3-HUD",
+    "class": "Qt6112QWindowToolSaveBits",
+    "hwnd": 16584200,
+    "left": 760,
+    "top": 366,
+    "right": 1160,
+    "bottom": 666,
+    "width": 400,
+    "height": 300
+  },
+  "client": {
+    "title": "DoubaoTypeless 预览",
+    "class": "Qt6112QWindowIcon",
+    "hwnd": 42667600,
+    "left": 674,
+    "top": 187,
+    "right": 1247,
+    "bottom": 823,
+    "width": 573,
+    "height": 636
+  },
+  "shots": {
+    "hud": "docs/evidence/v3-native-pack/hud.png",
+    "client": "docs/evidence/v3-native-pack/client.png"
+  },
+  "pixel_hits": {
+    "hud_teal": 9097,
+    "hud_ink": 41228,
+    "client_accent": 16802
+  },
+  "gates": {
+    "exe_hash_matched": true,
+    "client_visible": true,
+    "hud_visible": true,
+    "hud_width_400ish": true,
+    "hud_height_capped": true,
+    "hud_taller_than_min": true,
+    "hud_insert_button_visible": true,
+    "hud_body_ink_visible": true,
+    "client_chrome_visible": true,
+    "long_text_not_truncated_in_payload": true,
+    "repo_config_untouched": true
+  },
+  "android_claimed": false,
+  "cursor_claimed": false,
+  "release_ready": false,
+  "ok": true
+}

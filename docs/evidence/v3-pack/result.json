@@ -1,0 +1,11 @@
+{
+  "case_id": "AC3-084/085",
+  "status": "PASS",
+  "exe_sha256": "144dba6811b2a281dadd5cab29bc136842ffd3ecceb2d4177f0f32ee72279827",
+  "exe_bytes": 12556370,
+  "onedir_files": 886,
+  "onedir_bytes": 190292105,
+  "web_index": true,
+  "note": "local onedir; not a GitHub Release; no v* tag",
+  "started_at": "2026-09-18T08:02:52.903891+00:00"
+}

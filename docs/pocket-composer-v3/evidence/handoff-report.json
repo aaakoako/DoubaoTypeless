@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "task_count": 24,
+  "product_case_count": 96,
+  "product_cases_not_run": 96,
+  "acyclic_dependencies": true,
+  "missing_task_files": 0,
+  "missing_spec_files": 0
+}
