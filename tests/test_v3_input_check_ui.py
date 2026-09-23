@@ -25,7 +25,7 @@ def production_font(pair,monkeypatch):
 
 def test_settings_save_inspection_and_nonblocking_visible_controls(pair,monkeypatch):
     a,window,review=pair
-    monkeypatch.setattr(a.input_check,'_evaluate',lambda text,key,emotion:evaluate(text,key,emotion,post=response))
+    monkeypatch.setattr(a.input_check,'_evaluate',lambda text,key,emotion,**kwargs:evaluate(text,key,emotion,post=response,**kwargs))
     a.update_pc_text('请把图片插入扣得克斯。这里还有一些地方要修改。')
     pane=window.jev_settings
     pane.key.setText('fixture-key');pane.enabled.setChecked(True);pane.note.setChecked(True)
@@ -57,9 +57,10 @@ def test_production_input_check_screenshots(pair,monkeypatch):
     folder=os.environ.get('DT_JEV_UI_EVIDENCE_DIR')
     if not folder:return
     a,window,review=pair;path=Path(folder);path.mkdir(parents=True,exist_ok=True)
-    monkeypatch.setattr(a.input_check,'_evaluate',lambda text,key,emotion:evaluate(text,key,emotion,post=response))
+    monkeypatch.setattr(a.input_check,'_evaluate',lambda text,key,emotion,**kwargs:evaluate(text,key,emotion,post=response,**kwargs))
     pane=window.jev_settings
-    pane.key.setText('fixture-key');pane.enabled.setChecked(True);pane.note.setChecked(True)
+    pane.provider.setCurrentIndex(pane.provider.findData('vercel'))
+    pane.gateway_key.setText('fixture-key');pane.enabled.setChecked(True);pane.note.setChecked(True)
     window.save_settings();a.update_pc_text('把图片插入扣得克斯，保留原来的文字。')
     a.hud.start();a.hud.show_receiving(a.review_text());QTest.qWait(1200)
     try:
@@ -70,3 +71,16 @@ def test_production_input_check_screenshots(pair,monkeypatch):
         scroll.ensureWidgetVisible(pane.status,0,0);QTest.qWait(100)
         window.widget.grab().save(str(path/'settings.png'))
     finally:a.hud._widget.deleteLater()
+
+
+def test_provider_credentials_are_separate_visible_fields(pair):
+    _,window,_=pair;pane=window.jev_settings
+    pane.key.setText('typesafe-key')
+    pane.provider.setCurrentIndex(pane.provider.findData('vercel'))
+    assert pane.key.isHidden() and not pane.gateway_key.isHidden() and not pane.gateway_key.text()
+    pane.gateway_key.setText('gateway-key')
+    pane.status.setText('已连接 · 保存后生效')
+    pane.provider.setCurrentIndex(pane.provider.findData('typesafe'))
+    assert pane.gateway_key.isHidden() and pane.key.text()=='typesafe-key'
+    assert pane.values()['jev_vercel_key']=='gateway-key'
+    assert '待检测' in pane.status.text()

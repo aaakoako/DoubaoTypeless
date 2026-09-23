@@ -9,6 +9,11 @@ import time
 
 ENDPOINT = 'https://api.typesafe.ai/v1/systemone'
 MODEL = 'jev-1.13.0'
+PROVIDERS = {
+    'typesafe': {'endpoint': ENDPOINT, 'model': MODEL, 'key': 'jev_api_key', 'name': 'TypeSafe'},
+    'vercel': {'endpoint': 'https://ai-gateway.vercel.sh/typesafe/v1/systemone',
+               'model': 'typesafe-ai/jev', 'key': 'jev_vercel_key', 'name': 'Vercel AI Gateway'},
+}
 VOICE_NOTE = '【输入说明：以下文字可能含语音转写或表述误差。】'
 LABELS = {'clean': '未发现明显问题', 'transcription': '疑似转写错误',
           'ambiguous': '表达有歧义', 'missing': '可能缺少必要信息',
@@ -82,14 +87,25 @@ def parse_response(body, request, spans):
             'suspected_transcription': any(i['kind'] == 'transcription' for i in issues)}
 
 
-def evaluate(text, key, emotion=True, post=None):
+def evaluate(text, key, emotion=True, post=None, *, provider='typesafe'):
     from doubao_typeless.services.byok import classify_api_error
     try:
         request, spans = make_request(text, emotion)
+        route = PROVIDERS[provider]
+        request['model'] = route['model']
         if post is None:
             import httpx
             with httpx.Client(timeout=3, follow_redirects=False) as client:
-                response = client.post(ENDPOINT, json=request, headers={'Authorization': f'Bearer {key}'})
+                response = client.post(route['endpoint'], json=request, headers={'Authorization': f'Bearer {key}'})
+                if provider == 'vercel' and response.status_code == 403:
+                    problem = response.json()
+                    error = problem.get('error') if isinstance(problem,dict) else None
+                    if isinstance(error,dict) and error.get('type') == 'customer_verification_required':
+                        return {'status':'error','reason':'account_verification','message':'需激活额度',
+                                'detail':'请在 Vercel 后台完成账户验证，解锁免费额度。'}
+                if response.status_code == 402:
+                    return {'status':'error','reason':'credits','message':'额度不足',
+                            'detail':'请在服务商后台查看可用额度。原文仍可复制和插入。'}
                 response.raise_for_status()
                 body = response.json()
         else:
@@ -115,7 +131,9 @@ class InputCheck:
 
     def configure(self, options):
         with self._lock:
-            self.options = {k: options.get(k) for k in ('jev_enabled', 'jev_api_key', 'jev_emotion', 'jev_voice_note')}
+            self.options = {k: options.get(k) for k in ('jev_enabled', 'jev_api_key', 'jev_vercel_key', 'jev_emotion', 'jev_voice_note')}
+            self.options['jev_provider'] = options.get('jev_provider') or 'typesafe'
+            self._blocked_result = None
             self._serial += 1; self._identity = None
             self.result = {'status': 'disabled'}
 
@@ -131,19 +149,27 @@ class InputCheck:
                 self.result = {'status': 'disabled'}; return
             if not text.strip():
                 self.result = {'status': 'empty'}; return
-            if not self.options['jev_api_key']:
+            route = PROVIDERS.get(self.options['jev_provider'])
+            if route is None:
+                self.result = {'status':'error','message':'请重新选择服务商'}; return
+            if not self.options[route['key']]:
                 self.result = {'status': 'no_key', 'message': '待配置 Key'}; return
+            if self._blocked_result is not None:
+                self.result = copy.deepcopy(self._blocked_result); return
             if self._busy or self.result['status'] != 'waiting' or self._now()-self._changed < .65:return
             self._busy = True; self.result = {'status': 'checking'}
             serial = self._serial; options = dict(self.options)
         def work():
             try:
-                result = self._evaluate(text, options['jev_api_key'], options['jev_emotion'])
+                result = self._evaluate(text, options[route['key']], options['jev_emotion'], provider=options['jev_provider'])
             except Exception:
                 result = {'status': 'error', 'message': '检查暂不可用，原文仍可插入'}
             with self._lock:
                 self._busy = False
-                if serial == self._serial and not self._closed:self.result = result
+                if serial == self._serial and not self._closed:
+                    self.result = result
+                    if result.get('reason') in {'account_verification','credits'}:
+                        self._blocked_result = copy.deepcopy(result)
         threading.Thread(target=work, name='jev-input-check', daemon=True).start()
 
     def view(self, identity):
@@ -165,6 +191,7 @@ class InputCheck:
             if (not self._closed and identity == self._identity and
                     self.options['jev_enabled'] and self.result['status'] == 'error'):
                 self._serial += 1
+                self._blocked_result = None
                 self._changed = self._now()
                 self.result = {'status': 'waiting'}
 
@@ -179,7 +206,10 @@ def presentation(result):
     status = result.get('status')
     if status in {'disabled', 'empty'}:return '', ''
     if status in {'waiting', 'checking'}:return '检查中', '可直接复制或插入'
-    if status != 'ready':return ('待配置 Key' if status=='no_key' else '检查未完成'), result.get('message','可在常用设置配置 Jev')
+    if status != 'ready':
+        summary = {'no_key':'待配置 Key'}.get(status, '检查未完成')
+        if result.get('reason') in {'account_verification','credits'}:summary=result['message']
+        return summary, result.get('detail',result.get('message','可在常用设置配置 Jev'))
     issues = result['issues']
     summary = f'{len(issues)} 处待留意' if issues else ('暂无法判断' if result.get('inconclusive') else '未见明显问题')
     details = '\n'.join(f'{i["label"]}：{i["text"]}' for i in issues)

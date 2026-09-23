@@ -69,7 +69,7 @@ def test_disabled_missing_key_and_long_text_never_call_transport():
 
 def test_stale_response_discarded_and_same_draft_note_suppression_survives_edits():
     entered, release = threading.Event(), threading.Event(); now=[0.]
-    def run(*args): entered.set(); release.wait(2); return READY.copy()
+    def run(*args,**kwargs): entered.set(); release.wait(2); return READY.copy()
     service=InputCheck(OPTIONS,evaluate_fn=run,now=lambda:now[0])
     old=('d','e',1,'旧稿'); new=('d','e',2,'新稿')
     service.observe(old,'旧稿'); service.toggle_note(old)
@@ -84,7 +84,7 @@ def test_stale_response_discarded_and_same_draft_note_suppression_survives_edits
 def test_disable_and_shutdown_discard_active_response():
     for stop in ('disable','close'):
         entered, release=threading.Event(),threading.Event(); now=[0.]
-        def run(*args):entered.set();release.wait(2);return READY.copy()
+        def run(*args,**kwargs):entered.set();release.wait(2);return READY.copy()
         service=InputCheck(OPTIONS,evaluate_fn=run,now=lambda:now[0]);identity=('d','e',1,'稿')
         service.observe(identity,'稿');now[0]=1;service.observe(identity,'稿');assert entered.wait(1)
         if stop=='disable':service.configure({**OPTIONS,'jev_enabled':False})
@@ -139,7 +139,7 @@ def test_annotation_off_when_submitted_remains_off_after_enabling(app):
 
 def test_retry_after_failure_preserves_note_preference():
     now=[0.]; calls=[]
-    def run(*args):
+    def run(*args,**kwargs):
         calls.append(args)
         return {'status':'error','message':'超时'} if len(calls)==1 else READY.copy()
     service=InputCheck(OPTIONS,evaluate_fn=run,now=lambda:now[0])
@@ -181,3 +181,53 @@ def test_jev_key_separate_from_byok_and_redacted_on_disk(app,monkeypatch):
     assert settings['jev_api_key']=='' and settings['byok_api_key']=='other-key'
     from doubao_typeless.services.v3_diagnostics import snapshot
     assert 'test-key' not in json.dumps(snapshot(app))
+
+
+def test_vercel_http_route_and_account_verification(monkeypatch):
+    import httpx
+    from doubao_typeless.services.input_check import PROVIDERS
+    requests=[]
+    class Client:
+        def __init__(self,**kwargs):assert kwargs['follow_redirects'] is False
+        def __enter__(self):return self
+        def __exit__(self,*args):pass
+        def post(self,url,**kwargs):
+            requests.append((url,kwargs))
+            return httpx.Response(403,request=httpx.Request('POST',url),json={'error':{
+                'type':'customer_verification_required','message':'arbitrary untrusted response'}})
+    monkeypatch.setattr(httpx,'Client',Client)
+    result=evaluate('连接示例','gateway-test-key',provider='vercel')
+    assert requests[0][0]==PROVIDERS['vercel']['endpoint']
+    assert requests[0][1]['json']['model']=='typesafe-ai/jev'
+    assert result['reason']=='account_verification' and presentation(result)[0]=='需激活额度'
+    assert 'arbitrary' not in json.dumps(result)
+
+
+def test_provider_switch_never_reuses_other_provider_key(app,monkeypatch):
+    monkeypatch.setenv('DT_V3_SECRET_FILE','1')
+    save_settings(app.data_dir,{**OPTIONS,'jev_provider':'vercel','jev_vercel_key':'gateway-test-key'})
+    saved=load_settings(app.data_dir)
+    assert saved['jev_api_key']=='test-key' and saved['jev_vercel_key']=='gateway-test-key'
+    assert 'gateway-test-key' not in (app.data_dir/'settings.json').read_text()
+    calls=[];now=[0.]
+    def run(text,key,emotion,**kwargs):calls.append((key,kwargs['provider']));return READY.copy()
+    check=InputCheck(saved,evaluate_fn=run,now=lambda:now[0]);identity=('d','e',1,'稿')
+    check.observe(identity,'稿');now[0]=1;check.observe(identity,'稿');wait_for(lambda:not check._busy)
+    assert calls==[('gateway-test-key','vercel')]
+    check.configure({**saved,'jev_provider':'typesafe','jev_api_key':''})
+    check.observe(identity,'稿');now[0]=2;check.observe(identity,'稿')
+    assert check.result['status']=='no_key' and len(calls)==1
+
+
+def test_blocked_account_waits_for_explicit_retry_not_every_keystroke():
+    calls=[];now=[0.]
+    def run(*args,**kwargs):
+        calls.append(1)
+        return {'status':'error','reason':'account_verification','message':'需激活额度'}
+    check=InputCheck(OPTIONS,evaluate_fn=run,now=lambda:now[0])
+    old=('d','e',1,'稿');new=('d','e',2,'新稿')
+    check.observe(old,'稿');now[0]=1;check.observe(old,'稿');wait_for(lambda:not check._busy)
+    now[0]=2;check.observe(new,'新稿');now[0]=3;check.observe(new,'新稿')
+    assert len(calls)==1 and check.view(new)['reason']=='account_verification'
+    check.retry(new);now[0]=4;check.observe(new,'新稿');wait_for(lambda:not check._busy)
+    assert len(calls)==2

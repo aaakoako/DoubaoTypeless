@@ -5,6 +5,7 @@ import sys
 
 _root = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[3]))
 _checkmark = (_root / 'assets/checkmark.svg').as_posix()
+_chevron = (_root / 'assets/chevron-down.svg').as_posix()
 
 QSS = f"""
 QWidget {{ color:{C['ink']}; font-size:{M['text_size']}px; font-family: 'Microsoft YaHei UI','Microsoft YaHei','Noto Sans CJK SC','Segoe UI'; }}
@@ -37,6 +38,7 @@ QLineEdit:focus, QPlainTextEdit:focus, QComboBox:focus {{ border-color:{C['accen
 QTextEdit#hudBody {{ background:transparent; border:0; padding:0; font-size:14px; }}
 QLineEdit:disabled, QPlainTextEdit:disabled {{ background:{C['disabled']}; color:{C['disabled_ink']}; }}
 QComboBox::drop-down {{ border:0; width:24px; }}
+QComboBox::down-arrow {{ image:url('{_chevron}'); width:12px; height:12px; }}
 QComboBox QAbstractItemView {{ background:{C['surface']}; color:{C['ink']}; selection-background-color:{C['soft']}; selection-color:{C['ink']}; }}
 QListWidget::item {{ padding:8px; border-radius:6px; }}
 QListWidget::item:selected {{ background:{C['soft']}; color:{C['ink']}; }}

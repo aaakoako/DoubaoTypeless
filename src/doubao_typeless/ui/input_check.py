@@ -2,7 +2,7 @@
 import threading
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, QLineEdit, QPushButton, QPlainTextEdit
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, QLineEdit, QPushButton, QPlainTextEdit, QComboBox
 from doubao_typeless.services.input_check import evaluate, presentation, VOICE_NOTE
 from doubao_typeless.ui.icons import icon, judgment_icon, ToneBadge
 
@@ -13,6 +13,10 @@ class InputCheckSettings:
         self.enabled.setIcon(icon('inspect'))
         self.enabled.setChecked(bool(stored.get('jev_enabled')))
         form.addRow(self.enabled)
+        self.provider = QComboBox()
+        self.provider.addItem('TypeSafe','typesafe');self.provider.addItem('Vercel AI Gateway','vercel')
+        self.provider.setCurrentIndex(max(0,self.provider.findData(stored.get('jev_provider','typesafe'))))
+        form.addRow('服务商',self.provider)
         notice = QLabel('开启后发送当前文字至 TypeSafe；不含图片和历史。')
         notice.setToolTip('检查疑似转写错误、歧义和缺项。检查在后台进行，可随时复制或插入。')
         notice.setWordWrap(True); notice.setObjectName('muted')
@@ -20,7 +24,19 @@ class InputCheckSettings:
         self.key = QLineEdit(str(stored.get('jev_api_key') or ''))
         self.key.setEchoMode(QLineEdit.Password)
         self.key.setPlaceholderText('粘贴 TypeSafe API Key')
-        form.addRow('Jev API Key', self.key)
+        form.addRow('TypeSafe Key', self.key)
+        self.gateway_key = QLineEdit(str(stored.get('jev_vercel_key') or ''))
+        self.gateway_key.setEchoMode(QLineEdit.Password)
+        self.gateway_key.setPlaceholderText('粘贴 Vercel AI Gateway Key')
+        form.addRow('Vercel Key',self.gateway_key)
+        def key_field():
+            return self.gateway_key if self.provider.currentData()=='vercel' else self.key
+        def provider_changed():
+            vercel=self.provider.currentData()=='vercel'
+            for field,visible in ((self.key,not vercel),(self.gateway_key,vercel)):
+                field.setVisible(visible);form.labelForField(field).setVisible(visible)
+            notice.setText('文字经 Vercel 发给 TypeSafe；不含图片和历史。' if vercel else '开启后发送当前文字至 TypeSafe；不含图片和历史。')
+        self.provider.currentIndexChanged.connect(provider_changed);provider_changed()
         self.emotion = QCheckBox('显示语气')
         self.emotion.setIcon(icon('positive'))
         self.emotion.setToolTip('仅判断文字语气，不代表真实情绪；不会随正文发送。')
@@ -35,31 +51,39 @@ class InputCheckSettings:
         self.probe = QPushButton('检测连接'); self.probe.setIcon(icon('waiting'))
         get_key = QPushButton('申请 API Key')
         get_key.setIcon(icon('key'))
-        get_key.clicked.connect(lambda: QDesktopServices.openUrl(QUrl('https://console.typesafe.ai/')))
+        get_key.clicked.connect(lambda: QDesktopServices.openUrl(QUrl('https://vercel.com/ai-gateway' if self.provider.currentData()=='vercel' else 'https://console.typesafe.ai/')))
         row.addWidget(self.probe); row.addWidget(get_key); row.addStretch(1)
         form.addRow(row)
         self.status = QLabel('保存后生效')
         self.status.setToolTip('检测连接只发送固定示例文字。')
         self.status.setWordWrap(True); self.status.setObjectName('muted')
         form.addRow(self.status)
+        def configuration_changed():
+            self.status.setText('配置已变 · 待检测')
+            self.status.setToolTip('保存后生效；检测连接只发送固定示例文字。')
+        self.provider.currentIndexChanged.connect(configuration_changed)
+        self.key.textChanged.connect(configuration_changed)
+        self.gateway_key.textChanged.connect(configuration_changed)
         def probe():
-            key = self.key.text().strip()
+            key = key_field().text().strip();provider=self.provider.currentData()
             if not key:
                 self.status.setText('请先填写 Jev API Key'); return
             self.probe.setEnabled(False); self.status.setText('连接中…')
             def work():
-                result = evaluate('这是一条连接检测示例。', key, False)
+                result = evaluate('这是一条连接检测示例。', key, False, provider=provider)
                 def done():
                     self.probe.setEnabled(True)
-                    if self.key.text().strip() != key:
-                        self.status.setText('Key 已变化，请重新检测'); return
+                    if key_field().text().strip() != key or self.provider.currentData()!=provider:
+                        self.status.setText('配置已变化，请重新检测'); return
                     self.status.setText('已连接 · 保存后生效' if result['status']=='ready' else result['message'])
+                    self.status.setToolTip(result.get('detail','检测连接只发送固定示例文字。'))
                 QTimer.singleShot(0, parent, done)
             threading.Thread(target=work, daemon=True).start()
         self.probe.clicked.connect(probe)
 
     def values(self):
         return {'jev_enabled': self.enabled.isChecked(), 'jev_api_key': self.key.text().strip(),
+                'jev_vercel_key':self.gateway_key.text().strip(),'jev_provider':self.provider.currentData(),
                 'jev_emotion': self.emotion.isChecked(), 'jev_voice_note': self.note.isChecked()}
 
 
