@@ -172,6 +172,9 @@ def listen_for_commands(on_command, parent=None):
                 accept(sock)
 
     server.newConnection.connect(incoming)
+    # A native client can connect inside listen(), before the signal handler is
+    # installed. Drain that pending connection too; do not resend its command.
+    incoming()
     return server
 
 

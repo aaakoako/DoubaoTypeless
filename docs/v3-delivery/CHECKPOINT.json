@@ -2,7 +2,7 @@
   "schema_version": 1,
   "product_goal": "沿用 MASTER_PLAN，保留原版插入并复制等体验，交付可实际体验的完整 Windows V3 发布前候选。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "0.5.2 Jev输入辅助已实现，本地572项回归通过；新候选等待固定提交打包，0.5.1 fdfd829仍为上一份已核验制品。",
+  "working_tree": "0.5.2 Jev输入辅助与图标短标签已实现，启动提前连接竞态已复现修复，本地574项回归通过；新候选等待固定提交打包，0.5.1 fdfd829仍为上一份已核验制品。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
   "last_completed_slice": "FULL_PACKAGE_UPGRADE_AND_AUTOMATIC_RESTART",
   "active_slice": "JEV_INPUT_CHECK_CANDIDATE",

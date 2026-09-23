@@ -26,10 +26,21 @@ raise SystemExit(0 if result else 2)
 '''
 
 @pytest.mark.parametrize('command',['show','quit'])
-def test_command_waits_for_delayed_listener_once(monkeypatch,tmp_path,command):
+@pytest.mark.parametrize('early_connection',[False,True])
+def test_command_waits_for_delayed_listener_once(monkeypatch,tmp_path,command,early_connection):
     global QT
     QT=QApplication.instance() or QApplication([])
     monkeypatch.setenv('DT_V3_PIPE','DT-test-delayed-'+uuid.uuid4().hex)
+    monkeypatch.setenv('DT_V3_DATA_DIR',str(tmp_path/'control-data'))
+    if early_connection:
+        import doubao_typeless.ui.single_instance as instance
+        original_trace=instance._trace
+        def trace(stage,*args,**kwargs):
+            original_trace(stage,*args,**kwargs)
+            if stage=='listening':QTest.qWait(150)
+        # Force the client to connect while listen() is active but before its
+        # newConnection callback is registered. The real pipe remains in use.
+        monkeypatch.setattr(instance,'_trace',trace)
     marker=tmp_path/'started'
     env={**os.environ,'PYTHONPATH':str(Path(__file__).resolve().parents[1]/'src')}
     child=subprocess.Popen([sys.executable,'-c',CLIENT,command,str(marker)],env=env,
@@ -56,10 +67,11 @@ def test_command_waits_for_delayed_listener_once(monkeypatch,tmp_path,command):
         QTest.qWait(10)
 
 
-def test_missing_listener_is_bounded_and_has_no_side_effect(monkeypatch):
+def test_missing_listener_is_bounded_and_has_no_side_effect(monkeypatch,tmp_path):
     global QT
     QT=QApplication.instance() or QApplication([])
     monkeypatch.setenv('DT_V3_PIPE','DT-test-absent-'+uuid.uuid4().hex)
+    monkeypatch.setenv('DT_V3_DATA_DIR',str(tmp_path/'control-data'))
     start=time.monotonic()
     assert request_command('quit',120) is False
     assert time.monotonic()-start<.8
