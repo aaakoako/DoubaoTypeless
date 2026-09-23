@@ -47,6 +47,23 @@ async def until(check, *, timeout=12, message='condition not met'):
     raise AssertionError(message)
 
 
+def phone_diagnostics(phone):
+    pending, failures = {}, []
+    lifecycle = {'domcontentloaded': 0, 'load': 0}
+    phone.on('request', lambda r: pending.update(
+        {r: {'method': r.method, 'path': urlparse(r.url).path, 'resource': r.resource_type}}))
+    phone.on('requestfinished', lambda r: pending.pop(r, None))
+    def request_failed(request):
+        pending.pop(request, None)
+        failures.append({'path': urlparse(request.url).path,
+            'failure': (request.failure or '').split(' ', 1)[0][:80]})
+    phone.on('requestfailed', request_failed)
+    for event in lifecycle:
+        # Playwright passes the Page to lifecycle callbacks.
+        phone.on(event, lambda *_, name=event: lifecycle.update({name: lifecycle[name]+1}))
+    return pending, failures, lifecycle
+
+
 def own_window(pid, title):
     import win32gui,win32process
     found=[]
@@ -208,16 +225,7 @@ async def exercise(child,data,result,report):
                 await target.goto(target_url)
                 phone=await phone_browser.new_page(viewport={'width':430,'height':850})
                 errors=[];phone.on('pageerror',lambda e:errors.append(str(e)))
-                phone.on('request', lambda r: pending_phone_requests.update(
-                    {r: {'method': r.method, 'path': urlparse(r.url).path, 'resource': r.resource_type}}))
-                phone.on('requestfinished', lambda r: pending_phone_requests.pop(r, None))
-                def request_failed(request):
-                    pending_phone_requests.pop(request, None)
-                    phone_failures.append({'path': urlparse(request.url).path,
-                        'failure': (request.failure or '').split(' ', 1)[0][:80]})
-                phone.on('requestfailed', request_failed)
-                for event in phone_lifecycle:
-                    phone.on(event, lambda name=event: phone_lifecycle.update({name: phone_lifecycle[name]+1}))
+                pending_phone_requests, phone_failures, phone_lifecycle = phone_diagnostics(phone)
                 await phone.goto(base+'/?pair='+code)
                 await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
                 async with ClientSession() as http:
