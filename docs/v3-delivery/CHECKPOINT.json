@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "product_goal": "完成可公开发行的0.5.4修订版，保留真实设备验证边界。",
+  "product_goal": "0.5.4正式发行已交付，后续收集真实环境反馈。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "0.5.0已撤回；0.5.1/0.5.2/0.5.3均未发行。0.5.3候选两次通过，但正式包在定位后的单次焦点验证失败，退出也未及时完成。0.5.4加入只读有界复核、关闭连接及阶段取证，保留旧标签和失败证据。",
+  "working_tree": "0.5.4已合入master并公开；0.5.0保持撤回，0.5.1/0.5.2/0.5.3未发行，历史标签未重写。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
-  "last_completed_slice": "STABLE_0_5_0_PUBLISHED",
-  "active_slice": "FOCUS_AND_SHUTDOWN_0_5_4",
-  "next_action": "等待0.5.4固定源码全量、原生图文/升级、真实hook分类、依赖审计及下载校验。通过后再合入和发行，不跳过失败项。",
+  "last_completed_slice": "STABLE_0_5_4_PUBLISHED",
+  "active_slice": null,
+  "next_action": "从正式0.5.4收集实际设备反馈；Cursor、实体手机输入法、多屏仍未验收。",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -33,44 +33,16 @@
   ],
   "last_commands": [
     {
-      "cmd": "Stable tag release validation",
+      "cmd": "Exact-source candidate and stable validation",
       "exit_code": 0,
-      "output": "Windows 632 passed; Linux 623 passed, 9 skipped; 18 evidence tests; 7 native reports; 14 browser cases; official 0.4.2 complete upgrade/restart passed."
+      "output": "Windows 678 passed; Linux 668 passed, 10 skipped; 18 evidence tests; 7 native reports; 14 browser cases; real legacy0.4.2 full upgrade; isolated failure recovery and native input-origin checks passed."
     },
     {
-      "cmd": "Downloaded stable artifact audit and local offscreen startup",
+      "cmd": "Downloaded artifact, local startup, public latest verification",
       "exit_code": 0,
-      "output": "267 files/hashes/build source checked; normal startup/quit; API keys absent; public latest returns v0.5.0."
+      "output": "267 files verified; credentials absent; installed dependency audit clean; local startup/quit passed; unauthenticated public latest=v0.5.4 and asset digests match."
     }
   ],
-  "cloud_evidence": {
-    "run_id": 35866724399,
-    "ci_run_id": 35866732872,
-    "source_sha": "fdfd829bfe7dd9113f6952fd08a5bde3fca98e60",
-    "conclusion": "success",
-    "native_browser_cases": 14,
-    "actual_screen_capture": true,
-    "actual_codex_tested": false,
-    "actual_cursor_tested": false,
-    "actual_android_ime_tested": false,
-    "target_type": "independent Chromium test webpage",
-    "published_0_4_2_upgrade_tested": true,
-    "release_server": "local TLS fixture, child-only trust"
-  },
-  "candidate_artifact": {
-    "artifact_id": 10753256869,
-    "source_sha": "fdfd829bfe7dd9113f6952fd08a5bde3fca98e60",
-    "version": "0.5.1",
-    "channel": "release-candidate",
-    "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.1-RC-fdfd829",
-    "setup_sha256": "d57ceafcd482787a8e164183da7f99ababed09562ef4e5fd6581df3ce1eeb991",
-    "upgrade_exe_sha256": "d57ceafcd482787a8e164183da7f99ababed09562ef4e5fd6581df3ce1eeb991",
-    "zip_sha256": "84e9decb60cb3383b69e04356cbfaabdafc3082f2514d8b7f280936d0f4b997f",
-    "exe_sha256": "9a81e6c9216818e0393216a9f1a872e1ef4d2c003644b466d3d78de21759ca65",
-    "files_verified": 264,
-    "verified_after_download": true,
-    "release_ready": false
-  },
   "open_defects": [
     "实体手机输入法/软键盘/扫码及长后台、多屏拔插尚未完成当前正式包实机验收。",
     "Cursor当前版本尚未完成真实图文验收；Codex连续图片与正文由用户确认上一候选已通过。",
@@ -83,8 +55,8 @@
     "document": "docs/v3-delivery/RELEASE_0_5_0_PUBLISHED.md",
     "real_devices_reviewed": false
   },
-  "published": false,
-  "task_complete": false,
+  "published": true,
+  "task_complete": true,
   "integration_20260922": {
     "branch": "v3/integrated-preview-20260922",
     "base": "b32d2d536937d0fcad2c0e2ea76742d60fa47c42",
@@ -329,11 +301,119 @@
     "source_sha": "b85e30b4d972d75920d1b4f8fba0c4d853eada39",
     "run": 35914898416,
     "published": false,
-    "passed_candidates": [35912322252, 35913142680],
+    "passed_candidates": [
+      35912322252,
+      35913142680
+    ],
     "stage": "locate_composer_from_review",
     "evidence": "11 browser cases passed; restore_refused after DOM focus changed; no ready notification; forced cleanup after quit. Exact UIA rejection field not previously logged.",
     "repair": "Single SetFocus followed by bounded exact read-only verification with input-change cancellation; visible locator failure; shutdown stages and websocket close hook.",
     "shutdown_reproduction": "Real online loopback websocket keeps cleanup pending beyond1s without hook; phone response and non-response covered after fix. Does not establish old cloud shutdown cause.",
     "local_validation": "672 passed,1 skipped; independent review found no new blocker; native source and frozen gates pending."
+  },
+  "previous_verification_before_0_5_4": {
+    "cloud_evidence": {
+      "run_id": 35866724399,
+      "ci_run_id": 35866732872,
+      "source_sha": "fdfd829bfe7dd9113f6952fd08a5bde3fca98e60",
+      "conclusion": "success",
+      "native_browser_cases": 14,
+      "actual_screen_capture": true,
+      "actual_codex_tested": false,
+      "actual_cursor_tested": false,
+      "actual_android_ime_tested": false,
+      "target_type": "independent Chromium test webpage",
+      "published_0_4_2_upgrade_tested": true,
+      "release_server": "local TLS fixture, child-only trust"
+    },
+    "artifact": {
+      "artifact_id": 10753256869,
+      "source_sha": "fdfd829bfe7dd9113f6952fd08a5bde3fca98e60",
+      "version": "0.5.1",
+      "channel": "release-candidate",
+      "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.1-RC-fdfd829",
+      "setup_sha256": "d57ceafcd482787a8e164183da7f99ababed09562ef4e5fd6581df3ce1eeb991",
+      "upgrade_exe_sha256": "d57ceafcd482787a8e164183da7f99ababed09562ef4e5fd6581df3ce1eeb991",
+      "zip_sha256": "84e9decb60cb3383b69e04356cbfaabdafc3082f2514d8b7f280936d0f4b997f",
+      "exe_sha256": "9a81e6c9216818e0393216a9f1a872e1ef4d2c003644b466d3d78de21759ca65",
+      "files_verified": 264,
+      "verified_after_download": true,
+      "release_ready": false
+    }
+  },
+  "cloud_evidence": {
+    "source_sha": "2d15b6a860d955af9132876f5f8e049264fa125e",
+    "run_id": 35922254832,
+    "ci_run_id": 35922208171,
+    "conclusion": "success",
+    "native_browser_cases": 14,
+    "actual_codex_tested": false,
+    "actual_cursor_tested": false,
+    "actual_android_ime_tested": false,
+    "target_type": "independent Chromium test webpage",
+    "published_0_4_2_upgrade_tested": true,
+    "native_input_origin_tested": true
+  },
+  "published_artifact": {
+    "passed": true,
+    "source_sha": "2d15b6a860d955af9132876f5f8e049264fa125e",
+    "version": "0.5.4",
+    "checksums": {
+      "DoubaoTypeless_0.5.4_win_x64_Setup.exe": "0c92bd46481b5f49339e307eaf0944c992cb1ae308ccfdb7591bca11b0a8e1a0",
+      "DoubaoTypeless.exe": "0c92bd46481b5f49339e307eaf0944c992cb1ae308ccfdb7591bca11b0a8e1a0",
+      "DoubaoTypeless_0.5.4_win_x64_portable.zip": "df17e8a7535afadf480adafe1d31ff60b3e729bded0792fea78d2ae892614e09"
+    },
+    "exe_sha256": "3d0311f774b9a45f887be742a5374e90b126f15f8908e94d65cc46fca9cede14",
+    "files_verified": 267,
+    "reports_passed": {
+      "startup": true,
+      "text": true,
+      "phone-primary": true,
+      "browser": true,
+      "installer": true,
+      "upgrade-failures": true,
+      "legacy-upgrade": true
+    },
+    "native_browser_cases": 14,
+    "actual_codex_tested": false,
+    "actual_phone_tested": false,
+    "jev_inference_tested": true,
+    "jev_inference_surface": "source runtime, not frozen UI",
+    "credential_not_in_payload": true,
+    "release_ready": false,
+    "channel": "stable",
+    "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.4",
+    "verified_after_download": true
+  },
+  "release_0_5_4": {
+    "version": "0.5.4",
+    "tag": "v0.5.4",
+    "source_sha": "2d15b6a860d955af9132876f5f8e049264fa125e",
+    "release_run": 35922254832,
+    "ci_run": 35922208171,
+    "candidate_source": "783bb3b533f8a48ce9f6d6610ebb18bfd27c01de",
+    "candidate_run": 35917923638,
+    "published_at": "2026-09-23T21:43:38Z",
+    "url": "https://github.com/aaakoako/DoubaoTypeless/releases/tag/v0.5.4",
+    "installed_dependency_count": 61,
+    "known_vulnerabilities": 0,
+    "local_startup": {
+      "test": "frozen-startup-and-graceful-exit",
+      "executable": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.4\\portable\\DoubaoTypeless\\DoubaoTypeless.exe",
+      "passed": true,
+      "insertion_tested": false,
+      "cursor_tested": false,
+      "phone_tested": false,
+      "pid": 31880,
+      "protocol_ready": true,
+      "quit_command_exit": 0,
+      "process_exit": 0
+    },
+    "real_target_acceptance": {
+      "codex_desktop_image_then_text": "user reported successful on previous candidate",
+      "cursor": "not verified",
+      "physical_mobile_ime": "not verified"
+    },
+    "manual_release_decision": "User authorized stable publication; all required exact-source checks, native reports and downloaded artifact checks passed."
   }
 }
