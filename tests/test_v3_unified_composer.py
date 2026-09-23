@@ -136,9 +136,111 @@ def test_new_image_disappearing_is_not_stable_receipt(monkeypatch):
     assert adapter.observe_image(b,timeout_s=.12)=='unknown'
 
 def test_native_recovery_is_forbidden_after_new_user_input(app,monkeypatch):
+    import types
     app._read_focus=lambda:FOCUS._replace(runtime_id=(99,))
     app._injected_input_stamp=1;app._input_stamp=lambda:2;app._image_baseline=baseline()
+    app._delivery_input_activity=types.SimpleNamespace(snapshot=lambda:1)
+    app._delivery_input_baseline=0
     assert app._resume_after_image(FOCUS) is None
+
+
+def test_own_injected_timestamp_change_does_not_reject_scoped_recovery(app,monkeypatch):
+    import types
+    from doubao_typeless.platform.windows import automation_host
+    sequence=iter([FOCUS._replace(runtime_id=(99,)),FOCUS])
+    app._read_focus=lambda:next(sequence)
+    app._injected_input_stamp=1;app._input_stamp=lambda:2
+    app._image_baseline=baseline()
+    app._delivery_input_activity=types.SimpleNamespace(snapshot=lambda:0)
+    app._delivery_input_baseline=0
+    calls=[]
+    def restore(op,args):
+        calls.append(op)
+        assert args['input_stamp']==2 and args['expected']==list(FOCUS)
+        return list(FOCUS)
+    monkeypatch.setattr(automation_host,'host',lambda:types.SimpleNamespace(call=restore))
+    assert app._resume_after_image(FOCUS)==FOCUS
+    assert calls==['resume_composer']
+
+
+def test_delayed_attachment_refocus_retries_only_focus_and_is_bounded(app,monkeypatch):
+    import types
+    from doubao_typeless.platform.windows import automation_host
+    app._read_focus=lambda:FOCUS._replace(runtime_id=(99,))
+    app._input_stamp=lambda:2;app._image_baseline=baseline()
+    app._delivery_input_activity=types.SimpleNamespace(snapshot=lambda:0)
+    app._delivery_input_baseline=0
+    calls=[]
+    monkeypatch.setattr(automation_host,'host',lambda:types.SimpleNamespace(
+        call=lambda *args:(calls.append(args[0]) or list(FOCUS))))
+    app._paste=lambda:pytest.fail('focus recovery must not replay paste')
+    assert app._resume_after_image(FOCUS) is None
+    assert calls==['resume_composer']*3
+
+
+def test_external_input_during_restore_stops_without_another_focus_attempt(app,monkeypatch):
+    import types
+    from doubao_typeless.platform.windows import automation_host
+    app._read_focus=lambda:FOCUS._replace(runtime_id=(99,))
+    app._input_stamp=lambda:2;app._image_baseline=baseline()
+    changes=iter([0,1])
+    app._delivery_input_activity=types.SimpleNamespace(snapshot=lambda:next(changes))
+    app._delivery_input_baseline=0
+    calls=[]
+    monkeypatch.setattr(automation_host,'host',lambda:types.SimpleNamespace(
+        call=lambda *args:(calls.append(args[0]) or list(FOCUS))))
+    assert app._resume_after_image(FOCUS) is None
+    assert len(calls)==1
+
+
+def test_mixed_delivery_closes_activity_observer_even_when_paste_fails(app,monkeypatch):
+    from doubao_typeless.platform.windows import input_activity
+    calls=[]
+    class Monitor:
+        def start(self):calls.append('start');return self
+        def snapshot(self):return 0
+        def close(self):calls.append('close')
+    monkeypatch.setattr(input_activity,'InputActivityMonitor',Monitor)
+    platform(app)
+    bundle=mixed(app)
+    def fail(*args,**kw):raise OSError('synthetic')
+    app.delivery.run=fail
+    result=app.deliver_and_finish({'intent_id':'observer-cleanup'},bundle)
+    assert result['error_code']=='DELIVERY_FAILED'
+    assert calls==['start','close']
+    assert app._delivery_input_activity is None and app._delivery_input_baseline is None
+
+
+def test_user_input_during_timestamp_read_never_reaches_focus_helper(app,monkeypatch):
+    import types
+    from doubao_typeless.platform.windows import automation_host
+    activity={'count':0}
+    app._read_focus=lambda:FOCUS._replace(runtime_id=(99,))
+    def timestamp():
+        activity['count']+=1  # A user click while the timestamp is being read.
+        return 2
+    app._input_stamp=timestamp;app._image_baseline=baseline()
+    app._delivery_input_activity=types.SimpleNamespace(snapshot=lambda:activity['count'])
+    app._delivery_input_baseline=0
+    monkeypatch.setattr(automation_host,'host',lambda:pytest.fail('must not steal focus'))
+    assert app._resume_after_image(FOCUS) is None
+
+
+def test_target_change_during_initial_input_barrier_prevents_any_paste(app,monkeypatch):
+    from doubao_typeless.platform.windows import input_activity
+    written=platform(app)
+    target={'focus':FOCUS}
+    app._read_focus=lambda:target['focus']
+    app.delivery._read_focus=app._read_focus
+    app._restore_external_target=lambda:FOCUS[:2]
+    class Monitor:
+        def start(self):return self
+        def snapshot(self):target['focus']=FOCUS._replace(runtime_id=(99,));return 0
+        def close(self):pass
+    monkeypatch.setattr(input_activity,'InputActivityMonitor',Monitor)
+    app.delivery._paste=lambda:pytest.fail('must recheck target after barrier')
+    result=app.deliver_and_finish({'intent_id':'barrier-target-change'},mixed(app))
+    assert result['error_code']=='TARGET_CHANGED' and not result['steps'] and not written
 
 def test_theme_generated_outputs_match_single_source():
     subprocess.run([sys.executable,str(ROOT/'tools/export_ui_theme.py'),'--check'],check=True)

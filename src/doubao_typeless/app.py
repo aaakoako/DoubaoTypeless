@@ -700,6 +700,7 @@ class V3App:
         from doubao_typeless.platform.windows.clipboard import send_paste
 
         send_paste()
+        # Diagnostic only: LastInputInfo also changes for our own injected keys.
         self._injected_input_stamp = self._input_stamp()
         # Pace separate clipboard pastes so the target can dispatch Ctrl+V.
         # This is not an upload wait or proof that the target accepted content.
@@ -714,19 +715,37 @@ class V3App:
         except Exception:return None
 
     def _resume_after_image(self, expected):
-        current = self._read_focus()
-        if same_target(current, expected):return current
-        # 只在没有新键鼠动作、焦点仍在原附件容器时恢复。用户切走绝不抢回。
-        stamp = getattr(self, "_injected_input_stamp", None)
-        if stamp is None or self._input_stamp()!=stamp:return None
-        anchor=getattr(self, "_image_baseline", None)
-        if not anchor or not anchor.get("scope"):return None
         from doubao_typeless.platform.windows.automation_host import host
         from doubao_typeless.platform.windows.focus import FocusSnapshot
-        value=host().call("resume_composer", {"anchor":anchor,"expected":list(expected)})
-        if not value:return None
-        actual=FocusSnapshot(*value[:5],tuple(value[5]),value[6])
-        return actual if same_target(actual,self._read_focus()) else None
+        # Only refocus, never replay a paste. Attachment callbacks can move focus
+        # again while UIA is returning, so recheck the same scope at most 3 times.
+        for retry in range(3):
+            current = self._read_focus()
+            if same_target(current, expected):return current
+            # Read before the barrier: input during this read must invalidate
+            # recovery instead of becoming the helper's accepted timestamp.
+            stamp = self._input_stamp()
+            activity = getattr(self, '_delivery_input_activity', None)
+            baseline = getattr(self, '_delivery_input_baseline', None)
+            if activity is None or baseline is None or activity.snapshot() != baseline:
+                _log('[v3.focus_resume] refused=input_changed_or_unavailable')
+                return None
+            anchor=getattr(self, "_image_baseline", None)
+            if not anchor or not anchor.get("scope"):
+                _log('[v3.focus_resume] refused=missing_scope')
+                return None
+            if stamp is None:return None
+            value=host().call("resume_composer", {"anchor":anchor,"expected":list(expected),
+                                                   "input_stamp":stamp})
+            if activity.snapshot() != baseline:
+                _log('[v3.focus_resume] refused=external_input_during_probe')
+                return None
+            if value:
+                actual=FocusSnapshot(*value[:5],tuple(value[5]),value[6])
+                if same_target(actual,expected) and same_target(actual,self._read_focus()):
+                    return actual
+            _log(f'[v3.focus_resume] retry={retry+1} reason={"postcheck_changed" if value else "helper_refused"}')
+        return None
 
     def _set_image(self, data: bytes) -> None:
         from doubao_typeless.platform.windows.clipboard import set_clipboard_png
@@ -1002,10 +1021,24 @@ class V3App:
                 for old in intent.get("verified_steps") or []:
                     if old.get("asset_id") in valid_ids and old.get("state") == "observed":
                         attempt.steps.append(Step(len(attempt.steps), "image", old["asset_id"], "observed", old["evidence"]))
-                attempt = self.delivery.run(attempt, hydrated,
-                    mode=str(intent.get("recovery_mode") or "full"),
-                    skip_asset_ids=set(intent.get("skip_asset_ids") or []), remote=remote,
-                    expected_focus=self._last_target_fp)
+                activity = None
+                if hydrated.get('assets'):
+                    from doubao_typeless.platform.windows.input_activity import InputActivityMonitor
+                    activity = InputActivityMonitor().start()
+                self._delivery_input_activity = activity
+                self._delivery_input_baseline = None
+                try:
+                    # A synchronization barrier can block. Take it before
+                    # DeliveryService's final target checks, never inside paste.
+                    if activity is not None:self._delivery_input_baseline = activity.snapshot()
+                    attempt = self.delivery.run(attempt, hydrated,
+                        mode=str(intent.get("recovery_mode") or "full"),
+                        skip_asset_ids=set(intent.get("skip_asset_ids") or []), remote=remote,
+                        expected_focus=self._last_target_fp)
+                finally:
+                    self._delivery_input_activity = None
+                    self._delivery_input_baseline = None
+                    if activity is not None:activity.close()
             if intent.get("recovery_mode") == "text_only" and bundle.get("assets") and attempt.steps:
                 # 用户选择只贴文字，不等于全部图片都已收到；保留待恢复图文。
                 attempt.result = "PARTIAL"
