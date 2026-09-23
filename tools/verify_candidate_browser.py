@@ -260,8 +260,8 @@ async def exercise(child,data,result,report):
                 await ready(text)
                 from pynput.keyboard import Controller, Key
                 keyboard=Controller();keyboard.press(Key.shift)
-                from doubao_typeless.platform.windows.guards import key_down, VK_SHIFT
-                assert key_down(VK_SHIFT),'Shift was not held by the native fixture'
+                import win32api
+                assert win32api.GetAsyncKeyState(0x10)&0x8000,'Shift was not held by the native fixture'
                 try:
                     assert inspector.click(hud(),'插入并复制'),hud_text()
                     await until(lambda:clipboard_text()==text,timeout=1.2,
@@ -269,7 +269,7 @@ async def exercise(child,data,result,report):
                     assert inspector.click(win32gui.GetForegroundWindow(),'Other input',(50004,50030))
                     await until(lambda:inspector.uia.GetFocusedElement().CurrentName=='Other input',timeout=.7,
                                 message='Windows did not observe the new input focus')
-                    assert key_down(VK_SHIFT),'Modifier released before target-change observation'
+                    assert win32api.GetAsyncKeyState(0x10)&0x8000,'Modifier released before target-change observation'
                 finally:
                     keyboard.release(Key.shift)
                 await until(lambda:'目标变化' in hud_text(),timeout=10,message='target change had no visible result')
