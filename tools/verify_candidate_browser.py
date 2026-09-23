@@ -78,6 +78,8 @@ class NativeInspector:
     def __init__(self):
         sys.coinit_flags=0
         import comtypes.client
+        self.com_error = comtypes.COMError
+        self.transient_reads = {}
         self.module=comtypes.client.GetModule('UIAutomationCore.dll')
         self.uia=comtypes.client.CreateObject('{FF48DBA4-60EF-4201-AA87-54103EEF594E}',interface=self.module.IUIAutomation)
 
@@ -87,28 +89,50 @@ class NativeInspector:
         items=root.FindAll(4,self.uia.CreateTrueCondition())
         return [items.GetElement(i) for i in range(min(600,items.Length))]
 
+    def read(self, query, name, fallback):
+        try:
+            return query()
+        except self.com_error as exc:
+            if (exc.hresult & 0xffffffff) != 0x80040201:
+                raise
+            self.transient_reads[name] = self.transient_reads.get(name, 0) + 1
+            # A read-only UIA frame was unavailable. The caller's existing
+            # deadline remains in force; next poll reacquires every element.
+            return fallback
+
     def text(self, hwnd):
-        return '\n'.join(str(e.CurrentName or '') for e in self.controls(hwnd))
+        return self.read(lambda: '\n'.join(str(e.CurrentName or '') for e in self.controls(hwnd)), 'text', '')
+
+    def focused_name(self):
+        return self.read(lambda: self.uia.GetFocusedElement().CurrentName, 'focus', '')
+
+    def clickable_rects(self, hwnd, name, control_types):
+        def query():
+            rects = []
+            for element in self.controls(hwnd):
+                if element.CurrentName == name and element.CurrentControlType in control_types and element.CurrentIsEnabled:
+                    r = element.CurrentBoundingRectangle
+                    rects.append((r.left, r.top, r.right, r.bottom))
+            return rects
+        return self.read(query, 'click_geometry', [])
 
     def click(self, hwnd, name, control_types=(50000,)):
         from pynput.mouse import Controller, Button
         import win32gui, win32con
         end=time.monotonic()+2;last=None
         while time.monotonic()<end:
-            for element in self.controls(hwnd):
-                if element.CurrentName==name and element.CurrentControlType in control_types and element.CurrentIsEnabled:
-                    r=element.CurrentBoundingRectangle
-                    if r.right>r.left and r.bottom>r.top:
-                        point=((r.left+r.right)//2,(r.top+r.bottom)//2)
-                        mouse=Controller();mouse.position=point
-                        hit=win32gui.WindowFromPoint(point)
-                        root=win32gui.GetAncestor(hit,win32con.GA_ROOT) if hit else 0
-                        geometry=(r.left,r.top,r.right,r.bottom)
-                        # Wait for two equal layouts; never click through an occluder.
-                        if root==hwnd and last==geometry:
-                            mouse.click(Button.left)
-                            return True
-                        last=geometry if root==hwnd else None
+            for left, top, right, bottom in self.clickable_rects(hwnd, name, control_types):
+                if right>left and bottom>top:
+                    point=((left+right)//2,(top+bottom)//2)
+                    mouse=Controller();mouse.position=point
+                    hit=win32gui.WindowFromPoint(point)
+                    root=win32gui.GetAncestor(hit,win32con.GA_ROOT) if hit else 0
+                    geometry=(left,top,right,bottom)
+                    # Wait for two equal layouts; never click through an occluder.
+                    if root==hwnd and last==geometry:
+                        mouse.click(Button.left)
+                        return True
+                    last=geometry if root==hwnd else None
             time.sleep(.04)
         raise AssertionError(f"native control not stably clickable: {name}; window={hwnd}")
 
@@ -213,6 +237,7 @@ async def exercise(child,data,result,report):
     target_url='http://127.0.0.1:'+str(site._server.sockets[0].getsockname()[1])+'/'
     result['cases']=[]
     cases=result['cases']; inspector=NativeInspector()
+    result['uia_transient_reads'] = inspector.transient_reads
     try:
         async with async_playwright() as pw:
             browser=await pw.chromium.launch(headless=False,args=['--force-renderer-accessibility'])
@@ -293,7 +318,7 @@ async def exercise(child,data,result,report):
                     await until(lambda:clipboard_text()==text,timeout=1.2,
                                 message='delivery did not reach modifier guard')
                     assert inspector.click(win32gui.GetForegroundWindow(),'Other input',(50004,50030))
-                    await until(lambda:inspector.uia.GetFocusedElement().CurrentName=='Other input',timeout=.7,
+                    await until(lambda:inspector.focused_name()=='Other input',timeout=.7,
                                 message='Windows did not observe the new input focus')
                     assert win32api.GetAsyncKeyState(0x10)&0x8000,'Modifier released before target-change observation'
                 finally:
