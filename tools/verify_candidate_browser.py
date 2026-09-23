@@ -450,6 +450,11 @@ async def exercise(child,data,result,report):
                 before_locate=await target.evaluate('window.pasteCount')
                 assert inspector.click(review,'定位输入框'),inspector.text(review)
                 await until(lambda:target.evaluate("document.activeElement.id==='prompt-textarea'"),message='unique composer was not focused')
+                # SetFocus is observable before the locator has returned. Only
+                # the visible completion state promises the next action is ready.
+                await until(lambda:win32gui.IsWindowVisible(hud()) and '已定位输入框' in hud_text()
+                            and not win32gui.IsWindowVisible(review),
+                            message='locator did not reach its visible ready state')
                 assert await target.evaluate('window.pasteCount')==before_locate,'locating must never paste'
                 assert await phone.locator('#text').input_value()=='定位但不自动发送'
                 assert await target.locator('#prompt-textarea').input_value()==''
@@ -530,23 +535,29 @@ async def _matches(page,selector,expected):
 async def _phone_empty(page):return await page.locator('#text').input_value()==''
 
 
-def verify(exe,report):
+def verify(exe,report,*,source=False):
     if sys.platform!='win32' or os.environ.get('GITHUB_ACTIONS')!='true':
         raise RuntimeError('Only disposable Windows Actions runners are supported')
     exe=exe.resolve(strict=True);report=report.resolve();report.parent.mkdir(parents=True,exist_ok=True)
-    result={'passed':False,'test':'frozen-production-phone-browser-stability','cursor_tested':False,
-            'android_ime_tested':False,'exe_sha256':hashlib.sha256(exe.read_bytes()).hexdigest()}
+    result={'passed':False,'test':('source' if source else 'frozen')+'-production-phone-browser-stability',
+            'cursor_tested':False,'android_ime_tested':False,'frozen':not source}
+    if not source:result['exe_sha256']=hashlib.sha256(exe.read_bytes()).hexdigest()
+    command=[str(exe)] if not source else [str(exe),'-m','doubao_typeless']
     with tempfile.TemporaryDirectory(prefix='dt-browser-stability-') as temp:
         data=Path(temp)/'data';data.mkdir()
         (data/'settings.json').write_text(json.dumps({'phone_send_enabled':True,'phone_send_mode':'enter'}),encoding='utf-8')
         env={**os.environ,'DT_V3_DATA_DIR':str(data),'DT_V3_PIPE':'DT-stable-'+uuid.uuid4().hex,'PYTHONUTF8':'1'}
         env.pop('QT_QPA_PLATFORM',None)
-        child=subprocess.Popen([str(exe),'--minimized'],env=env)
+        if source:
+            root=Path(__file__).resolve().parents[1]
+            env['PYTHONPATH']=str(root/'src')
+            result['source_sha']=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()
+        child=subprocess.Popen([*command,'--minimized'],env=env)
         result['pid']=child.pid
         try:
             asyncio.run(exercise(child,data,result,report))
             result['stage']='normal_exit'
-            quitproc=subprocess.run([str(exe),'--quit'],env=env,timeout=15)
+            quitproc=subprocess.run([*command,'--quit'],env=env,timeout=15)
             assert quitproc.returncode==0
             result['exit_code']=child.wait(15)
             assert result['exit_code']==0
@@ -555,7 +566,7 @@ def verify(exe,report):
             result.update(error_type=type(exc).__name__,error=str(exc),process_exit_before_cleanup=child.poll())
         finally:
             if child.poll() is None:
-                subprocess.run([str(exe),'--quit'],env=env,timeout=15)
+                subprocess.run([*command,'--quit'],env=env,timeout=15)
                 try:child.wait(15)
                 except subprocess.TimeoutExpired:
                     child.terminate();child.wait(5);result['test_owned_forced_cleanup']=True
@@ -568,5 +579,8 @@ def verify(exe,report):
 
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('exe',type=Path);p.add_argument('--report',type=Path,required=True)
-    a=p.parse_args();raise SystemExit(verify(a.exe,a.report))
+    p=argparse.ArgumentParser();p.add_argument('exe',type=Path,nargs='?');p.add_argument('--report',type=Path,required=True)
+    p.add_argument('--source',action='store_true',help='Diagnose source runtime; never substitutes for the frozen gate')
+    a=p.parse_args()
+    if a.exe is None and not a.source:p.error('exe is required unless --source is selected')
+    raise SystemExit(verify(Path(sys.executable) if a.source else a.exe,a.report,source=a.source))
