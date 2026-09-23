@@ -5,6 +5,25 @@ import argparse, datetime, hashlib, http.server, json, os, shutil, ssl, subproce
 from pathlib import Path
 from urllib.request import urlopen
 
+def identify(pipe):
+    """Query the isolated application's public local-control protocol."""
+    from PySide6.QtNetwork import QLocalSocket
+    sock=QLocalSocket();raw=bytearray();deadline=time.monotonic()+3
+    try:
+        sock.connectToServer(pipe)
+        assert sock.waitForConnected(3000),'Isolated application control unavailable'
+        assert sock.write(b'identify\n')==9
+        if sock.bytesToWrite():assert sock.waitForBytesWritten(3000)
+        while time.monotonic()<deadline:
+            raw.extend(bytes(sock.readAll()))
+            if b'\n' in raw:
+                reply=json.loads(raw.split(b'\n',1)[0])
+                assert reply.get('schema')==1 and reply.get('pid')
+                return reply
+            sock.waitForReadyRead(max(1,int((deadline-time.monotonic())*1000)))
+        raise AssertionError('Isolated application identity timed out')
+    finally:sock.close()
+
 class ReleaseProxy:
     def __init__(self, folder, package, version):
         from cryptography import x509
@@ -55,6 +74,8 @@ def verify(package, report):
     import win32gui,win32process,win32api,win32con,winreg
     from pynput.mouse import Controller,Button
     from PIL import ImageGrab
+    from PySide6.QtCore import QCoreApplication
+    qt=QCoreApplication.instance() or QCoreApplication([])
     key=r'Software\DoubaoTypelessInstallerTest'
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER,key):raise RuntimeError('Existing test registration')
@@ -116,9 +137,19 @@ def verify(package, report):
             assert (old/'config.json').read_bytes()==before_config and dictionary.read_bytes()==before_dictionary
             result.update(source_sha=source,legacy_data_unchanged=True,complete_entry_replaced=True,proxy_requests=proxy.calls)
             # Reopening the replaced old shortcut must forward without reinstalling.
-            stamp=new_exe.stat().st_mtime_ns
+            identity=identify(env['DT_V3_PIPE'])
+            assert identity['source_sha']==source and Path(identity['executable']).resolve()==new_exe.resolve()
+            # NSIS preserves packaged timestamps: change a non-running payload's
+            # timestamp first so another extraction cannot masquerade as forwarding.
+            marker=new_exe.parent/'_internal'/'build-info.json'
+            stamp=946684800000000000
+            os.utime(marker,ns=(stamp,stamp))
+            stamp=marker.stat().st_mtime_ns
             forwarded=subprocess.run([str(original)],cwd=old,env=env,timeout=60)
-            assert forwarded.returncode==0 and new_exe.stat().st_mtime_ns==stamp
+            assert forwarded.returncode==0 and marker.stat().st_mtime_ns==stamp
+            after=identify(env['DT_V3_PIPE'])
+            assert after['pid']==identity['pid'] and after['source_sha']==source
+            result['forwarded_pid']=after['pid']
             result['repeated_old_entry_forwards']=True
             ImageGrab.grab().save(report.parent/'legacy-upgrade-complete.png')
             result['passed']=True
