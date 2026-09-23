@@ -183,7 +183,11 @@ async def exercise(child,data,result,report):
     from playwright.async_api import async_playwright
     import win32gui,win32clipboard
     note=data/'pair.txt'
-    await until(lambda:note.is_file() or child.poll() is not None,message='startup note missing')
+    started = time.monotonic()
+    # Match the dedicated startup gate: first-use source/Qt initialization is
+    # not an interaction deadline. Keep every post-start interaction limit.
+    await until(lambda:note.is_file() or child.poll() is not None,timeout=45,message='startup note missing')
+    result['startup_ready_seconds'] = round(time.monotonic()-started, 3)
     if child.poll() is not None:raise RuntimeError('candidate exited during startup')
     addr,code=note.read_text(encoding='utf-8').splitlines()[:2]
     base='http://127.0.0.1:'+str(urlparse(addr).port)
