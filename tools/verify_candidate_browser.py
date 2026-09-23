@@ -72,22 +72,27 @@ class NativeInspector:
     def text(self, hwnd):
         return '\n'.join(str(e.CurrentName or '') for e in self.controls(hwnd))
 
-    def click(self, hwnd, name):
+    def click(self, hwnd, name, control_types=(50000,)):
         from pynput.mouse import Controller, Button
-        for element in self.controls(hwnd):
-            if element.CurrentName==name and element.CurrentControlType==50000 and element.CurrentIsEnabled:
-                r=element.CurrentBoundingRectangle
-                if r.right>r.left and r.bottom>r.top:
-                    import win32gui, win32con
-                    point=((r.left+r.right)//2,(r.top+r.bottom)//2)
-                    mouse=Controller();mouse.position=point
-                    hit=win32gui.WindowFromPoint(point)
-                    root=win32gui.GetAncestor(hit,win32con.GA_ROOT) if hit else 0
-                    if root!=hwnd:
-                        raise AssertionError(f"native button occluded: {name}; expected={hwnd}, actual={root}")
-                    mouse.click(Button.left)
-                    return True
-        return False
+        import win32gui, win32con
+        end=time.monotonic()+2;last=None
+        while time.monotonic()<end:
+            for element in self.controls(hwnd):
+                if element.CurrentName==name and element.CurrentControlType in control_types and element.CurrentIsEnabled:
+                    r=element.CurrentBoundingRectangle
+                    if r.right>r.left and r.bottom>r.top:
+                        point=((r.left+r.right)//2,(r.top+r.bottom)//2)
+                        mouse=Controller();mouse.position=point
+                        hit=win32gui.WindowFromPoint(point)
+                        root=win32gui.GetAncestor(hit,win32con.GA_ROOT) if hit else 0
+                        geometry=(r.left,r.top,r.right,r.bottom)
+                        # Wait for two equal layouts; never click through an occluder.
+                        if root==hwnd and last==geometry:
+                            mouse.click(Button.left)
+                            return True
+                        last=geometry if root==hwnd else None
+            time.sleep(.04)
+        raise AssertionError(f"native control not stably clickable: {name}; window={hwnd}")
 
 
 def hotkey(expand=False):
@@ -255,11 +260,16 @@ async def exercise(child,data,result,report):
                 await ready(text)
                 from pynput.keyboard import Controller, Key
                 keyboard=Controller();keyboard.press(Key.shift)
+                from doubao_typeless.platform.windows.guards import key_down, VK_SHIFT
+                assert key_down(VK_SHIFT),'Shift was not held by the native fixture'
                 try:
                     assert inspector.click(hud(),'插入并复制'),hud_text()
                     await until(lambda:clipboard_text()==text,timeout=1.2,
                                 message='delivery did not reach modifier guard')
-                    await target.locator('#other').click()
+                    assert inspector.click(win32gui.GetForegroundWindow(),'Other input',(50004,50030))
+                    await until(lambda:inspector.uia.GetFocusedElement().CurrentName=='Other input',timeout=.7,
+                                message='Windows did not observe the new input focus')
+                    assert key_down(VK_SHIFT),'Modifier released before target-change observation'
                 finally:
                     keyboard.release(Key.shift)
                 await until(lambda:'目标变化' in hud_text(),timeout=10,message='target change had no visible result')
@@ -500,6 +510,8 @@ async def exercise(child,data,result,report):
                     result['recovery_visible']=bool(rw and win32gui.IsWindowVisible(rw))
                     result['recovery_text']=inspector.text(rw) if rw else ''
                     await target.screenshot(path=str(report.with_suffix('.png')))
+                    from PIL import ImageGrab
+                    ImageGrab.grab().save(report.parent/(report.stem+'-desktop.png'))
                 except Exception as evidence_error:
                     result['evidence_error_type']=type(evidence_error).__name__
                 raise

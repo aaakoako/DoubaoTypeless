@@ -64,6 +64,15 @@ SectionEnd
             time.sleep(1.2)
             assert marker.read_text().count('started')==baseline+1
             result['extraction_failure_reopens_previous']=True
+            foreign=root/'occupied';foreign.mkdir();(foreign/'user.txt').write_text('keep')
+            baseline=marker.read_text().count('started')
+            env['DT_UPGRADE_TEST_ROOT']=str(foreign)
+            try:assert run(bad,'/UPDATE','/WAITPID=0')==2
+            finally:env['DT_UPGRADE_TEST_ROOT']=str(install)
+            time.sleep(1.2)
+            assert marker.read_text().count('started')==baseline+1
+            assert list(foreign.iterdir())==[foreign/'user.txt'] and (foreign/'user.txt').read_text()=='keep'
+            result['foreign_directory_refusal_reopens_previous_without_writes']=True
             # Native entry forwarding should not overwrite a working runtime.
             forward=root/'DoubaoTypeless.exe';forward.write_bytes(good.read_bytes())
             stamp=Path(previous).stat().st_mtime_ns
