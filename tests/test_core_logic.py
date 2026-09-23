@@ -92,6 +92,30 @@ def test_update_bat_uses_no_console_safe_sleep(tmp_path, monkeypatch):
     assert "Start-Sleep" in text
     assert "call :sleep_sec 10" in text
     assert "call :sleep_sec 4" in text
+    assert 'set "PYINSTALLER_RESET_ENVIRONMENT=1"' in text
+    assert 'Start-Process -LiteralPath' not in text
+    assert 'Start-Process -FilePath' in text
+
+
+def test_updater_never_replaces_application_with_installer():
+    assets = [
+        {"name": "DoubaoTypeless_0.5.0_win_x64_Setup.exe", "browser_download_url": "https://example.test/setup.exe"},
+        {"name": "other.exe", "browser_download_url": "https://example.test/other.exe"},
+    ]
+    assert pick_exe_asset(assets) is None
+    assets.append({"name": "DoubaoTypeless.exe", "browser_download_url": "https://example.test/app.exe"})
+    assert pick_exe_asset(assets)["name"] == "DoubaoTypeless.exe"
+
+
+def test_update_launcher_resets_frozen_environment_without_changing_parent(tmp_path, monkeypatch):
+    import os
+    calls = []
+    monkeypatch.setenv("PYINSTALLER_RESET_ENVIRONMENT", "0")
+    monkeypatch.setenv("_PYI_APPLICATION_HOME_DIR", str(tmp_path / "removed-runtime"))
+    monkeypatch.setattr(updater.subprocess, "Popen", lambda **kw: calls.append(kw))
+    assert updater.launch_update_bat(tmp_path / "update.bat")
+    assert calls[0]["env"]["PYINSTALLER_RESET_ENVIRONMENT"] == "1"
+    assert os.environ["PYINSTALLER_RESET_ENVIRONMENT"] == "0"
 
 
 def test_learn_json_parser_chooses_result_over_echo():

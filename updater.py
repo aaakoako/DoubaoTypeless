@@ -166,15 +166,9 @@ def pick_exe_asset(assets: list[Any]) -> dict[str, Any] | None:
         url = a.get("browser_download_url")
         if not url or not isinstance(url, str):
             continue
-        if name.endswith(".exe") and "doubao" in name:
+        if name == "doubaotypeless.exe":
             return a
-    for a in assets:
-        if not isinstance(a, dict):
-            continue
-        name = str(a.get("name", "")).lower()
-        url = a.get("browser_download_url")
-        if url and isinstance(url, str) and name.endswith(".exe"):
-            return a
+    # A Setup executable is not a standalone application update.
     return None
 
 
@@ -279,6 +273,7 @@ def write_update_bat(
                 "@echo off",
                 "chcp 65001 >nul",
                 "setlocal EnableDelayedExpansion",
+                'set "PYINSTALLER_RESET_ENVIRONMENT=1"',
                 f'set "DT_LOG_DIR={dir_set}"',
                 'set "LOGU=%DT_LOG_DIR%\\update.log"',
                 'set "LOGD=%DT_LOG_DIR%\\debug.log"',
@@ -357,7 +352,7 @@ def write_update_bat(
                 "if errorlevel 1 (",
                 '  call :ulog "WARN cmd start returned errorlevel, trying PowerShell Start-Process"',
                 "  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \""
-                "try { Start-Process -LiteralPath $env:DT_RESTART_EXE "
+                "try { Start-Process -FilePath $env:DT_RESTART_EXE "
                 "-WorkingDirectory $env:DT_RESTART_DIR; exit 0 } catch { exit 1 }\"",
                 "  if errorlevel 1 (",
                 '    call :ulog "ERROR both start and PowerShell failed"',
@@ -504,6 +499,9 @@ def launch_update_bat(bat: Path, *, log: Callable[[str], Any] | None = None) -> 
             "stdin": subprocess.DEVNULL,
             "stdout": subprocess.DEVNULL,
             "stderr": subprocess.DEVNULL,
+            # The restarted onefile instance must unpack a fresh runtime after
+            # the old process removes its _MEI directory (PyInstaller >= 6.9).
+            "env": {**os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"},
         }
         if sys.platform == "win32":
             kw["creationflags"] = _win32_updater_creation_flags()
@@ -573,7 +571,8 @@ async def run_update_precheck(*, log) -> tuple[str, dict[str, Any]]:
             "show",
             {
                 "message": (
-                    f"发现新版本 {tag}，但未找到 exe 附件。请浏览器打开：\n{releases_page}"
+                    f"发现新版本 {tag}，但它不能通过旧版单文件替换方式升级。"
+                    f"请保留旧程序和数据，从下载页查看安装与迁移说明：\n{releases_page}"
                 )
             },
         )
