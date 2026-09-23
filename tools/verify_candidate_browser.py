@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 from urllib.parse import urlparse
 import uuid
 
@@ -542,7 +543,7 @@ def verify(exe,report,*,source=False):
     result={'passed':False,'test':('source' if source else 'frozen')+'-production-phone-browser-stability',
             'cursor_tested':False,'android_ime_tested':False,'frozen':not source}
     if not source:result['exe_sha256']=hashlib.sha256(exe.read_bytes()).hexdigest()
-    command=[str(exe)] if not source else [str(exe),'-m','doubao_typeless']
+    command=[str(exe)] if not source else [str(exe),str(Path(__file__).resolve().parent/'run_v3.py')]
     with tempfile.TemporaryDirectory(prefix='dt-browser-stability-') as temp:
         data=Path(temp)/'data';data.mkdir()
         (data/'settings.json').write_text(json.dumps({'phone_send_enabled':True,'phone_send_mode':'enter'}),encoding='utf-8')
@@ -563,7 +564,8 @@ def verify(exe,report,*,source=False):
             assert result['exit_code']==0
             result['passed']=True;result['stage']='complete'
         except Exception as exc:
-            result.update(error_type=type(exc).__name__,error=str(exc),process_exit_before_cleanup=child.poll())
+            result.update(error_type=type(exc).__name__,error=str(exc),traceback=traceback.format_exc(),
+                          process_exit_before_cleanup=child.poll())
         finally:
             if child.poll() is None:
                 subprocess.run([*command,'--quit'],env=env,timeout=15)
