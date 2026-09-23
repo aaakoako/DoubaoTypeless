@@ -485,12 +485,23 @@ async def exercise(child,data,result,report):
                 # 确认发送与插入分离。测试设置仅写本脚本创建的隔离目录。
                 result['stage']='phone_explicit_send'
                 await phone.wait_for_selector('#submitPanel',state='visible')
+                async def confirm_phone_send():
+                    # Native Enter precedes the phone's HTTP acknowledgement and
+                    # asynchronous overlay history.back(). Reconnect only after
+                    # the phone has visibly finished the user's send action.
+                    async with phone.expect_response(lambda response:
+                            urlparse(response.url).path == '/v3/send/commit'
+                            and response.request.method == 'POST') as response:
+                        await phone.click('#confirmSend')
+                    assert (await response.value).status == 200
+                    await phone.wait_for_selector('#confirmSend', state='hidden')
+                    await phone.wait_for_function('!history.state?.typelessOverlay')
                 before_paste=await target.evaluate('window.pasteCount')
                 before_clipboard=clipboard_text()
                 await phone.click('#submitMessage');await phone.wait_for_selector('#confirmSend')
                 await phone.click('#cancelSend')
                 assert await target.evaluate('window.enterEvents')==0
-                await phone.click('#submitMessage');await phone.click('#confirmSend')
+                await phone.click('#submitMessage');await confirm_phone_send()
                 await until(lambda:target.evaluate('window.enterEvents===1'),message='confirmed phone Enter missing')
                 assert await target.evaluate('window.submitKeys')==[{'ctrl':False,'target':'prompt-textarea'}]
                 assert await target.evaluate('window.pasteCount')==before_paste
@@ -509,7 +520,7 @@ async def exercise(child,data,result,report):
                 before_paste=await target.evaluate('window.pasteCount')
                 await phone.click('#submitMessage')
                 assert 'Ctrl+Enter' in await phone.locator('#submitShortcut').inner_text()
-                await phone.click('#confirmSend')
+                await confirm_phone_send()
                 await until(lambda:target.evaluate('window.enterEvents===2'),message='confirmed Ctrl+Enter missing')
                 assert await target.evaluate('window.submitKeys')==[{'ctrl':False,'target':'prompt-textarea'},{'ctrl':True,'target':'prompt-textarea'}]
                 assert await target.evaluate('window.pasteCount')==before_paste
