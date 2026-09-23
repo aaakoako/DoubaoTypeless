@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "product_goal": "0.5.0 正式发行已交付，后续以已发布版本收集真实环境反馈。",
+  "product_goal": "完成可公开发行的 0.5.2 修订版，保留真实设备验证边界。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "0.5.0短暂发布后因GitHub依赖扫描发现27项依赖告警撤回草稿，公开latest已恢复0.4.2；正在升级aiohttp/Pillow并验证0.5.1，不重写v0.5.0标签。",
+  "working_tree": "0.5.0已撤回；0.5.1正式构建在焦点变化后立即重试场景失败，未发布。已确定性复现并修复队列终态通知提前问题，准备0.5.2。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
   "last_completed_slice": "STABLE_0_5_0_PUBLISHED",
-  "active_slice": "SECURITY_CORRECTION_0_5_1",
-  "next_action": "在正式运行依赖更新到aiohttp3.14.3/Pillow12.3.0后跑全量、依赖审计和完整发行验证，发布0.5.1修订版。",
+  "active_slice": "RETRY_READY_0_5_2",
+  "next_action": "运行0.5.2完整测试、原生图文/升级验证、依赖审计及下载校验；全部通过后公开发行。",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -293,5 +293,16 @@
     "delivery_root": "G:\\AgentStorage\\Deliveries\\DoubaoTypeless-0.5.0",
     "withdrawn": true,
     "withdrawal_reason": "Dependency advisories discovered after publication; latest reverted to v0.4.2; preserve tag history."
+  },
+  "failed_0_5_1_stable": {
+    "source_sha": "fb6bdc535016913a0d548140534453efe0eeab76",
+    "run": 35900742142,
+    "attempt": 1,
+    "stage": "target_change_then_recover",
+    "published": false,
+    "diagnosis": "Terminal failure UI could precede receipt persistence and queue release; immediate retry returned a silent BUSY. Deterministically reproduced with blocked persistence.",
+    "repair": "Defer terminal UI until queue is ready; show local BUSY without replay; preserve original browser assertions.",
+    "counterfactual": "Disabling when_ready makes immediate retry regression fail with BUSY.",
+    "independent_review": "No new blocker; frozen-browser validation remains required."
   }
 }
