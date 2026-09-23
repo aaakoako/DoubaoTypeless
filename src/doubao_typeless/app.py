@@ -124,6 +124,7 @@ class V3App:
             is_locked=lambda: self._session_locked(), is_elevated=lambda: self._target_elevated())
         self._last_suggestion = None
         self.hud = HudController(
+            motion_enabled=bool(stored.get('ui_motion',True)),
             on_toggle_note=self.toggle_input_note,
             on_insert=self.request_insert,
             on_copy=self.copy_text,

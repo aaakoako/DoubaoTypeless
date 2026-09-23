@@ -12,18 +12,15 @@ DEFAULT_POLISH_PROMPT = (
 
 
 def chat_url(endpoint: str) -> str:
-    url = (endpoint or "").rstrip("/")
-    if not url:
-        return ""
-    if url.endswith("/chat/completions"):
-        return url
-    return url + "/chat/completions"
+    from doubao_typeless.services.endpoints import normalize_endpoint
+    return normalize_endpoint(endpoint,'chat')
 
 
 def url_join_note(endpoint: str) -> str:
     if not (endpoint or "").strip():
         return "已含 /chat/completions 的完整地址不会再拼接。"
-    return f"实际请求 {chat_url(endpoint)}"
+    try:return f"实际请求 {chat_url(endpoint)}"
+    except ValueError as exc:return str(exc)
 
 
 def extract_model_text(body: dict[str, Any], original: str) -> str:
@@ -115,6 +112,9 @@ class ByokService:
             else:
                 body = self._post(chat_url(self.endpoint), payload, headers)
         except Exception as exc:
+            from doubao_typeless.services.endpoints import EndpointError
+            if isinstance(exc,EndpointError):
+                return {'status':'error','reason':'invalid_endpoint','message':str(exc),'text':text}
             reason = classify_api_error(exc, self.api_key)
             return {
                 "status": "error",

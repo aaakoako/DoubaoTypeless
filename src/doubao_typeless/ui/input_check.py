@@ -15,6 +15,7 @@ class InputCheckSettings:
         form.addRow(self.enabled)
         self.provider = QComboBox()
         self.provider.addItem('TypeSafe','typesafe');self.provider.addItem('Vercel AI Gateway','vercel')
+        self.provider.addItem('OpenRouter','openrouter');self.provider.addItem('自定义','custom')
         self.provider.setCurrentIndex(max(0,self.provider.findData(stored.get('jev_provider','typesafe'))))
         form.addRow('服务商',self.provider)
         notice = QLabel('开启后发送当前文字至 TypeSafe；不含图片和历史。')
@@ -29,13 +30,30 @@ class InputCheckSettings:
         self.gateway_key.setEchoMode(QLineEdit.Password)
         self.gateway_key.setPlaceholderText('粘贴 Vercel AI Gateway Key')
         form.addRow('Vercel Key',self.gateway_key)
+        self.openrouter_key=QLineEdit(str(stored.get('jev_openrouter_key') or ''))
+        self.custom_key=QLineEdit(str(stored.get('jev_custom_key') or ''))
+        for label,field in (('OpenRouter Key',self.openrouter_key),('自定义 Key',self.custom_key)):
+            field.setEchoMode(QLineEdit.Password);form.addRow(label,field)
+        self.custom_endpoint=QLineEdit(str(stored.get('jev_custom_endpoint') or ''))
+        self.custom_endpoint.setPlaceholderText('域名、Base URL 或完整接口地址')
+        self.custom_model=QLineEdit(str(stored.get('jev_custom_model') or 'jev-latest'))
+        from doubao_typeless.services.endpoints import endpoint_origin
+        self._custom_key_origin=endpoint_origin(self.custom_endpoint.text()) if self.custom_key.text() else None
+        self._custom_key_edited=False
+        form.addRow('接口地址',self.custom_endpoint);form.addRow('模型 ID',self.custom_model)
+        self._key_fields={'typesafe':self.key,'vercel':self.gateway_key,'openrouter':self.openrouter_key,'custom':self.custom_key}
         def key_field():
-            return self.gateway_key if self.provider.currentData()=='vercel' else self.key
+            return self._key_fields[self.provider.currentData()]
         def provider_changed():
-            vercel=self.provider.currentData()=='vercel'
-            for field,visible in ((self.key,not vercel),(self.gateway_key,vercel)):
-                field.setVisible(visible);form.labelForField(field).setVisible(visible)
-            notice.setText('文字经 Vercel 发给 TypeSafe；不含图片和历史。' if vercel else '开启后发送当前文字至 TypeSafe；不含图片和历史。')
+            provider=self.provider.currentData()
+            for name,field in self._key_fields.items():
+                field.setVisible(name==provider);form.labelForField(field).setVisible(name==provider)
+            for field in (self.custom_endpoint,self.custom_model):
+                field.setVisible(provider=='custom');form.labelForField(field).setVisible(provider=='custom')
+            notice.setText({'typesafe':'当前文字发送至 TypeSafe；不含图片和历史。',
+                'vercel':'文字经 Vercel 发给 TypeSafe；不含图片和历史。',
+                'openrouter':'文字经 OpenRouter 发给 TypeSafe；不含图片和历史。',
+                'custom':'使用 TypeSafe 兼容接口；仅发送当前文字。'}[provider])
         self.provider.currentIndexChanged.connect(provider_changed);provider_changed()
         self.emotion = QCheckBox('显示语气')
         self.emotion.setIcon(icon('positive'))
@@ -47,11 +65,15 @@ class InputCheckSettings:
         self.note.setChecked(bool(stored.get('jev_voice_note')))
         self.note.setToolTip(VOICE_NOTE+'\n只提示可能有误，不要求目标模型追问。可在浮窗为本段取消。')
         form.addRow(self.note)
+        self.motion=QCheckBox('界面动效与语气彩蛋');self.motion.setIcon(icon('positive'))
+        self.motion.setChecked(bool(stored.get('ui_motion',True)))
+        form.addRow(self.motion)
         row = QHBoxLayout()
         self.probe = QPushButton('检测连接'); self.probe.setIcon(icon('waiting'))
         get_key = QPushButton('申请 API Key')
         get_key.setIcon(icon('key'))
-        get_key.clicked.connect(lambda: QDesktopServices.openUrl(QUrl('https://vercel.com/ai-gateway' if self.provider.currentData()=='vercel' else 'https://console.typesafe.ai/')))
+        get_key.clicked.connect(lambda: QDesktopServices.openUrl(QUrl({'vercel':'https://vercel.com/ai-gateway',
+            'openrouter':'https://openrouter.ai/keys'}.get(self.provider.currentData(),'https://console.typesafe.ai/'))))
         row.addWidget(self.probe); row.addWidget(get_key); row.addStretch(1)
         form.addRow(row)
         self.status = QLabel('保存后生效')
@@ -64,16 +86,43 @@ class InputCheckSettings:
         self.provider.currentIndexChanged.connect(configuration_changed)
         self.key.textChanged.connect(configuration_changed)
         self.gateway_key.textChanged.connect(configuration_changed)
+        self.openrouter_key.textChanged.connect(configuration_changed);self.custom_key.textChanged.connect(configuration_changed)
+        self.custom_endpoint.textChanged.connect(configuration_changed);self.custom_model.textChanged.connect(configuration_changed)
+        def bind_custom_key():
+            origin=endpoint_origin(self.custom_endpoint.text())
+            self._custom_key_origin=origin if self.custom_key.text() and origin[1] else None
+            self._custom_key_edited=True
+        self.custom_key.textChanged.connect(bind_custom_key)
+        def normalize_custom():
+            from doubao_typeless.services.endpoints import normalize_endpoint,endpoint_origin
+            try:
+                normalized=normalize_endpoint(self.custom_endpoint.text(),'systemone')
+                self.custom_endpoint.setText(normalized)
+                if (self._custom_key_origin and endpoint_origin(normalized)!=self._custom_key_origin
+                        and self.custom_key.text()):
+                    self.custom_key.clear();self.status.setText('地址已变 · 请填写 Key')
+                else:
+                    if self.custom_key.text():self._custom_key_origin=endpoint_origin(normalized)
+                    self.status.setText('地址已补全');self.status.setToolTip(normalized)
+                return True
+            except ValueError as exc:self.status.setText(str(exc));return False
+        self.custom_endpoint.editingFinished.connect(normalize_custom)
+        self.normalize_custom=normalize_custom
         def probe():
             key = key_field().text().strip();provider=self.provider.currentData()
+            if provider=='custom' and not normalize_custom():return
+            key=key_field().text().strip()
+            endpoint=self.custom_endpoint.text();model=self.custom_model.text()
             if not key:
                 self.status.setText('请先填写 Jev API Key'); return
             self.probe.setEnabled(False); self.status.setText('连接中…')
             def work():
-                result = evaluate('这是一条连接检测示例。', key, False, provider=provider)
+                result = evaluate('这是一条连接检测示例。', key, False, provider=provider,
+                                  endpoint=endpoint,model=model if provider=='custom' else '')
                 def done():
                     self.probe.setEnabled(True)
-                    if key_field().text().strip() != key or self.provider.currentData()!=provider:
+                    if (key_field().text().strip()!=key or self.provider.currentData()!=provider or
+                        (provider=='custom' and (self.custom_endpoint.text(),self.custom_model.text())!=(endpoint,model))):
                         self.status.setText('配置已变化，请重新检测'); return
                     self.status.setText('已连接 · 保存后生效' if result['status']=='ready' else result['message'])
                     self.status.setToolTip(result.get('detail','检测连接只发送固定示例文字。'))
@@ -82,13 +131,18 @@ class InputCheckSettings:
         self.probe.clicked.connect(probe)
 
     def values(self):
+        from doubao_typeless.services.endpoints import endpoint_origin
         return {'jev_enabled': self.enabled.isChecked(), 'jev_api_key': self.key.text().strip(),
                 'jev_vercel_key':self.gateway_key.text().strip(),'jev_provider':self.provider.currentData(),
+                'jev_openrouter_key':self.openrouter_key.text().strip(),'jev_custom_key':self.custom_key.text().strip(),
+                'jev_custom_endpoint':self.custom_endpoint.text().strip(),'jev_custom_model':self.custom_model.text().strip(),
+                'jev_custom_key_reentered':bool(self._custom_key_edited and self._custom_key_origin==endpoint_origin(self.custom_endpoint.text())),
+                'ui_motion':self.motion.isChecked(),
                 'jev_emotion': self.emotion.isChecked(), 'jev_voice_note': self.note.isChecked()}
 
 
 class InputCheckDetails(QWidget):
-    def __init__(self, app, parent):
+    def __init__(self, app, parent,feedback=None):
         super().__init__(parent)
         layout = QVBoxLayout(self); layout.setContentsMargins(0, 0, 0, 0)
         self.summary = QLabel(); self.summary.setTextFormat(Qt.PlainText); self.summary.setWordWrap(True)
@@ -109,6 +163,9 @@ class InputCheckDetails(QWidget):
         self._timer = QTimer(self); self._timer.setInterval(250)
         def refresh():
             result = app.input_check.view(app.input_check_identity())
+            if feedback is not None:
+                feedback.configure(app.input_check.options.get('ui_motion',True))
+                feedback.set_tone(result.get('tone_kind',''))
             summary, details = presentation(result)
             self.setVisible(bool(summary))
             self.summary.setText(summary)

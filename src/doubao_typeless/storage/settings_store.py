@@ -10,8 +10,8 @@ from doubao_typeless.storage.secret_store import get_secret, put_secret
 
 
 def endpoint_authority(url: str) -> tuple[str, str, int | None]:
-    parsed = urlparse((url or "").strip())
-    return ((parsed.scheme or "").lower(), (parsed.hostname or "").lower(), parsed.port)
+    from doubao_typeless.services.endpoints import endpoint_origin
+    return endpoint_origin(url)
 
 
 def settings_path(data_dir: Path) -> Path:
@@ -41,6 +41,11 @@ def load_settings(data_dir: Path) -> dict[str, Any]:
         "jev_api_key": "",
         "jev_vercel_key": "",
         "jev_provider": "typesafe",
+        "jev_openrouter_key": "",
+        "jev_custom_key": "",
+        "jev_custom_endpoint": "",
+        "jev_custom_model": "jev-latest",
+        "ui_motion": True,
         "jev_emotion": True,
         "jev_voice_note": False,
     }
@@ -50,6 +55,8 @@ def load_settings(data_dir: Path) -> dict[str, Any]:
         out["byok_api_key"] = get_secret(data_dir, "byok_api_key")
         out["jev_api_key"] = get_secret(data_dir, "jev_api_key")
         out["jev_vercel_key"] = get_secret(data_dir, "jev_vercel_key")
+        out["jev_openrouter_key"] = get_secret(data_dir,"jev_openrouter_key")
+        out["jev_custom_key"] = get_secret(data_dir,"jev_custom_key")
         return out
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -84,7 +91,7 @@ def load_settings(data_dir: Path) -> dict[str, Any]:
         stored_key = file_key
         _rewrite_without_secrets(path, data)
     out["byok_api_key"] = stored_key
-    for name in ('jev_api_key','jev_vercel_key'):
+    for name in ('jev_api_key','jev_vercel_key','jev_openrouter_key','jev_custom_key'):
         out[name] = get_secret(data_dir,name)
         if data.get(name):
             if not out[name]:
@@ -98,6 +105,8 @@ def _rewrite_without_secrets(path: Path, data: dict[str, Any]) -> None:
     cleaned["byok_api_key"] = ""
     cleaned["jev_api_key"] = ""
     cleaned["jev_vercel_key"] = ""
+    cleaned["jev_openrouter_key"] = ""
+    cleaned["jev_custom_key"] = ""
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(cleaned, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     tmp.replace(path)
@@ -105,6 +114,7 @@ def _rewrite_without_secrets(path: Path, data: dict[str, Any]) -> None:
 
 ALLOWED = {
     "jev_enabled", "jev_api_key", "jev_vercel_key", "jev_provider", "jev_emotion", "jev_voice_note",
+    "jev_openrouter_key", "jev_custom_key", "jev_custom_endpoint", "jev_custom_model", "ui_motion",
     "hud_position",
     "byok_endpoint",
     "byok_api_key",
@@ -129,19 +139,28 @@ def save_settings(data_dir: Path, payload: dict[str, Any]) -> None:
     path = settings_path(data_dir)
     current = load_settings(data_dir)
     previous_endpoint = str(current.get("byok_endpoint") or "")
+    previous_jev_endpoint = str(current.get('jev_custom_endpoint') or '')
+    previous_jev_key = str(current.get('jev_custom_key') or '')
     previous_key = str(current.get("byok_api_key") or "")
     current.update({k: payload[k] for k in payload if k in ALLOWED})
     new_endpoint = str(current.get("byok_endpoint") or "")
     new_key = str(current.get("byok_api_key") or "")
-    if endpoint_authority(previous_endpoint) != endpoint_authority(new_endpoint) and new_key == previous_key:
+    if endpoint_authority(previous_endpoint) != endpoint_authority(new_endpoint) and new_key == previous_key and not payload.get('byok_key_reentered'):
         current["byok_api_key"] = ""
+    if (endpoint_authority(previous_jev_endpoint)!=endpoint_authority(current.get('jev_custom_endpoint',''))
+            and current.get('jev_custom_key')==previous_jev_key and not payload.get('jev_custom_key_reentered')):
+        current['jev_custom_key']=''
     put_secret(data_dir, "byok_api_key", str(current.get("byok_api_key") or ""))
     put_secret(data_dir, "jev_api_key", str(current.get("jev_api_key") or ""))
     put_secret(data_dir, "jev_vercel_key", str(current.get("jev_vercel_key") or ""))
+    put_secret(data_dir,"jev_openrouter_key",str(current.get('jev_openrouter_key') or ''))
+    put_secret(data_dir,"jev_custom_key",str(current.get('jev_custom_key') or ''))
     on_disk = dict(current)
     on_disk["byok_api_key"] = ""
     on_disk["jev_api_key"] = ""
     on_disk["jev_vercel_key"] = ""
+    on_disk["jev_openrouter_key"] = ""
+    on_disk["jev_custom_key"] = ""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(on_disk, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

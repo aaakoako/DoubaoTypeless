@@ -7,6 +7,12 @@ PATHS = {
     'urgent': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     'forceful': '<path d="m13 2-9 12h7l-1 8 10-13h-7z"/>',
     'frustrated': '<circle cx="12" cy="12" r="9"/><path d="M8 16c2-3 6-3 8 0M8 9h.1M16 9h.1"/>',
+    'angry': '<circle cx="12" cy="12" r="9"/><path d="m7 8 3 2m7-2-3 2M8 16c2-2 6-2 8 0"/>',
+    'fire': '<path d="M13 2c2 5-2 6 0 10 2-1 3-3 3-5 4 4 5 7 3 11-3 6-13 5-15-1-1-4 2-8 5-10-1 4 0 6 2 7 2-4-2-7 2-12z"/>',
+    'excited': '<path d="m12 2 3 6 7 1-5 5 1 8-6-4-6 4 1-8-5-5 7-1z"/>',
+    'grateful': '<path d="M12 21 3 12C-2 5 7 0 12 7c5-7 14-2 9 5z"/>',
+    'playful': '<circle cx="12" cy="12" r="9"/><path d="M8 14c2 3 6 3 8 0M7 9h3M16 9h.1"/>',
+    'sad': '<circle cx="12" cy="12" r="9"/><path d="M8 17c2-3 6-3 8 0M8 9h.1M16 9h.1"/>',
     'check': '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
     'inspect': '<circle cx="10" cy="10" r="6"/><path d="m15 15 6 6M10 7v4M10 13h.1"/>',
     'help': '<circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4M12 17h.1"/>',
@@ -21,7 +27,9 @@ PATHS = {
     'target': '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
     'key': '<circle cx="8" cy="9" r="5"/><path d="m12 13 8 8M16 17l3-3M18 19l3-3"/>',
 }
-TONE_ICONS = {'平和':'calm','积极':'positive','急切':'urgent','强烈':'forceful','不满':'frustrated'}
+TONE_ICONS = {'平和':'calm','积极':'positive','急切':'urgent','坚定':'forceful','不满':'frustrated',
+              '生气':'angry','彻底怒了':'fire','兴奋':'excited','轻松':'playful','感谢':'grateful',
+              '困惑':'help','低落':'sad'}
 
 
 def svg_source(name, color='#6254e8'):
@@ -64,6 +72,6 @@ class ToneBadge(QWidget):
     def set_tone(self, tone):
         self.setVisible(tone in TONE_ICONS)
         if tone in TONE_ICONS:
-            self.symbol.setPixmap(icon(TONE_ICONS[tone]).pixmap(18,18))
+            self.symbol.setPixmap(icon(TONE_ICONS[tone],'#d56635' if tone in {'生气','彻底怒了'} else '#6254e8').pixmap(18,18))
             self.label.setText(tone)
             self.setAccessibleName('表达语气：'+tone)

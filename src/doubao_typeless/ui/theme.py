@@ -60,6 +60,8 @@ QToolTip {{ background:{C['ink']}; color:white; border:0; padding:6px; }}
 """
 
 def style_root(widget, *, hud=False):
+    from doubao_typeless.ui.motion import interface_motion
+    interface_motion()
     widget.setObjectName('hudWindow' if hud else 'appWindow')
     widget.setStyleSheet(QSS)
     layout=widget.layout()

@@ -1,4 +1,5 @@
 import { decorateTools } from "./icons";
+import { installInputMotion } from './input-motion';
 import { overlayHistory } from "./overlay-history";
 import { SharedEditor, type Tool } from "./editor/canvas";
 import { applyReady, applyRotated, buildDraftUpdate, buildPrimaryUpdate, rotatePrimary, DraftOutbox } from "./sync.js";
@@ -46,7 +47,7 @@ export function boot(root: HTMLElement): void {
         <button id="settingsBtn" aria-label="设置">设置</button>
       </header>
       <section class="composer" id="composer">
-        <div class="composer-heading"><span>这次想做什么？</span><button id="clearDraft" aria-label="清空当前文字和图片">清空</button></div>
+        <div class="composer-heading"><span>这次想做什么？</span><i id="inputActivity" class="input-activity" aria-hidden="true" title="正在输入" hidden><b></b><b></b><b></b><b></b></i><button id="clearDraft" aria-label="清空当前文字和图片">清空</button></div>
         <div class="attach" id="attachments"></div>
         <div id="removeNotice" class="undo-notice" role="status" hidden><span id="removeMessage"></span><button id="undoRemove">撤销删除</button></div>
         <div id="conflictBanner" class="conflict" hidden>
@@ -192,6 +193,7 @@ export function boot(root: HTMLElement): void {
     }
   }
   const $ = (id: string) => document.getElementById(id)!;
+  const inputMotion=installInputMotion($('text') as HTMLTextAreaElement,$('inputActivity'));
   let sheetReturnFocus: HTMLElement | null = null;
   function openSheet() {
     if (!$("sheet").classList.contains("show")) sheetReturnFocus = document.activeElement as HTMLElement;
@@ -323,6 +325,7 @@ export function boot(root: HTMLElement): void {
     if (signature === attachmentsSignature) return;
     attachmentsSignature = signature;
     const strip = $("attachments");
+    const previousIds = new Set(Array.from(strip.children).map(el => (el as HTMLElement).dataset.assetId));
     strip.replaceChildren();
     if (!state.assets.length) {
       strip.classList.add("empty");
@@ -332,6 +335,8 @@ export function boot(root: HTMLElement): void {
     state.assets.forEach((a, i) => {
       const wrap = document.createElement("div");
       wrap.className = "attach-card";
+      wrap.dataset.assetId = a.id;
+      if (!previousIds.has(a.id)) wrap.classList.add('arriving');
       const status = a.pending_png && a.status !== "ready" ? (a.status === "failed" ? "等待重试" : `同步 ${a.progress || 0}%`) :
         a.status === "queued" ? "待编辑" : a.status === "editing" ? "编辑中" : a.status === "failed" ? "未传完" : "电脑已收到";
       wrap.innerHTML = `<img alt="${i + 1} · ${a.kind}" /><label>${i + 1} · ${a.kind} · ${status}</label><button class="left">←</button><button class="right">→</button><button class="remove">删</button>`;
@@ -563,6 +568,7 @@ export function boot(root: HTMLElement): void {
       const labels: Record<string,string> = {offline:"手机已保留 · 连接恢复后继续同步",synced:"电脑已收到当前版本 · 不自动发送",
         syncing:"正在同步最新图文…",retrying:"网络较慢，正在补发当前稿…",conflict:"同步暂停，手机稿保留；请勿同时打开两个编辑页",save_failed:"手机存储暂不可写，内容留在页面中"};
       $("transferStatus").textContent = labels[status] || status;
+      $("transferStatus").dataset.busy = String(status === 'syncing' || status === 'retrying');
     },
   });
   function currentMessage() {
@@ -1343,11 +1349,17 @@ export function boot(root: HTMLElement): void {
   $("settingsBtn").onclick = () => {
     const version = ++sheetRevision;
     $("sheetCard").innerHTML = `<h2>连接与设置</h2>
+      <button id="motionToggle" aria-pressed="${inputMotion.enabled}"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 10c3-5 5 5 8 0s5 5 8 0M4 16c3-5 5 5 8 0s5 5 8 0"/></svg> 界面动效 · ${inputMotion.enabled?'开':'关'}</button>
       <p id="settingsStatus" role="status">正在读取电脑状态…</p><p id="settingsVersion"></p><p id="settingsGrant"></p>
       <h3>日常怎么用</h3><ol class="quick-start"><li>在手机写字、说话或加图，内容自动同步。</li><li>在电脑点一下要输入的位置，再点手机「插入电脑」或电脑「插入并复制」。</li><li>插入完成后写下一段；上一份可在「最近」找回。</li></ol>
       <details><summary>连接不上或插入不了</summary><p>确认手机和电脑在同一网络，并扫描正在运行的这一版二维码。电脑连接页可开启本机的插入、截图权限。</p><p>自动插入失败时，在电脑选择输入框再粘贴；图片结果不确定时，从电脑浮窗「恢复」查看已完成的部分。</p><p>断线仍可写草稿，重连后继续同步。连接和重连不会自动插入。</p></details>
       <details><summary>AI 辅助与确认发送</summary><p>手机听写使用输入法，不需要配置 AI 密钥。AI 改写仅在电脑主动调用。</p><p>需要手机确认发送时，在电脑常用设置开启「允许手机确认后发送」。插入完成后，另行核对电脑内容并确认发送。</p></details>`;
     openSheet();
+    $('motionToggle').onclick=()=>{
+      inputMotion.setEnabled(!inputMotion.enabled);
+      $('motionToggle').setAttribute('aria-pressed',String(inputMotion.enabled));
+      $('motionToggle').lastChild!.textContent=` 界面动效 · ${inputMotion.enabled?'开':'关'}`;
+    };
     void fetch("/v3/status", {headers:headers(),signal:AbortSignal.timeout(6000)}).then(async res => {
       if (!res.ok) throw new Error("offline");
       const st = await res.json();

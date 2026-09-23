@@ -3,7 +3,7 @@ from pathlib import Path
 import json
 import sys
 
-VERSION = "0.5.2"
+VERSION = "0.5.0"
 
 
 def build_info() -> dict:

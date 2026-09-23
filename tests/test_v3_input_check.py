@@ -59,6 +59,26 @@ def test_uncertainty_not_reported_as_clean():
     assert '暂无法判断' in presentation(result)[0]
 
 
+@pytest.mark.parametrize('angry,furious,confidence,expected',[
+    (.28,.72,.68,'furious'),(.44,.56,.51,'angry'),(.01,0.,.74,''),(.06,0.,.52,''),(.45,.45,.6,''),
+    (.85,0.,.9,''),(.95,0.,.9,'angry'),(.94,0.,.99,''),
+])
+def test_anger_family_gate_handles_split_intensity(angry,furious,confidence,expected):
+    req,spans=make_request('合成样本');body=response(req,choice='clean')
+    a=body['answers']['tone'];a['probabilities']={k:0. for k in req['questions']['tone']['criteria']}
+    a['probabilities'].update(angry=angry,furious=furious,neutral=1-angry-furious)
+    a['choice']=max(a['probabilities'],key=a['probabilities'].get);a['confidence']=confidence
+    assert parse_response(body,req,spans)['tone_kind']==expected
+
+
+def test_tentative_typo_does_not_automatically_add_voice_note():
+    req,spans=make_request('合成样本');body=response(req,confidence=.65)
+    a=body['answers']['part_0'];a['probabilities']['transcription']=.71;a['probabilities']['clean']=.29
+    result=parse_response(body,req,spans)
+    assert result['issues'][0]['kind']=='transcription'
+    assert result['suspected_transcription'] is False
+
+
 def test_disabled_missing_key_and_long_text_never_call_transport():
     for options in ({**OPTIONS, 'jev_enabled': False}, {**OPTIONS, 'jev_api_key': ''}):
         service = InputCheck(options, evaluate_fn=lambda *a: pytest.fail('unexpected call'), now=lambda:100.)

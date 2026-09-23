@@ -2,7 +2,7 @@
 
 手机说话、拍图或画白板，把图文放进 Windows 的对话输入框。
 
-**当前开发候选：0.5.0。公开发布版仍以 [GitHub Releases](https://github.com/aaakoako/DoubaoTypeless/releases) 为准。** 候选已加入 Windows 安装与升级流程；真实 Codex/Cursor、多图恢复和实体手机使用仍须完成验收，不把自动化通过等同于正式可发布。
+**0.5.0：图文连续输入、完整安装升级和可选输入检查。** 从 [GitHub Releases](https://github.com/aaakoako/DoubaoTypeless/releases) 获取已发布版本。用户已确认 Codex 桌面端连续图文插入；其他输入框、手机浏览器和输入法的兼容性请以实际使用为准。
 
 [安装与使用](docs/release/v3-installation.md) · [构建与验证](docs/release/v3-build.md) · [完整产品计划](docs/v3-product/MASTER_PLAN.md) · [旧版指南](docs/legacy-v0.4.md)
 
@@ -20,7 +20,7 @@
 
 浮窗支持拖动、常驻置顶、展开后返回、人工阅读时暂停追尾。手机白板提供图标工具、可退出的文字编辑、保存与取消；返回键会处理当前面板和未保存编辑。断线时保留草稿，重新连接后对账。
 
-插入动作不自动发送消息。图片接收结果不确定时保留恢复入口，避免假称成功或重复粘贴。可选模型辅助使用你自己的 API 配置；原文输入不依赖模型服务。
+插入动作不自动发送消息。图片接收结果不确定时保留恢复入口，避免假称成功或重复粘贴。可选 Jev 输入检查提示疑似误字、歧义、缺项及语气，支持 TypeSafe、Vercel、OpenRouter 和兼容自定义接口。纠错与改写模型单独配置；原文输入不依赖模型服务。界面提供输入波形、面板反馈和愤怒火焰彩蛋，可在应用设置关闭。
 
 ## 安装、升级与数据
 

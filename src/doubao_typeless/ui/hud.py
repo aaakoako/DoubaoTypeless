@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Callable
 from contextlib import contextmanager
+import time
 from doubao_typeless.ui.theme import style_root
 from doubao_typeless.ui.theme_generated import COLORS
 
@@ -32,6 +33,7 @@ class HudController:
         position: list | None = None,
         on_position: Callable | None = None,
         on_toggle_note: Callable | None = None,
+        motion_enabled: bool = True,
     ):
         self._on_insert = on_insert
         self._on_expand = on_expand
@@ -41,6 +43,7 @@ class HudController:
         self._on_toggle_note = on_toggle_note
         self._check_row = None
         self._check_signature = None
+        self._motion_enabled=motion_enabled;self._input_at=0.
         self._saved_position = position
         self._user_positioned = False
         self._companions = []
@@ -159,6 +162,9 @@ class HudController:
         except Exception:
             pass
         self._body.setObjectName("hudBody")
+        from doubao_typeless.ui.motion import InputFeedback,ActivityIndicator,interface_motion
+        interface_motion().configure(self._motion_enabled)
+        self._feedback=InputFeedback(self._body);self._feedback.configure(self._motion_enabled)
         bar = QWidget()
         bar.setFixedHeight(40)
         bar.setObjectName("hudActions")
@@ -204,6 +210,7 @@ class HudController:
         for action in (expand, copy, btn, dismiss):
             action.setFocusPolicy(Qt.NoFocus)
         header = QHBoxLayout()
+        self._activity=ActivityIndicator();header.addWidget(self._activity)
         header.addWidget(self._status, 1)
         self._latest = QPushButton("回到最新 ↓")
         self._latest.setFocusPolicy(Qt.NoFocus)
@@ -248,6 +255,8 @@ class HudController:
         self._bar = bar
         w.hide()
         self._widget = w
+        self._activity_clock=QTimer(w);self._activity_clock.setInterval(200)
+        self._activity_clock.timeout.connect(self._update_activity);self._activity_clock.start()
         # An unplugged display may not produce a content update. Recover the
         # visible HUD without activating it or moving it during a drag.
         self._screen_timer = QTimer(w)
@@ -286,6 +295,7 @@ class HudController:
 
     def show_receiving(self, text: str, image_count: int = 0, *, assets: list[dict] | None = None,
                        revision: int = 0, phone_primary: bool = False, draft_key: tuple | None = None) -> None:
+        if text!=self.text:self._input_at=time.monotonic()
         self._content_serial += 1
         self.text = text
         self.image_count = image_count
@@ -373,6 +383,19 @@ class HudController:
         if self._mode in {"failed", "result"}:
             self._mode, self._operation_message = "receiving", ""
         self._apply_show()
+        if time.monotonic()-self._input_at<1.4:self._feedback.pulse()
+
+    def set_motion(self,enabled):
+        self._motion_enabled=bool(enabled)
+        if self._widget is not None:
+            from doubao_typeless.ui.motion import interface_motion
+            interface_motion().configure(enabled)
+            self._feedback.configure(enabled);self._update_activity()
+
+    def _update_activity(self):
+        active=(self._widget.isVisible() and self.phone_online and self._mode=='receiving'
+                and time.monotonic()-self._input_at<1.4)
+        self._activity.set_active(active,self._motion_enabled)
 
     def _idle_timeout(self) -> None:
         # 未完成的稿件常驻；切换应用、停止说话都不是用户收起的意图。
@@ -494,6 +517,7 @@ class HudController:
         available = 160 if result.get('note') or result.get('suppressed') else 240
         self._check_button.setIcon(icon(judgment_icon(result)))
         self._tone_badge.set_tone(result.get('tone',''))
+        self._feedback.set_tone(result.get('tone_kind',''))
         self._check_button.setText(self._check_button.fontMetrics().elidedText(summary, Qt.ElideRight, available))
         import html
         self._check_button.setToolTip(html.escape(details).replace('\n', '<br>'))
@@ -654,7 +678,7 @@ class HudController:
         self._refresh_thumbnails()
         unfinished = sum(a.get("status", "ready") != "ready" for a in self.assets)
         ready = len(self.assets) - unfinished
-        status = (f"手机稿 · r{self.revision}" if self.phone_online else f"手机离线 · 电脑保留稿 r{self.revision}") if self.phone_primary else "手机输入中"
+        status = '当前图文' if self.phone_online else '手机离线 · 稿件已保留'
         if self.assets:
             status += f" · {ready}/{len(self.assets)} 张已收到" if unfinished else f" · {ready} 张图片已更新"
         self._status.setText(self._operation_message if self._mode != "receiving" else status)

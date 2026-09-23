@@ -13,13 +13,18 @@ PROVIDERS = {
     'typesafe': {'endpoint': ENDPOINT, 'model': MODEL, 'key': 'jev_api_key', 'name': 'TypeSafe'},
     'vercel': {'endpoint': 'https://ai-gateway.vercel.sh/typesafe/v1/systemone',
                'model': 'typesafe-ai/jev', 'key': 'jev_vercel_key', 'name': 'Vercel AI Gateway'},
+    'openrouter': {'endpoint':'https://openrouter.ai/api/v1/systemone','model':'typesafe/jev-1.13',
+                  'key':'jev_openrouter_key','name':'OpenRouter'},
+    'custom': {'endpoint':'','model':'jev-latest','key':'jev_custom_key','name':'自定义'},
 }
 VOICE_NOTE = '【输入说明：以下文字可能含语音转写或表述误差。】'
 LABELS = {'clean': '未发现明显问题', 'transcription': '疑似转写错误',
           'ambiguous': '表达有歧义', 'missing': '可能缺少必要信息',
           'context': '依赖上文', 'conflict': '表述可能矛盾', 'uncertain': '暂无法判断'}
 TONES = {'neutral': '平和', 'positive': '积极', 'urgent': '急切',
-         'forceful': '强烈', 'frustrated': '不满', 'uncertain': '不明确'}
+         'forceful': '坚定', 'frustrated': '不满', 'angry':'生气', 'furious':'彻底怒了',
+         'excited':'兴奋', 'playful':'轻松', 'grateful':'感谢', 'confused':'困惑', 'sad':'低落',
+         'uncertain': '不明确'}
 
 
 def make_request(text: str, emotion: bool = True):
@@ -38,7 +43,7 @@ def make_request(text: str, emotion: bool = True):
             'You have no audio and cannot verify transcription. Do not invent corrections or judge the person.',
             'criteria': {
                 'clean': 'No clear communication issue in this segment.',
-                'transcription': 'Likely speech-to-text word substitution or accidental repetition that obstructs meaning.',
+                'transcription': 'Clear evidence of an unintended word or character substitution (including Chinese homophones) or accidental repetition, even when the intended meaning is recoverable. Never flag unfamiliar proper names or technical terms merely for being unusual.',
                 'ambiguous': 'Two materially different interpretations of this segment are plausible.',
                 'missing': 'An essential argument is absent or the sentence stops before its meaning is recoverable.',
                 'context': 'An explicit reference requires earlier conversation; it may be entirely clear there.',
@@ -47,10 +52,20 @@ def make_request(text: str, emotion: bool = True):
     if emotion:
         questions['tone'] = {'type': 'choice', 'instructions':
             'Classify only the apparent tone of the supplied wording. Do not infer actual feelings, mental health, '
-            'personality or intent beyond the text. Quoted speech and examples do not establish the speaker tone.',
+            'personality or intent beyond the text. Quoted speech, reported anger, memes and examples do not establish '
+            'the speaker tone. Profanity alone is not anger: excitement and affectionate banter may include profanity. '
+            'Choose angry or furious only for explicit anger directed at the present situation or addressee.',
             'criteria': {'neutral': 'Neutral or calm wording', 'positive': 'Positive or appreciative wording',
                          'urgent': 'Time pressure or urgency', 'forceful': 'Strong or emphatic expression',
-                         'frustrated': 'Explicit dissatisfaction or frustration', 'uncertain': 'Not enough evidence'}}
+                         'frustrated': 'Dissatisfied or frustrated, without clear anger',
+                         'angry':'Explicit anger or indignation',
+                         'furious':'Intense sustained anger, outrage or loss of patience beyond ordinary dissatisfaction',
+                         'excited':'Enthusiastic delight or excitement, including positive exclamations',
+                         'playful':'Joking, light-hearted or friendly playful wording',
+                         'grateful':'Explicit thanks or appreciation',
+                         'confused':'Explicit confusion or uncertainty about understanding',
+                         'sad':'Explicit disappointment or sadness in the wording',
+                         'uncertain': 'Not enough evidence'}}
     return {'model': MODEL, 'state': {'text': text, 'segments': dict(enumerate(spans))},
             'questions': questions}, spans
 
@@ -58,7 +73,7 @@ def make_request(text: str, emotion: bool = True):
 def parse_response(body, request, spans):
     if not isinstance(body, dict) or not isinstance(body.get('answers'), dict):
         raise ValueError('format')
-    issues = []; tone = ''; inconclusive = False
+    issues = []; tone = ''; tone_kind = ''; inconclusive = False; note_candidate = False
     for key, question in request['questions'].items():
         a = body['answers'].get(key, {})
         choices = question['criteria']
@@ -73,26 +88,42 @@ def parse_response(body, request, spans):
                 or abs(sum(probabilities.values())-1) > .03):
             raise ValueError('format')
         choice = a['choice']
+        # Adjacent anger levels can split the probability mass. Require strong
+        # evidence for the anger family before choosing its displayed intensity.
+        if key == 'tone' and choice in {'angry','furious'}:
+            if probabilities['angry']+probabilities['furious'] >= .95:
+                tone_kind = 'furious' if probabilities['furious'] >= .7 else 'angry'
+                tone = TONES[tone_kind]
+            continue
+        # A tentative typo may be worth showing, without adding text to a paste.
+        if key != 'tone' and choice == 'transcription' and confidence >= .6 and probabilities[choice] >= .65:
+            issues.append({'label':LABELS[choice],'kind':choice,'text':spans[int(key[5:])]})
+            note_candidate |= confidence >= .8 and probabilities[choice] >= .8
+            continue
         # Provisional conservative gate, not a claim of Chinese calibration.
         if confidence < .8 or probabilities[choice] < .8:
             if key != 'tone': inconclusive = True
             continue
         if choice == 'uncertain' and key != 'tone': inconclusive = True
         if key == 'tone':
-            if choice != 'uncertain': tone = TONES[choice]
+            if choice != 'uncertain': tone = TONES[choice];tone_kind=choice
         elif choice not in {'clean', 'uncertain'}:
             issues.append({'label': LABELS[choice], 'kind': choice, 'text': spans[int(key[5:])]})
-    return {'status': 'ready', 'issues': issues, 'tone': tone,
+    return {'status': 'ready', 'issues': issues, 'tone': tone, 'tone_kind':tone_kind,
             'inconclusive': inconclusive,
-            'suspected_transcription': any(i['kind'] == 'transcription' for i in issues)}
+            'suspected_transcription': note_candidate}
 
 
-def evaluate(text, key, emotion=True, post=None, *, provider='typesafe'):
+def evaluate(text, key, emotion=True, post=None, *, provider='typesafe',endpoint='',model=''):
     from doubao_typeless.services.byok import classify_api_error
     try:
         request, spans = make_request(text, emotion)
-        route = PROVIDERS[provider]
-        request['model'] = route['model']
+        route = dict(PROVIDERS[provider])
+        if provider=='custom':
+            from doubao_typeless.services.endpoints import normalize_endpoint
+            route['endpoint']=normalize_endpoint(endpoint,'systemone')
+            if not route['endpoint']:raise ValueError('missing_endpoint')
+        request['model'] = model.strip() or route['model']
         if post is None:
             import httpx
             with httpx.Client(timeout=3, follow_redirects=False) as client:
@@ -112,6 +143,8 @@ def evaluate(text, key, emotion=True, post=None, *, provider='typesafe'):
             body = post(request)
         return parse_response(body, request, spans)
     except Exception as exc:
+        from doubao_typeless.services.endpoints import EndpointError
+        if isinstance(exc,EndpointError):return {'status':'error','reason':'invalid_endpoint','message':str(exc)}
         reason = 'too_long' if str(exc) == 'too_long' else classify_api_error(exc, key)
         labels = {'too_long': '这段较长，可分段检查', 'unauthorized': '请检查 Jev API Key',
                   'forbidden': 'Jev 暂未开放访问权限', 'rate_limited': '检查暂时繁忙',
@@ -131,7 +164,9 @@ class InputCheck:
 
     def configure(self, options):
         with self._lock:
-            self.options = {k: options.get(k) for k in ('jev_enabled', 'jev_api_key', 'jev_vercel_key', 'jev_emotion', 'jev_voice_note')}
+            self.options = {k: options.get(k) for k in ('jev_enabled', 'jev_api_key', 'jev_vercel_key',
+                'jev_openrouter_key','jev_custom_key','jev_custom_endpoint','jev_custom_model','jev_emotion','jev_voice_note','ui_motion')}
+            self.options['ui_motion']=options.get('ui_motion',True)
             self.options['jev_provider'] = options.get('jev_provider') or 'typesafe'
             self._blocked_result = None
             self._serial += 1; self._identity = None
@@ -161,7 +196,9 @@ class InputCheck:
             serial = self._serial; options = dict(self.options)
         def work():
             try:
-                result = self._evaluate(text, options[route['key']], options['jev_emotion'], provider=options['jev_provider'])
+                kwargs={'provider':options['jev_provider']}
+                if options['jev_provider']=='custom':kwargs.update(endpoint=options['jev_custom_endpoint'] or '',model=options['jev_custom_model'] or '')
+                result = self._evaluate(text, options[route['key']], options['jev_emotion'], **kwargs)
             except Exception:
                 result = {'status': 'error', 'message': '检查暂不可用，原文仍可插入'}
             with self._lock:

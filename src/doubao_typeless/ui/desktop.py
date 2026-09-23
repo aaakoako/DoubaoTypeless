@@ -16,6 +16,8 @@ PROVIDER_PRESETS = [
     ("自定义", "", ""),
     ("DeepSeek", "https://api.deepseek.com/v1", "deepseek-chat"),
     ("智谱 GLM", "https://open.bigmodel.cn/api/paas/v4", "glm-4-flash"),
+    ("OpenRouter", "https://openrouter.ai/api/v1", ""),
+    ("Vercel AI Gateway", "https://ai-gateway.vercel.sh/v1", ""),
 ]
 from doubao_typeless.ui.filelog import FileLogger
 from doubao_typeless.ui.single_instance import listen_for_commands, request_quit, request_show
@@ -189,11 +191,14 @@ class ReviewPanel:
         self.image_row = QHBoxLayout()
         layout.addLayout(self.image_row)
         self.editor = QPlainTextEdit()
+        from doubao_typeless.ui.motion import InputFeedback
+        self.input_feedback=InputFeedback(self.editor)
+        self.input_feedback.configure(bool(load_settings(self.app.data_dir).get('ui_motion',True)))
         self.editor.setMinimumHeight(110)
         self.editor.textChanged.connect(self._mark_editing)
         layout.addWidget(self.editor, 1)
         from doubao_typeless.ui.input_check import InputCheckDetails
-        self.input_check_details = InputCheckDetails(self.app, w)
+        self.input_check_details = InputCheckDetails(self.app, w, feedback=self.input_feedback)
         layout.addWidget(self.input_check_details)
         row = QHBoxLayout()
         use_phone = QPushButton("采用手机版")
@@ -277,6 +282,7 @@ class ReviewPanel:
         self.app._on_activity(self.app.review_text(), len(self.app.draft.assets))
 
     def _mark_editing(self) -> None:
+        self.input_feedback.pulse()
         self._editing = True
         self.app.review_editing = True
         self.app.update_pc_text(self.editor.toPlainText())
@@ -489,13 +495,16 @@ class ClientWindow:
         self._closing_for_quit = False
         self._session_sig = None
         stored = load_settings(app.data_dir)
+        from doubao_typeless.ui.motion import interface_motion
+        interface_motion().configure(stored.get('ui_motion',True))
 
         class ShellWindow(QWidget):
             def closeEvent(inner_self, event):
                 self._close_event(event)
 
         w = ShellWindow()
-        w.setWindowTitle("DoubaoTypeless V3 · 体验版")
+        from doubao_typeless.services.v3_update import preview_version_label
+        w.setWindowTitle(preview_version_label())
         w.resize(560, 600)
         style_root(w)
         root = QVBoxLayout(w)
@@ -622,7 +631,8 @@ class ClientWindow:
         self.phone_send_mode.setCurrentIndex(1 if stored.get("phone_send_mode") == "ctrl_enter" else 0)
         sl.addRow(self.phone_send_enabled)
         sl.addRow("目标应用发送快捷键", self.phone_send_mode)
-        ai_intro = QLabel("AI 文字辅助（可选）\n仅在「当前图文」主动检查时调用。不负责语音识别，不影响普通输入和画图。")
+        ai_intro = QLabel("纠错与改写 · 按需调用")
+        ai_intro.setToolTip('只在主动检查或改写时发送当前文字；不影响普通输入和画图。')
         ai_intro.setWordWrap(True)
         sl.addRow(ai_intro)
         self.byok_provider = QComboBox()
@@ -634,15 +644,26 @@ class ClientWindow:
         self.byok_key = QLineEdit(str(stored.get("byok_api_key") or ""))
         self.byok_key.setEchoMode(QLineEdit.Password)
         self.byok_model = QLineEdit(str(stored.get("byok_model") or ""))
-        sl.addRow("Base URL", self.byok_endpoint)
+        self.byok_endpoint.setPlaceholderText('域名、Base URL 或完整接口地址')
+        from doubao_typeless.services.endpoints import endpoint_origin
+        self._byok_key_origin=endpoint_origin(self.byok_endpoint.text()) if self.byok_key.text() else None
+        self._byok_key_edited=False
+        def bind_byok_key():
+            origin=endpoint_origin(self.byok_endpoint.text())
+            self._byok_key_origin=origin if self.byok_key.text() and origin[1] else None
+            self._byok_key_edited=True
+        self.byok_key.textChanged.connect(bind_byok_key)
+        sl.addRow("接口地址", self.byok_endpoint)
         sl.addRow("API Key", self.byok_key)
         sl.addRow("模型 ID", self.byok_model)
         from doubao_typeless.services.byok import url_join_note
 
-        self.byok_url_note = QLabel(url_join_note(self.byok_endpoint.text()))
+        self.byok_url_note = QLabel('自动补全接口地址')
+        self.byok_url_note.setToolTip(url_join_note(self.byok_endpoint.text()))
         self.byok_url_note.setObjectName("muted")
         self.byok_url_note.setWordWrap(True)
-        self.byok_endpoint.textChanged.connect(lambda t: self.byok_url_note.setText(url_join_note(t)))
+        self.byok_endpoint.textChanged.connect(lambda t: self.byok_url_note.setToolTip(url_join_note(t)))
+        self.byok_endpoint.editingFinished.connect(self._normalize_byok)
         sl.addRow(self.byok_url_note)
         from PySide6.QtWidgets import QGroupBox
 
@@ -675,7 +696,7 @@ class ClientWindow:
         sl.addRow(self.byok_status)
         from doubao_typeless.ui.input_check import InputCheckSettings
         self.jev_settings = InputCheckSettings(sl, stored, w)
-        sl.addRow(QLabel("词库（仅本预览目录，一行 错词 -> 正确）"))
+        sl.addRow(QLabel("词库（一行 错词 -> 正确）"))
         self.vocab = QPlainTextEdit()
         self.vocab.setPlainText(load_vocab(app.data_dir))
         self.vocab.setFixedHeight(120)
@@ -786,8 +807,22 @@ class ClientWindow:
         _name, url, model = PROVIDER_PRESETS[index]
         if url:
             self.byok_endpoint.setText(url)
-        if model:
-            self.byok_model.setText(model)
+            self._normalize_byok()
+        self.byok_model.setText(model)
+
+    def _normalize_byok(self):
+        from doubao_typeless.services.endpoints import normalize_endpoint,endpoint_origin
+        try:
+            normalized=normalize_endpoint(self.byok_endpoint.text())
+            self.byok_endpoint.setText(normalized)
+            if self._byok_key_origin and endpoint_origin(normalized)!=self._byok_key_origin and self.byok_key.text():
+                self.byok_key.clear();self.byok_status.setText('地址已变 · 请填写 Key')
+            elif self.byok_key.text():self._byok_key_origin=endpoint_origin(normalized)
+            self.byok_url_note.setText('地址就绪' if normalized else '自动补全接口地址')
+            self.byok_url_note.setToolTip(normalized)
+            return True
+        except ValueError as exc:
+            self.byok_status.setText(str(exc));self.byok_url_note.setText('地址格式有误');return False
 
     def phone_url(self) -> str:
         return f"http://{lan_ip()}:{self.app.port}/"
@@ -918,13 +953,13 @@ class ClientWindow:
         reply = QMessageBox.question(
             self.widget,
             "导入日用词库",
-            f"从 {info['path']} 复制 {info['mappings']} 条到本预览词库。\n不会改源文件，也不会写日用 config.json。",
+            f"从 {info['path']} 复制 {info['mappings']} 条到当前词库。\n不会改源文件，也不会写日用 config.json。",
         )
         if reply != QMessageBox.Yes:
             return
         result = import_vocab_preview(self.app.data_dir, source)
         self.vocab.setPlainText(load_vocab(self.app.data_dir))
-        self.byok_status.setText(f"已复制 {result['imported']} 条新词到预览词库")
+        self.byok_status.setText(f"已复制 {result['imported']} 条新词到当前词库")
 
     def hide_to_tray(self) -> None:
         stored = load_settings(self.app.data_dir)
@@ -1093,6 +1128,9 @@ class ClientWindow:
         self.refresh()
 
     def save_settings(self) -> None:
+        if not self._normalize_byok():return
+        if self.jev_settings.provider.currentData()=='custom' and not self.jev_settings.normalize_custom():return
+        from doubao_typeless.services.endpoints import endpoint_origin
         nicks = dict(load_settings(self.app.data_dir).get("device_nicknames") or {})
         sessions = self.app.auth.public_sessions()
         if sessions and self.device_name.text().strip():
@@ -1108,6 +1146,7 @@ class ClientWindow:
             "phone_send_mode": self.phone_send_mode.currentData(),
             "byok_endpoint": self.byok_endpoint.text().strip(),
             "byok_api_key": self.byok_key.text().strip(),
+            "byok_key_reentered":bool(self._byok_key_edited and self._byok_key_origin==endpoint_origin(self.byok_endpoint.text())),
             "byok_model": self.byok_model.text().strip(),
             "byok_prompt": self.byok_prompt.toPlainText().strip(),
             "byok_temperature": self.byok_temperature.text().strip(),
@@ -1119,6 +1158,7 @@ class ClientWindow:
         save_vocab(self.app.data_dir, self.vocab.toPlainText())
         stored = load_settings(self.app.data_dir)
         self.app.input_check.configure(stored)
+        self.app.hud.set_motion(stored.get('ui_motion',True))
         self.app.byok.endpoint = stored["byok_endpoint"]
         self.app.byok.api_key = stored["byok_api_key"]
         self.app.byok.model = stored["byok_model"]
@@ -1138,15 +1178,16 @@ class ClientWindow:
             self.byok_status.setText(f"设置已保存。开机自启未写入：{err}")
             self.byok_status.setObjectName("error")
         elif failures:
-            self.byok_status.setText("已保存。热键注册失败，请改键。不会把语法合法当成成功。")
+            self.byok_status.setText("已保存 · 热键冲突，请改键")
             self.byok_status.setObjectName("error")
         else:
-            self.byok_status.setText("已保存。热键已按新组合重新注册。")
+            self.byok_status.setText("设置已保存")
             self.byok_status.setObjectName("muted")
 
     def probe_byok(self) -> None:
         from doubao_typeless.services.byok import ByokService, ERROR_LABELS
 
+        if not self._normalize_byok():return
         endpoint = self.byok_endpoint.text().strip()
         key = self.byok_key.text().strip()
         model = self.byok_model.text().strip()
@@ -1157,7 +1198,7 @@ class ClientWindow:
 
         stored = load_settings(self.app.data_dir)
         if endpoint_authority(stored.get("byok_endpoint") or "") != endpoint_authority(endpoint):
-            if key == (stored.get("byok_api_key") or ""):
+            if key == (stored.get("byok_api_key") or "") and not self._byok_key_edited:
                 self.byok_status.setText("换了服务地址，请重新填写并批准密钥后再测试")
                 return
         from doubao_typeless.app import _httpx_json_post, _optional_float
@@ -1174,7 +1215,12 @@ class ClientWindow:
             out = svc.polish("ping", draft_id="probe", revision=1, current_draft_id="probe", current_revision=1)
             used = out.get("model") or model
             def apply() -> None:
-                self.byok_status.setText(f"{out.get('message') or out.get('status') or ''}  model={used}")
+                if (self.byok_endpoint.text().strip(),self.byok_key.text().strip(),self.byok_model.text().strip())!=(endpoint,key,model):
+                    self.byok_status.setText('配置已变 · 待检测');return
+                labels={'unauthorized':'Key 无效','forbidden':'暂无权限','not_found':'检查接口地址',
+                        'timeout':'连接超时','rate_limited':'稍后重试','format':'响应格式不兼容'}
+                self.byok_status.setText('已连接' if out.get('status')=='ok' else labels.get(out.get('reason'),'连接未完成'))
+                self.byok_status.setToolTip(f"{out.get('message') or ''}\n模型：{used}")
             try:
                 from PySide6.QtCore import QTimer
 
@@ -1254,7 +1300,7 @@ class DesktopShell:
         menu.addSeparator()
         menu.addAction("退出", self.quit)
         self.tray.setContextMenu(menu)
-        self.tray.setToolTip("DoubaoTypeless 预览")
+        self.tray.setToolTip("DoubaoTypeless")
         self.tray.activated.connect(self._tray_activated)
         self.tray.show()
         self._wake = listen_for_commands(self._on_ipc)
@@ -1262,7 +1308,7 @@ class DesktopShell:
 
     def _explained_tray(self) -> None:
         if not load_settings(self.app.data_dir).get("tray_explained"):
-            self.tray.showMessage("DoubaoTypeless 预览", "已在托盘运行。点图标可再打开窗口。")
+            self.tray.showMessage("DoubaoTypeless", "已在托盘运行。点图标可再打开窗口。")
             save_settings(self.app.data_dir, {"tray_explained": True})
 
     def _on_ipc(self, command: str) -> None:
@@ -1450,7 +1496,7 @@ def run_desktop(argv: list[str] | None = None) -> int:
         QMessageBox.warning(
             None,
             "已经在运行",
-            "另一个预览实例已在运行，但没能唤起窗口。请从托盘打开，或结束后再试。不会强杀已有进程。",
+            "另一个实例已在运行，但没能唤起窗口。请从托盘打开，或结束后再试。不会强杀已有进程。",
         )
         return 1
 

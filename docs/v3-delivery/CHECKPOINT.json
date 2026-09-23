@@ -2,11 +2,11 @@
   "schema_version": 1,
   "product_goal": "沿用 MASTER_PLAN，保留原版插入并复制等体验，交付可实际体验的完整 Windows V3 发布前候选。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "0.5.2 Jev/Vercel输入辅助与图标短标签已实现，启动提前连接竞态已修复；本地全量577项及最后27项针对性回归通过，新候选待固定提交打包。",
+  "working_tree": "0.5.0 OpenRouter真实中文验证、独立接口与凭据配置、丰富语气及桌面手机动效完成；最终源码回归与发行包验证推进中。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
   "last_completed_slice": "FULL_PACKAGE_UPGRADE_AND_AUTOMATIC_RESTART",
-  "active_slice": "JEV_INPUT_CHECK_CANDIDATE",
-  "next_action": "打包并核验包含Vercel适配的0.5.2独立候选；用户在Vercel激活免费额度后实测Jev中文判断质量与延迟；真实Codex/Cursor、实体手机及多屏验收仍待完成，不合并、不打tag、不公开发布。",
+  "active_slice": "FINAL_0_5_0_RELEASE",
+  "next_action": "最终全量回归、固定提交云端发行验证、下载载荷校验；全部通过后按用户明确授权合入master并发布v0.5.0。真实Cursor与实体手机输入法仍标为未验证。",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -15,7 +15,7 @@
     "按手机顺序逐图再正文，不因图片上传或接收证据缺失阻塞后续粘贴；逐步验证目标，缺证据仍记录UNKNOWN。",
     "用户新增独立手机发送：电脑默认关闭授权；用户检查电脑后在手机单独确认 Enter 或 Ctrl+Enter",
     "插入/同步/重连/恢复不自动发Enter；发送票据绑定来源、图文、目标、权限、时限并至多执行一次",
-    "不merge、不tag、不Release、不覆盖日用数据、不强制结束用户进程",
+    "用户已授权本轮完成后合入master并发布0.5.0；不覆盖日用数据、不强制结束用户进程",
     "未完成浮窗可拖动并保存位置、切换应用常驻置顶，展开可返回；设置与浮窗并存",
     "用户明确操作电脑已有稿不依赖手机在线；重连回执只清理对应旧稿",
     "不自动弹出图文恢复窗口；失败可复制时提供手动粘贴退路；白板文字使用可退出的页面内编辑",
@@ -33,19 +33,9 @@
   ],
   "last_commands": [
     {
-      "cmd": "Fixed-source CI and release validation",
+      "cmd": "Final local regression and evidence checker",
       "exit_code": 0,
-      "output": "Windows 553 passed; Linux 544 passed, 9 skipped; 18 evidence checks; TypeScript/Vite passed"
-    },
-    {
-      "cmd": "Frozen/native/installer/published-0.4.2 upgrade",
-      "exit_code": 0,
-      "output": "Seven reports passed; 14 native browser cases; official 0.4.2 download/exit/replace/restart/data preservation/old entry forwarding passed with controlled TLS release server"
-    },
-    {
-      "cmd": "Downloaded candidate audit",
-      "exit_code": 0,
-      "output": "264 files and all package hashes/build identity verified; artifact 10753256869"
+      "output": "630 pytest passed; 18 evidence checker tests passed; frontend TypeScript/Vite passed; live OpenRouter final 10/10 HTTP200; real Qt event loop displayed live furious response without pasting."
     }
   ],
   "cloud_evidence": {
@@ -248,5 +238,22 @@
       "upgrade-failures",
       "legacy-upgrade"
     ]
+  },
+  "jev_live": {
+    "provider": "openrouter",
+    "actual_model": "typesafe/jev-1.13-20260917",
+    "synthetic_cases_final": 10,
+    "http_successes": 10,
+    "latency_seconds": [
+      1.329,
+      1.505
+    ],
+    "cost_usd": 0.000492576,
+    "population_accuracy_verified": false
+  },
+  "user_acceptance": {
+    "codex_desktop_image_then_text": "user reported successful on previous candidate",
+    "cursor": "not verified",
+    "physical_mobile_ime": "not verified"
   }
 }

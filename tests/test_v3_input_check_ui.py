@@ -84,3 +84,15 @@ def test_provider_credentials_are_separate_visible_fields(pair):
     assert pane.gateway_key.isHidden() and pane.key.text()=='typesafe-key'
     assert pane.values()['jev_vercel_key']=='gateway-key'
     assert '待检测' in pane.status.text()
+
+
+def test_custom_endpoint_change_clears_key_after_saving_same_window(pair):
+    _,window,_=pair;pane=window.jev_settings
+    pane.provider.setCurrentIndex(pane.provider.findData('custom'))
+    pane.custom_endpoint.setText('https://first.example/v1');pane.custom_key.setText('custom-key')
+    window.save_settings()
+    pane.custom_endpoint.setText('https://second.example/v1')
+    pane.probe.click()
+    assert pane.custom_key.text()=='' and pane.probe.isEnabled()
+    pane.custom_key.setText('custom-key');window.save_settings()
+    assert load_settings(pair[0].data_dir)['jev_custom_key']=='custom-key'
