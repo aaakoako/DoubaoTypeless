@@ -212,7 +212,7 @@ class V3App:
         """UI/热键非阻塞入口；总是返回Future，校验失败同样有明确结果。"""
         from concurrent.futures import Future
         if self.draft.authority == "phone":
-            return self._commands.submit(self._insert_primary, bool(self._desktop_edit and self._desktop_edit["base"] == source_snapshot(self.draft)))
+            return self._local_command(self._insert_primary, bool(self._desktop_edit and self._desktop_edit["base"] == source_snapshot(self.draft)))
         with self._state_lock:
             if not (self.draft.text or self.draft.assets):
                 self._notify_ui("delivery_failed", error_code="EMPTY_DRAFT")
@@ -226,7 +226,19 @@ class V3App:
                 done = Future(); done.set_result({"result":"NO_STEPS", "error_code":code})
                 return done
             intent = self._session_intent("insert_current")
-        return self.submit_delivery(intent, bundle)
+        return self._local_command(self.deliver_and_finish, dict(intent), self._with_input_note(copy.deepcopy(bundle)))
+
+    def _local_command(self, callback, *args):
+        future = self._commands.submit(callback, *args)
+        # Rejected commands never enter the worker; hotkeys have no caller that
+        # consumes their Future. Show feedback without queueing a later paste.
+        if future.done():
+            result = future.result() or {}
+            if result.get('result') == 'BUSY':
+                code = result.get('error_code', 'BUSY')
+                _log(f'[v3.command] rejected={code}')
+                self._notify_ui('command_rejected', error_code=code)
+        return future
 
     def request_locate_composer(self):
         """用户明确点定位；只定位不投递，不改变草稿或之前的投递结果。"""
@@ -332,7 +344,7 @@ class V3App:
 
     def request_review_insert(self):
         if self.draft.authority == "phone":
-            return self._commands.submit(self._insert_primary, True)
+            return self._local_command(self._insert_primary, True)
         return self.request_insert()
 
     def _copy_fallback(self, bundle: dict, payload: dict) -> dict:
@@ -356,7 +368,6 @@ class V3App:
             else:
                 return payload
             payload = {**payload, "copied": copied}
-            self._notify_ui("delivery_failed", **payload)
             return payload
         except Exception as exc:
             self._report_command_error(exc)
@@ -400,8 +411,9 @@ class V3App:
             self._report_command_error(exc)
             payload = {"result":"NO_STEPS", "error_code":"DELIVERY_FAILED",
                        "detail_code":getattr(exc,"error_code",""), "steps":[]}
+        payload = self._copy_fallback(bundle, payload) if bundle else payload
         self._notify_ui("delivery_failed", **payload)
-        return self._copy_fallback(bundle, payload) if bundle else payload
+        return payload
 
     def remember_connected(self) -> int:
         count = 0
@@ -435,8 +447,11 @@ class V3App:
         return count
 
     def _notify_ui(self, event: str, **kwargs) -> None:
+        if event in {'delivery_failed', 'delivery_complete', 'recovery_available', 'composer_located'}:
+            if self._commands.when_ready(lambda: self._notify_ui(event, **kwargs)):
+                return
         # 状态首先进入真正的HUD，托盘提示只是补充；未知结果不能伪装成成功。
-        if event in {"sync_wait", "delivery_start", "delivery_failed", "delivery_complete", "composer_locating", "composer_located", "delivery_progress", "recovery_available"}:
+        if event in {"sync_wait", "delivery_start", "delivery_failed", "delivery_complete", "composer_locating", "composer_located", "delivery_progress", "recovery_available", "command_rejected"}:
             self._last_delivery_status = {"event": event, **kwargs}
             hud = getattr(self, "hud", None)
             if hud is not None:

@@ -19,6 +19,15 @@ class CommandQueue:
         self._closed = False
         self._thread: threading.Thread | None = None
         self._on_error = on_error
+        self._executing = False
+        self._ready_callbacks: list[Callable[[], None]] = []
+
+    def when_ready(self, callback: Callable[[], None]) -> bool:
+        """Defer terminal UI feedback until this worker can accept a retry."""
+        if threading.current_thread() is not self._thread or not self._executing:
+            return False
+        self._ready_callbacks.append(callback)
+        return True
 
     def submit(self, callback: Callable[..., Any], *args, **kwargs) -> Future:
         future: Future = Future()
@@ -42,6 +51,7 @@ class CommandQueue:
             future, callback, args, kwargs = job
             value: Any = {"result": "CANCELLED"}
             if future.set_running_or_notify_cancel():
+                self._executing = True
                 try:
                     value = callback(*args, **kwargs)
                 except Exception as exc:
@@ -52,8 +62,19 @@ class CommandQueue:
                             pass
                     value = {"result": "UNKNOWN", "error_code": "COMMAND_FAILED"}
                 finally:
+                    self._executing = False
                     with self._guard:
                         self._active = False
+                callbacks, self._ready_callbacks = self._ready_callbacks, []
+                for notify in callbacks:
+                    try:
+                        notify()
+                    except Exception as exc:
+                        if self._on_error:
+                            try:
+                                self._on_error(exc)
+                            except Exception:
+                                pass
                 future.set_result(value)
             else:
                 with self._guard:

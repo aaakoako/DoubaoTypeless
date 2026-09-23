@@ -1338,7 +1338,7 @@ class DesktopShell:
             pass  # 统一HUD状态机已处理，不能只改一行文字却忘记停空闲计时。
         elif event == "restore_on_phone":
             QTimer.singleShot(0, host, lambda: self.tray.showMessage("恢复图文", "已发到手机，请在手机确认；当前内容没有被覆盖"))
-        elif event == "delivery_failed":
+        elif event in {"delivery_failed", "command_rejected"}:
             code = str(_kw.get("error_code") or "")
             from doubao_typeless.ui.insert_status import error_message
             text = error_message(_kw)

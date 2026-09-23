@@ -2,7 +2,7 @@
 
 手机说话、拍图或画白板，把图文放进 Windows 的对话输入框。
 
-**0.5.1 修订中：图文连续输入、完整安装升级和可选输入检查。** 从 [GitHub Releases](https://github.com/aaakoako/DoubaoTypeless/releases) 获取已发布版本。用户已确认 Codex 桌面端连续图文插入；其他输入框、手机浏览器和输入法的兼容性请以实际使用为准。
+**0.5.2 修订中：图文连续输入、完整安装升级和可选输入检查。** 从 [GitHub Releases](https://github.com/aaakoako/DoubaoTypeless/releases) 获取已发布版本。用户已确认 Codex 桌面端连续图文插入；其他输入框、手机浏览器和输入法的兼容性请以实际使用为准。
 
 [安装与使用](docs/release/v3-installation.md) · [构建与验证](docs/release/v3-build.md) · [完整产品计划](docs/v3-product/MASTER_PLAN.md) · [旧版指南](docs/legacy-v0.4.md)
 

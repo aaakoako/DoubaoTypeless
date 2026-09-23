@@ -357,6 +357,9 @@ class HudController:
             if payload.get("copied"):
                 self._mode = "result"
                 self._operation_message = f"{error_message(payload).split('，')[0].split('；')[0]}；已复制{payload['copied']}，可按 Ctrl+V 粘贴"
+        elif event == "command_rejected":
+            self._mode = "busy" if payload.get('error_code') == 'BUSY' else "failed"
+            self._operation_message = error_message(payload)
         elif event == "recovery_available":
             self._mode = "failed"
             self._operation_message = (payload.get("progress") or {}).get("message") or "部分图文待确认；可点恢复继续"
