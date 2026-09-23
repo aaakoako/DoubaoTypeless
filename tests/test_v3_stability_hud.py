@@ -116,3 +116,26 @@ def test_hidden_reading_hud_returns_after_location_without_losing_reading(hud,re
     assert (hud._body.toPlainText(),hud._body.textCursor().selectedText(),bar.value())==before
     assert not hud._follow_tail
     bar.setSliderDown(False)
+
+
+def test_location_failure_returns_visible_feedback_from_covered_review(hud):
+    from types import SimpleNamespace
+    from PySide6.QtWidgets import QWidget, QLabel
+    from doubao_typeless.ui.desktop import DesktopShell
+    host, review = QWidget(), QWidget()
+    hud.bind_foreground_surface(review)
+    review.show()
+    QTest.qWait(10)
+    assert not hud._widget.isVisible()
+    shell = SimpleNamespace(app=SimpleNamespace(hud=hud),
+        client=SimpleNamespace(widget=host, delivery_status=QLabel(host)),
+        review=SimpleNamespace(widget=review, banner=QLabel(review)))
+    payload = {'error_code': 'NEEDS_TARGET', 'operation': 'locate'}
+    hud.operation_event('delivery_failed', **payload)
+    thread = threading.Thread(target=lambda: DesktopShell._from_service(shell, 'delivery_failed', **payload))
+    thread.start(); thread.join()
+    QTest.qWait(30)
+    assert hud._widget.isVisible() and not review.isVisible()
+    assert hud._body.toPlainText() == '本次正文' and hud._copy.isEnabled()
+    assert '输入框' in hud._status.text()
+    review.deleteLater(); host.deleteLater(); QTest.qWait(10)

@@ -131,6 +131,23 @@ def test_locate_unique_restores_without_inserting_or_clearing(app,monkeypatch):
     assert app.request_locate_composer().result(2)['status']=='located'
     assert calls==['focus'] and app.draft.text=='保留此稿'
 
+
+def test_locate_while_busy_explains_rejection_without_queuing(app):
+    import threading
+    entered, release = threading.Event(), threading.Event()
+    def hold():
+        entered.set()
+        release.wait(2)
+    future = app._commands.submit(hold)
+    assert entered.wait(1)
+    try:
+        result = app.request_locate_composer().result(1)
+        assert result['result'] == 'BUSY'
+        assert app._last_delivery_status == {'event': 'command_rejected', 'error_code': 'BUSY'}
+    finally:
+        release.set()
+        future.result(2)
+
 def test_locate_does_not_steal_after_user_changes_application(app,monkeypatch):
     from doubao_typeless.platform.windows import composer_locator, focus
     monkeypatch.setattr(composer_locator,'locate_current',lambda _: {'status':'found','candidate':candidate(),'reason':'unique_in_window'})

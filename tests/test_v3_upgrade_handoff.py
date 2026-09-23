@@ -6,12 +6,14 @@ SCRIPT=Path(__file__).resolve().parents[1]/'packaging/upgrade-launch.ps1'
 pytestmark=pytest.mark.skipif(sys.platform!='win32',reason='Windows helper')
 
 def wait_file(path,worker):
-    end=time.monotonic()+8
+    # Match start_upgrade's15s launch acknowledgement budget. Cancellation and
+    # old-process-exit assertions below keep their separate original8s bounds.
+    started=time.monotonic();end=started+15
     while time.monotonic()<end:
         if path.exists():return
         assert worker.poll() is None
         time.sleep(.05)
-    raise AssertionError('missing handoff')
+    raise AssertionError(f'missing handoff after {time.monotonic()-started:.1f}s; helper_exit={worker.poll()}')
 
 @pytest.mark.parametrize('approve',[False,True])
 def test_wait_requires_ack_and_cancel_prevents_late_install(tmp_path,approve):

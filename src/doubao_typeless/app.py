@@ -242,7 +242,7 @@ class V3App:
 
     def request_locate_composer(self):
         """用户明确点定位；只定位不投递，不改变草稿或之前的投递结果。"""
-        return self._commands.submit(self._locate_composer, True)
+        return self._local_command(self._locate_composer, True)
 
     def _locate_composer(self, show_choices: bool = False) -> dict:
         from doubao_typeless.platform.windows.composer_locator import locate_current
@@ -258,7 +258,7 @@ class V3App:
                     if show_choices:
                         self._notify_ui("composer_pick", candidates=self._composer_candidates)
                 code = "COMPOSER_AMBIGUOUS" if result.get("status") == "ambiguous" else "COMPOSER_NOT_FOUND"
-                self._notify_ui("delivery_failed", error_code=code)
+                self._notify_ui("delivery_failed", error_code=code, operation="locate")
                 return result
             item = result["candidate"]
             target = FocusSnapshot(item["class_name"], item["title"], item["hwnd"], item["pid"],
@@ -266,15 +266,15 @@ class V3App:
             # 查找期间用户切到其他应用时，不抢回来。自身控件点击仍允许恢复已保存窗口。
             current = self._read_focus()
             if (not is_own_window(*before[:2]) and not same_target(before, current)):
-                self._notify_ui("delivery_failed", error_code="TARGET_CHANGED")
+                self._notify_ui("delivery_failed", error_code="TARGET_CHANGED", operation="locate")
                 return {"status": "changed"}
             if (not is_own_window(*current[:2]) and len(current) >= 4
                     and (current[2], current[3]) != (target.hwnd, target.pid)):
-                self._notify_ui("delivery_failed", error_code="TARGET_CHANGED")
+                self._notify_ui("delivery_failed", error_code="TARGET_CHANGED", operation="locate")
                 return {"status": "changed"}
             if not restore_target(target):
                 _log('[v3.locator] stage=restore_refused')
-                self._notify_ui("delivery_failed", error_code="NEEDS_TARGET")
+                self._notify_ui("delivery_failed", error_code="NEEDS_TARGET", operation="locate")
                 return {"status": "focus_failed"}
             self._saved_target = target
             _log('[v3.locator] stage=restored')
@@ -1470,14 +1470,19 @@ class V3App:
         """停止下一步发键，等当前操作收尾；超时不强杀、不提前关闭数据库。"""
         self._stopping = True
         self._stop_hotkeys()
+        _log('[v3.shutdown] stage=queue_begin')
         stopped = await asyncio.to_thread(self._commands.close, 5.0)
         if not stopped:
             _log("[v3] 当前目标仍未返回，未强制结束；可稍后再退出")
             return False
+        _log('[v3.shutdown] stage=queue_done')
         self.input_check.close()
+        _log('[v3.shutdown] stage=bridge_begin')
         await self.bridge.stop()
+        _log('[v3.shutdown] stage=bridge_done')
         from doubao_typeless.platform.windows.automation_host import close_host
         await asyncio.to_thread(close_host)
+        _log('[v3.shutdown] stage=helper_done')
         try:
             self.db.conn.close()
         except Exception:
@@ -1485,6 +1490,7 @@ class V3App:
         lock = getattr(self, "_lock", None)
         if lock:
             lock.release()
+        _log('[v3.shutdown] stage=complete')
         return True
 
 

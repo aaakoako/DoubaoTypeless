@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 import sys
+import time
 from typing import NamedTuple
 
 
@@ -163,11 +164,49 @@ def same_target(left, right) -> bool:
     return tuple(left) == tuple(right)
 
 
+def _focus_trace(stage: str, **fields) -> None:
+    """Only categorical state/identity comparisons; never names or input text."""
+    try:
+        from doubao_typeless.runtime import v3_data_dir
+        from doubao_typeless.ui.filelog import FileLogger
+        FileLogger(v3_data_dir() / 'logs' / 'focus.log', also_print=False)(
+            f"stage={stage} " + ' '.join(f'{key}={value}' for key, value in fields.items()))
+    except Exception:
+        pass
+
+
+def _verify_restored_target(saved, read, unchanged, *, timeout=0.4,
+                            clock=time.monotonic, sleep=time.sleep, trace=_focus_trace):
+    """SetFocus is asynchronous in some providers; only re-read, never re-focus."""
+    deadline = clock() + timeout
+    while True:
+        if not unchanged():
+            trace('input_changed')
+            return False
+        current = read()
+        if not unchanged():
+            trace('input_changed_during_read')
+            return False
+        matches = same_target(saved, current) if len(saved) > 3 else current.hwnd == saved[2]
+        if matches:
+            trace('verified')
+            return True
+        if clock() >= deadline:
+            trace('verification_timeout', window=current[2] == saved[2],
+                  pid=len(saved) > 3 and current[3] == saved[3],
+                  control=len(saved) > 4 and current[4] == saved[4],
+                  runtime=len(saved) > 5 and tuple(current[5]) == tuple(saved[5]),
+                  expected_kind=saved[6] if len(saved) > 6 else 'unknown',
+                  actual_kind=current[6])
+            return False
+        sleep(min(0.025, max(0, deadline-clock())))
+
+
 def _restore_target_direct(saved) -> bool:
     """只恢复明确保存的那一个控件；不按同名窗口枚举兜底。"""
     if sys.platform != "win32" or len(saved) < 3 or not saved[2]:
         return False
-    import win32gui
+    import win32gui, win32api
     import win32process
     hwnd = int(saved[2])
     if not win32gui.IsWindow(hwnd):
@@ -175,6 +214,7 @@ def _restore_target_direct(saved) -> bool:
     if len(saved) > 3 and win32process.GetWindowThreadProcessId(hwnd)[1] != saved[3]:
         return False
     try:
+        stamp = win32api.GetLastInputInfo()
         win32gui.SetForegroundWindow(hwnd)
         if len(saved) > 5 and saved[5]:
             with automation() as uia:
@@ -185,17 +225,27 @@ def _restore_target_direct(saved) -> bool:
                 while todo and count < 600:
                     element = todo.pop(); count += 1
                     if runtime_id(element) == expected:
-                        element.SetFocus()
+                        if win32api.GetLastInputInfo() != stamp:
+                            _focus_trace('input_changed_before_focus')
+                            return False
+                        try:
+                            element.SetFocus()
+                        except Exception as exc:
+                            # A provider can apply focus before returning an error.
+                            # Exact read-only verification still decides success.
+                            _focus_trace('set_focus_error', error_type=type(exc).__name__)
                         break
                     child = uia.ControlViewWalker.GetFirstChildElement(element)
                     while child and len(todo) + count < 600:
                         todo.append(child)
                         child = uia.ControlViewWalker.GetNextSiblingElement(child)
                 else:
+                    _focus_trace('element_missing')
                     return False
-        current = _read_target_direct()
-        return same_target(saved, current) if len(saved) > 3 else current.hwnd == hwnd
-    except Exception:
+        return _verify_restored_target(saved, _read_target_direct,
+                                       lambda: win32api.GetLastInputInfo() == stamp)
+    except Exception as exc:
+        _focus_trace('restore_error', error_type=type(exc).__name__)
         return False
 
 

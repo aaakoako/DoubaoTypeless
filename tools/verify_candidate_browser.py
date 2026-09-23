@@ -47,6 +47,23 @@ async def until(check, *, timeout=12, message='condition not met'):
     raise AssertionError(message)
 
 
+def phone_diagnostics(phone):
+    pending, failures = {}, []
+    lifecycle = {'domcontentloaded': 0, 'load': 0}
+    phone.on('request', lambda r: pending.update(
+        {r: {'method': r.method, 'path': urlparse(r.url).path, 'resource': r.resource_type}}))
+    phone.on('requestfinished', lambda r: pending.pop(r, None))
+    def request_failed(request):
+        pending.pop(request, None)
+        failures.append({'path': urlparse(request.url).path,
+            'failure': (request.failure or '').split(' ', 1)[0][:80]})
+    phone.on('requestfailed', request_failed)
+    for event in lifecycle:
+        # Playwright passes the Page to lifecycle callbacks.
+        phone.on(event, lambda *_, name=event: lifecycle.update({name: lifecycle[name]+1}))
+    return pending, failures, lifecycle
+
+
 def own_window(pid, title):
     import win32gui,win32process
     found=[]
@@ -61,6 +78,8 @@ class NativeInspector:
     def __init__(self):
         sys.coinit_flags=0
         import comtypes.client
+        self.com_error = comtypes.COMError
+        self.transient_reads = {}
         self.module=comtypes.client.GetModule('UIAutomationCore.dll')
         self.uia=comtypes.client.CreateObject('{FF48DBA4-60EF-4201-AA87-54103EEF594E}',interface=self.module.IUIAutomation)
 
@@ -70,28 +89,50 @@ class NativeInspector:
         items=root.FindAll(4,self.uia.CreateTrueCondition())
         return [items.GetElement(i) for i in range(min(600,items.Length))]
 
+    def read(self, query, name, fallback):
+        try:
+            return query()
+        except self.com_error as exc:
+            if (exc.hresult & 0xffffffff) != 0x80040201:
+                raise
+            self.transient_reads[name] = self.transient_reads.get(name, 0) + 1
+            # A read-only UIA frame was unavailable. The caller's existing
+            # deadline remains in force; next poll reacquires every element.
+            return fallback
+
     def text(self, hwnd):
-        return '\n'.join(str(e.CurrentName or '') for e in self.controls(hwnd))
+        return self.read(lambda: '\n'.join(str(e.CurrentName or '') for e in self.controls(hwnd)), 'text', '')
+
+    def focused_name(self):
+        return self.read(lambda: self.uia.GetFocusedElement().CurrentName, 'focus', '')
+
+    def clickable_rects(self, hwnd, name, control_types):
+        def query():
+            rects = []
+            for element in self.controls(hwnd):
+                if element.CurrentName == name and element.CurrentControlType in control_types and element.CurrentIsEnabled:
+                    r = element.CurrentBoundingRectangle
+                    rects.append((r.left, r.top, r.right, r.bottom))
+            return rects
+        return self.read(query, 'click_geometry', [])
 
     def click(self, hwnd, name, control_types=(50000,)):
         from pynput.mouse import Controller, Button
         import win32gui, win32con
         end=time.monotonic()+2;last=None
         while time.monotonic()<end:
-            for element in self.controls(hwnd):
-                if element.CurrentName==name and element.CurrentControlType in control_types and element.CurrentIsEnabled:
-                    r=element.CurrentBoundingRectangle
-                    if r.right>r.left and r.bottom>r.top:
-                        point=((r.left+r.right)//2,(r.top+r.bottom)//2)
-                        mouse=Controller();mouse.position=point
-                        hit=win32gui.WindowFromPoint(point)
-                        root=win32gui.GetAncestor(hit,win32con.GA_ROOT) if hit else 0
-                        geometry=(r.left,r.top,r.right,r.bottom)
-                        # Wait for two equal layouts; never click through an occluder.
-                        if root==hwnd and last==geometry:
-                            mouse.click(Button.left)
-                            return True
-                        last=geometry if root==hwnd else None
+            for left, top, right, bottom in self.clickable_rects(hwnd, name, control_types):
+                if right>left and bottom>top:
+                    point=((left+right)//2,(top+bottom)//2)
+                    mouse=Controller();mouse.position=point
+                    hit=win32gui.WindowFromPoint(point)
+                    root=win32gui.GetAncestor(hit,win32con.GA_ROOT) if hit else 0
+                    geometry=(left,top,right,bottom)
+                    # Wait for two equal layouts; never click through an occluder.
+                    if root==hwnd and last==geometry:
+                        mouse.click(Button.left)
+                        return True
+                    last=geometry if root==hwnd else None
             time.sleep(.04)
         raise AssertionError(f"native control not stably clickable: {name}; window={hwnd}")
 
@@ -183,7 +224,11 @@ async def exercise(child,data,result,report):
     from playwright.async_api import async_playwright
     import win32gui,win32clipboard
     note=data/'pair.txt'
-    await until(lambda:note.is_file() or child.poll() is not None,message='startup note missing')
+    started = time.monotonic()
+    # Match the dedicated startup gate: first-use source/Qt initialization is
+    # not an interaction deadline. Keep every post-start interaction limit.
+    await until(lambda:note.is_file() or child.poll() is not None,timeout=45,message='startup note missing')
+    result['startup_ready_seconds'] = round(time.monotonic()-started, 3)
     if child.poll() is not None:raise RuntimeError('candidate exited during startup')
     addr,code=note.read_text(encoding='utf-8').splitlines()[:2]
     base='http://127.0.0.1:'+str(urlparse(addr).port)
@@ -192,15 +237,20 @@ async def exercise(child,data,result,report):
     target_url='http://127.0.0.1:'+str(site._server.sockets[0].getsockname()[1])+'/'
     result['cases']=[]
     cases=result['cases']; inspector=NativeInspector()
+    result['uia_transient_reads'] = inspector.transient_reads
     try:
         async with async_playwright() as pw:
             browser=await pw.chromium.launch(headless=False,args=['--force-renderer-accessibility'])
             phone_browser=await pw.chromium.launch()
+            pending_phone_requests = {}
+            phone_failures = []
+            phone_lifecycle = {'domcontentloaded': 0, 'load': 0}
             try:
                 target=await browser.new_page(viewport={'width':1100,'height':850})
                 await target.goto(target_url)
                 phone=await phone_browser.new_page(viewport={'width':430,'height':850})
                 errors=[];phone.on('pageerror',lambda e:errors.append(str(e)))
+                pending_phone_requests, phone_failures, phone_lifecycle = phone_diagnostics(phone)
                 await phone.goto(base+'/?pair='+code)
                 await phone.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
                 async with ClientSession() as http:
@@ -268,7 +318,7 @@ async def exercise(child,data,result,report):
                     await until(lambda:clipboard_text()==text,timeout=1.2,
                                 message='delivery did not reach modifier guard')
                     assert inspector.click(win32gui.GetForegroundWindow(),'Other input',(50004,50030))
-                    await until(lambda:inspector.uia.GetFocusedElement().CurrentName=='Other input',timeout=.7,
+                    await until(lambda:inspector.focused_name()=='Other input',timeout=.7,
                                 message='Windows did not observe the new input focus')
                     assert win32api.GetAsyncKeyState(0x10)&0x8000,'Modifier released before target-change observation'
                 finally:
@@ -468,12 +518,23 @@ async def exercise(child,data,result,report):
                 # 确认发送与插入分离。测试设置仅写本脚本创建的隔离目录。
                 result['stage']='phone_explicit_send'
                 await phone.wait_for_selector('#submitPanel',state='visible')
+                async def confirm_phone_send():
+                    # Native Enter precedes the phone's HTTP acknowledgement and
+                    # asynchronous overlay history.back(). Reconnect only after
+                    # the phone has visibly finished the user's send action.
+                    async with phone.expect_response(lambda response:
+                            urlparse(response.url).path == '/v3/send/commit'
+                            and response.request.method == 'POST') as response:
+                        await phone.click('#confirmSend')
+                    assert (await response.value).status == 200
+                    await phone.wait_for_selector('#confirmSend', state='hidden')
+                    await phone.wait_for_function('!history.state?.typelessOverlay')
                 before_paste=await target.evaluate('window.pasteCount')
                 before_clipboard=clipboard_text()
                 await phone.click('#submitMessage');await phone.wait_for_selector('#confirmSend')
                 await phone.click('#cancelSend')
                 assert await target.evaluate('window.enterEvents')==0
-                await phone.click('#submitMessage');await phone.click('#confirmSend')
+                await phone.click('#submitMessage');await confirm_phone_send()
                 await until(lambda:target.evaluate('window.enterEvents===1'),message='confirmed phone Enter missing')
                 assert await target.evaluate('window.submitKeys')==[{'ctrl':False,'target':'prompt-textarea'}]
                 assert await target.evaluate('window.pasteCount')==before_paste
@@ -492,7 +553,7 @@ async def exercise(child,data,result,report):
                 before_paste=await target.evaluate('window.pasteCount')
                 await phone.click('#submitMessage')
                 assert 'Ctrl+Enter' in await phone.locator('#submitShortcut').inner_text()
-                await phone.click('#confirmSend')
+                await confirm_phone_send()
                 await until(lambda:target.evaluate('window.enterEvents===2'),message='confirmed Ctrl+Enter missing')
                 assert await target.evaluate('window.submitKeys')==[{'ctrl':False,'target':'prompt-textarea'},{'ctrl':True,'target':'prompt-textarea'}]
                 assert await target.evaluate('window.pasteCount')==before_paste
@@ -503,7 +564,20 @@ async def exercise(child,data,result,report):
                 await target.screenshot(path=str(report.with_suffix('.png')))
             except Exception:
                 # 只收集合成测试输入，保留真实DOM/剪贴板事件与可见错误，不重放插入。
+                result['pending_phone_requests'] = list(pending_phone_requests.values())[-20:]
+                result['phone_request_failures'] = phone_failures[-20:]
+                result['phone_lifecycle'] = phone_lifecycle
                 try:
+                    async with ClientSession() as http:
+                        async with http.get(base+'/v3/status', timeout=2) as response:
+                            result['bridge_http_status_at_failure'] = response.status
+                except Exception as health_error:
+                    result['bridge_health_error_type'] = type(health_error).__name__
+                try:
+                    result['phone_state'] = await phone.evaluate("""() => ({
+                        ready: document.readyState, editor: document.querySelector('#editor')?.classList.contains('show'),
+                        transfer: document.querySelector('#transferStatus')?.textContent,
+                        attachments: document.querySelectorAll('.attach-card').length})""")
                     result['observed']=await target.evaluate('''() => ({
                         active:document.activeElement?.id,
                         inputs:[...document.querySelectorAll('textarea,[contenteditable]')].map(e=>({

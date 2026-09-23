@@ -1343,10 +1343,18 @@ class DesktopShell:
             from doubao_typeless.ui.insert_status import error_message
             text = error_message(_kw)
             def show_error():
+                from doubao_typeless.app import _log
+                if _kw.get('operation') == 'locate':
+                    # Focus may have moved before the provider rejected its
+                    # acknowledgement. Keep feedback visible above the target.
+                    self.review.widget.hide()
+                    self.app.hud.operation_event(event, **_kw)
                 self.client.delivery_status.setText(text)
                 if self.review.widget.isVisible():
                     self.review.banner.setText(text)
                     self.review.banner.show()
+                _log(f'[v3.feedback] event={event} code={code} review={self.review.widget.isVisible()} '
+                     f'hud={self.app.hud._widget.isVisible()}')
             QTimer.singleShot(0, host, show_error)
         elif event == "capture_region":
             QTimer.singleShot(0, host, self.app.capture_region)
@@ -1442,6 +1450,8 @@ class DesktopShell:
                 return
             self.client._closing_for_quit = True
             self.tray.hide()
+            from doubao_typeless.app import _log
+            _log('[v3.shutdown] stage=qt_quit')
             QApplication.instance().quit()
         QTimer.singleShot(0, self.client.widget, check)
 
