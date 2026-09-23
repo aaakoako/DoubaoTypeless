@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "product_goal": "完成可公开发行的0.5.3修订版，保留真实设备验证边界。",
+  "product_goal": "完成可公开发行的0.5.4修订版，保留真实设备验证边界。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "0.5.0已撤回；0.5.1/0.5.2正式构建未通过，均未发行。0.5.3加入外部输入来源计数及有限scope恢复，故障测试隔离到独立runner并保留超时诊断。",
+  "working_tree": "0.5.0已撤回；0.5.1/0.5.2/0.5.3均未发行。0.5.3候选两次通过，但正式包在定位后的单次焦点验证失败，退出也未及时完成。0.5.4加入只读有界复核、关闭连接及阶段取证，保留旧标签和失败证据。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
   "last_completed_slice": "STABLE_0_5_0_PUBLISHED",
-  "active_slice": "INPUT_ORIGIN_0_5_3",
-  "next_action": "等待0.5.3固定源码全量、原生图文/升级、真实hook分类、依赖审计及下载校验。通过后再合入和发行，不跳过失败项。",
+  "active_slice": "FOCUS_AND_SHUTDOWN_0_5_4",
+  "next_action": "等待0.5.4固定源码全量、原生图文/升级、真实hook分类、依赖审计及下载校验。通过后再合入和发行，不跳过失败项。",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -324,5 +324,16 @@
       "timeout_root_cause": "not established"
     },
     "repair": "input source counter excludes only own tagged events; same-container bounded refocus with external-input guard; no paste replay; isolated mandatory recovery job with diagnostics"
+  },
+  "failed_0_5_3_stable": {
+    "source_sha": "b85e30b4d972d75920d1b4f8fba0c4d853eada39",
+    "run": 35914898416,
+    "published": false,
+    "passed_candidates": [35912322252, 35913142680],
+    "stage": "locate_composer_from_review",
+    "evidence": "11 browser cases passed; restore_refused after DOM focus changed; no ready notification; forced cleanup after quit. Exact UIA rejection field not previously logged.",
+    "repair": "Single SetFocus followed by bounded exact read-only verification with input-change cancellation; visible locator failure; shutdown stages and websocket close hook.",
+    "shutdown_reproduction": "Real online loopback websocket keeps cleanup pending beyond1s without hook; phone response and non-response covered after fix. Does not establish old cloud shutdown cause.",
+    "local_validation": "672 passed,1 skipped; independent review found no new blocker; native source and frozen gates pending."
   }
 }

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 from urllib.parse import urlparse
 
-from aiohttp import web, WSMsgType
+from aiohttp import web, WSMsgType, WSCloseCode
 
 from doubao_typeless.core.bundle import Draft, apply_draft_update, freeze_bundle
 from doubao_typeless.storage.asset_store import AssetStore
@@ -146,6 +146,7 @@ class V3Bridge:
 
     def make_app(self) -> web.Application:
         app = web.Application(middlewares=[self._origin_host_gate], client_max_size=2 * 1024 * 1024)
+        app.on_shutdown.append(self._close_websockets)
         app.router.add_get("/", self._index)
         app.router.add_get("/ws", self._ws)
         app.router.add_get("/app-icon.png", self._app_icon)
@@ -193,6 +194,17 @@ class V3Bridge:
         if self._runner:
             await self._runner.cleanup()
             self._runner = None
+
+    async def _close_websockets(self, _app: web.Application) -> None:
+        async def close_one(ws: web.WebSocketResponse) -> None:
+            try:
+                # Close idle phone connections before AppRunner waits for their
+                # handlers. A disconnected phone must not hold up application exit.
+                await asyncio.wait_for(ws.close(code=WSCloseCode.GOING_AWAY), timeout=2.0)
+            except asyncio.TimeoutError:
+                self._log("[v3.bridge] websocket shutdown handshake timed out")
+
+        await asyncio.gather(*(close_one(ws) for ws in tuple(self._clients)))
 
     async def _index(self, request: web.Request) -> web.Response:
         dist_index = _web_dist() / "index.html"
