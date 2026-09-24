@@ -431,6 +431,13 @@
       "live_model": "4 synthetic Chinese samples via OpenRouter",
       "independent_review": "two layout findings fixed and rechecked"
     },
-    "visual_evidence": "G:/AgentStorage/Deliveries/typeless-redesign-20260924"
+    "visual_evidence": "G:/AgentStorage/Deliveries/typeless-redesign-20260924",
+    "graphics": {
+      "reference": "animated categorical four-axis map, no score",
+      "mobile": "state-bound sync trace and byte-bound image progress",
+      "validation": "35 related and 64 broader checks passed",
+      "evidence": "G:/AgentStorage/Deliveries/typeless-redesign-20260924/graphics/reference-chart.gif",
+      "final_validation": "19 checks after hidden-state fix; 17 after provisional-outline and retry-label corrections; build/typecheck passed"
+    }
   }
 }

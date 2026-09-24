@@ -134,3 +134,45 @@ def test_mobile_composer_and_settings_at_large_text(tmp_path):
                 await page.screenshot(path=str(Path(folder) / 'phone-composer.png'), full_page=True)
     asyncio.run(run())
 
+
+
+def test_reference_chart_unknown_has_no_score_and_animation_settles(pair):
+    from PySide6.QtTest import QTest
+    from doubao_typeless.ui.reference_chart import ReferenceChart
+    chart = ReferenceChart()
+    try:
+        chart.set_result({'status':'ready','references':[{'id':'goal','state':'unknown'}]})
+        chart.show();QTest.qWait(30)
+        assert '目标：暂无法判断' in chart.accessibleDescription()
+        assert chart.states['goal'] == 'unknown'
+        assert chart.timer.isActive()
+        started = chart.started
+        chart.set_result({'status':'ready','references':[{'id':'goal','state':'unknown'}]})
+        assert chart.started == started, 'unchanged results must not restart animation'
+        QTest.qWait(650)
+        assert not chart.timer.isActive() and chart.phase == 1.
+        chart.set_result({'status':'ready','references':[{'id':'goal','state':'clear'}]})
+        chart.set_motion(False)
+        assert not chart.timer.isActive() and chart.phase == 1.
+        chart.hide()
+        assert not chart.timer.isActive()
+    finally:chart.deleteLater()
+
+
+def test_sync_graph_never_marks_failed_image_as_received(tmp_path):
+    from tests.test_v3_editor_transactions import product, synced, photo, editing
+    async def run():
+        async with product(tmp_path, touch=True) as (page, app, uploads):
+            await page.fill('#text','文字已同步，图片传输独立判断')
+            await synced(page)
+            assert await page.locator('#syncMap').get_attribute('data-state') == 'synced'
+            assert not await page.locator('#connectBtn').is_visible()
+            await page.route('**/v3/assets/init', lambda route:route.fulfill(status=503,body='unavailable'))
+            await page.locator('#file').set_input_files(photo())
+            await editing(page); await page.click('#done')
+            await page.wait_for_function("document.querySelector('#syncMap').dataset.state === 'asset_failed'")
+            assert '图片待重试' in await page.locator('#transferStatus').inner_text()
+            assert await page.locator('.attach-card[data-state="ready"]').count() == 0
+            assert await page.locator('.asset-progress').count() == 1
+            assert await page.locator('#text').input_value() == '文字已同步，图片传输独立判断'
+    asyncio.run(run())

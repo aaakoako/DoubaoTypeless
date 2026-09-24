@@ -88,3 +88,27 @@ button{white-space:normal;overflow-wrap:anywhere}
 .editor>.head{position:sticky;top:0;z-index:6}
 #stage{flex:1 0 160px}
 @media(max-height:520px){#stage{flex-basis:80px;min-height:80px}.editor .caption-drawer{padding-bottom:12px}}
+
+/* Real sync state, never a simulated completion percentage. */
+.sync-map{display:flex;align-items:center;justify-content:center;gap:10px;color:var(--muted);height:28px;flex:none}
+.sync-map svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.5;flex:none}
+.sync-track{width:100px;height:2px;position:relative;background:var(--line);border-radius:4px}
+.sync-track i{position:absolute;width:6px;height:6px;top:-2px;left:0;background:var(--accent);border-radius:50%;opacity:0}
+.sync-map[data-state="syncing"],.sync-map[data-state="retrying"],.sync-map[data-state="synced"]{color:var(--accent)}
+.sync-map[data-state="uploading"] .sync-track i,.sync-map[data-state="syncing"] .sync-track i,.sync-map[data-state="retrying"] .sync-track i{opacity:1;animation:sync-travel 1.15s ease-in-out infinite}
+.sync-map[data-state="synced"] .sync-track{background:var(--accent)}
+.sync-mark{width:16px;text-align:center;font-size:15px}
+.sync-map[data-state="synced"] .sync-mark::after{content:"✓"}
+.sync-map[data-state="conflict"] .sync-mark::after,.sync-map[data-state="save_failed"] .sync-mark::after{content:"!";color:var(--danger)}
+.sync-map[data-state="offline"] .sync-track{background:repeating-linear-gradient(90deg,var(--line) 0 5px,transparent 5px 10px)}
+.asset-progress{display:block;width:calc(100% - 16px);height:5px;margin:0 8px 8px;border:0;border-radius:4px;overflow:hidden;accent-color:var(--accent)}
+.asset-progress::-webkit-progress-bar{background:var(--line)}.asset-progress::-webkit-progress-value{background:var(--accent);transition:width .18s}
+.attach-card[data-state="ready"]::after{content:"✓";position:absolute;right:6px;top:6px;border-radius:50%;background:var(--accent);color:white;width:20px;height:20px;text-align:center;pointer-events:none}
+@keyframes sync-travel{0%{transform:translateX(0);opacity:0}20%,80%{opacity:1}100%{transform:translateX(94px);opacity:0}}
+#transferStatus{text-align:center;border:0;background:transparent;padding:0;min-height:18px}
+.compact-keyboard .sync-map{display:none}
+
+.sync-map[data-state="asset_failed"] .sync-mark::after{content:"!";color:var(--danger)}
+
+/* Component display rules must never override explicit hidden state. */
+[hidden]{display:none!important}

@@ -398,7 +398,7 @@ class HudController:
         if self._widget is not None:
             from doubao_typeless.ui.motion import interface_motion
             interface_motion().configure(enabled)
-            self._feedback.configure(enabled);self._update_activity()
+            self._feedback.configure(enabled);self._references.set_motion(enabled);self._update_activity()
 
     def _update_activity(self):
         active=(self._widget.isVisible() and self.phone_online and self._mode=='receiving'
@@ -518,6 +518,7 @@ class HudController:
         if self._check_row is None:return
         from doubao_typeless.services.input_check import presentation
         summary, details = presentation(result)
+        self._references.set_motion(self._motion_enabled)
         self._references.set_result(result)
         signature = (repr(result.get('references')), summary, details, result.get('note'), result.get('suppressed'), result.get('tone'))
         if signature == self._check_signature:return

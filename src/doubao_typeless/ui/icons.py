@@ -15,6 +15,7 @@ PATHS = {
     'sad': '<circle cx="12" cy="12" r="9"/><path d="M8 17c2-3 6-3 8 0M8 9h.1M16 9h.1"/>',
     'check': '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
     'inspect': '<circle cx="10" cy="10" r="6"/><path d="m15 15 6 6M10 7v4M10 13h.1"/>',
+    'link': '<path d="m10 14 4-4M8 16l-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0M16 8l1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0"/>',
     'help': '<circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4M12 17h.1"/>',
     'waiting': '<path d="M20 8a8 8 0 1 0 0 8M20 3v5h-5"/>',
     'mic': '<rect x="9" y="3" width="6" height="12" rx="3"/><path d="M6 11v1a6 6 0 0 0 12 0v-1M12 18v3M9 21h6"/>',

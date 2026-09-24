@@ -67,6 +67,12 @@ export function boot(root: HTMLElement): void {
           <p>上一份已放入电脑输入框。请看电脑确认图文完整。</p>
           <button id="submitMessage">确认后发送上一份</button>
         </section>
+        <div class="sync-map" id="syncMap" data-state="offline" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/></svg>
+          <span class="sync-track"><i></i></span>
+          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 22h8M12 17v5"/></svg>
+          <span class="sync-mark"></span>
+        </div>
         <p id="deliveryStatus" class="progress-detail" role="status" aria-live="polite" hidden></p><p id="transferStatus" role="status" aria-live="polite">手机主稿 · 等待同步</p><p id="sync">图在前，文字在后 · 不自动发送</p><p id="localSave" role="status" aria-live="polite"></p>
       </section>
       <section class="editor" id="editor">
@@ -304,6 +310,7 @@ export function boot(root: HTMLElement): void {
 
   let attachmentsSignature = "";
   function update() {
+    renderSyncState();
     const input = $("text") as HTMLTextAreaElement;
     if (input.value !== state.text) input.value = state.text;
     $("charCount").textContent = `${[...state.text].length} 字`;
@@ -340,6 +347,14 @@ export function boot(root: HTMLElement): void {
       const status = a.pending_png && a.status !== "ready" ? (a.status === "failed" ? "等待重试" : `同步 ${a.progress || 0}%`) :
         a.status === "queued" ? "待编辑" : a.status === "editing" ? "编辑中" : a.status === "failed" ? "未传完" : "电脑已收到";
       wrap.innerHTML = `<img alt="${i + 1} · ${a.kind}" /><label>${i + 1} · ${a.kind} · ${status}</label><button class="left">←</button><button class="right">→</button><button class="remove">删</button>`;
+      if (a.pending_png && a.status !== 'ready') {
+        const progress = document.createElement('progress');
+        progress.className = 'asset-progress'; progress.max = 100;
+        progress.value = Math.max(0, Math.min(100, a.progress || 0));
+        progress.setAttribute('aria-label', `第 ${i+1} 张图片上传进度`);
+        wrap.appendChild(progress);
+      }
+      wrap.dataset.state = a.asset_id && (!a.status || a.status === 'ready') ? 'ready' : (a.status || 'queued');
       const img = wrap.querySelector("img") as HTMLImageElement;
       if (a.preview.startsWith("/v3/assets/") && state.session) {
         void fetch(a.preview, {headers: headers()}).then(async res => {
@@ -565,12 +580,26 @@ export function boot(root: HTMLElement): void {
     },
     onState: (status: string) => {
       syncState = status;
-      const labels: Record<string,string> = {offline:"手机已保留 · 连接恢复后继续同步",synced:"电脑已收到当前版本 · 不自动发送",
-        syncing:"正在同步最新图文…",retrying:"网络较慢，正在补发当前稿…",conflict:"同步暂停，手机稿保留；请勿同时打开两个编辑页",save_failed:"手机存储暂不可写，内容留在页面中"};
-      $("transferStatus").textContent = labels[status] || status;
-      $("transferStatus").dataset.busy = String(status === 'syncing' || status === 'retrying');
+      renderSyncState();
     },
   });
+  function renderSyncState() {
+    let status = syncState;
+    if (status === 'synced') {
+      if (state.assets.some(a => a.status === 'failed')) status = 'asset_failed';
+      else if (state.assets.some(a => a.pending_png && a.status !== 'ready')) status = 'uploading';
+      else if (state.assets.some(a => !a.asset_id || a.status === 'editing')) status = 'editing';
+    }
+    const labels: Record<string,string> = {uploading:"图片仍在传输，电脑尚未收到全部图文",asset_failed:"图片上传失败，原稿保留，可重试",editing:"图片尚未保存到本次图文",offline:"手机已保留 · 连接恢复后继续同步",synced:"电脑已收到当前版本 · 不自动发送",
+      syncing:"正在同步最新图文…",retrying:"网络较慢，正在补发当前稿…",conflict:"同步暂停，手机稿保留；请勿同时打开两个编辑页",save_failed:"手机存储暂不可写，内容留在页面中"};
+    const shortLabels: Record<string,string> = {uploading:"图片传输中",asset_failed:"图片待重试",editing:"图片待保存",offline:"离线 · 稿件保留",synced:"电脑已收到当前版本",
+      syncing:"同步中",retrying:"正在补发",conflict:"草稿有分歧",save_failed:"本地保存失败"};
+    $("transferStatus").textContent = shortLabels[status] || status;
+    $("transferStatus").title = labels[status] || status;
+    $("transferStatus").setAttribute('aria-label',labels[status] || status);
+    $("syncMap").dataset.state = status;
+    $("transferStatus").dataset.busy = String(['syncing','retrying','uploading'].includes(status));
+  }
   function currentMessage() {
     if (!latestMessage || latestMessage.epoch !== state.epoch || latestMessage.revision !== state.revision)
       latestMessage = {...buildDraftUpdate({...state, revision:state.revision - 1}), authority:"phone",generation:state.generation,update_id:newId()};
