@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "product_goal": "0.5.5体验候选交付与主干中英文产品介绍、发布说明、MIT商用条件整理。",
+  "product_goal": "Pocket Composer macOS / Linux 跨平台体验包交付；Windows 稳定版继续保留。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "PR #9已合入master；0.5.5预览公开，稳定latest仍为0.5.4。",
+  "working_tree": "PR #10 已合入 master；跨平台体验包使用固定源码 56457c0，稳定 latest 仍为 0.5.4。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
-  "last_completed_slice": "PUBLIC_0_5_5_PREVIEW_AND_BILINGUAL_PRODUCT_HOME",
+  "last_completed_slice": "MACOS_LINUX_NATIVE_PREVIEW_PACKAGES",
   "active_slice": null,
-  "next_action": "收集0.5.5实体手机与目标Composer体验，再决定正式稳定发行；不将候选检查等同于全部实机验收。",
+  "next_action": "收集 macOS 辅助功能授权后的真实 Codex/Cursor 图文插入、实体手机与多屏反馈；Wayland 自动插入、macOS 公证和跨平台登录自启动尚未提供。",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -504,5 +504,46 @@
     "source_update_urls": "updated",
     "published_binaries": "unchanged; existing clients should use manual download",
     "validation": "15 update UI/delivery checks passed"
+  },
+  "cross_platform_preview": {
+    "tag": "preview-0.5.5-posix",
+    "source_sha": "56457c0f0d607bc9d2eb7892b3894393b9901eed",
+    "merge_sha": "b066dde077c35ede706fef0a6faea402fd3f77b6",
+    "release_ready": false,
+    "release_url": "https://github.com/aaakoako/Pocket-Composer/releases/tag/preview-0.5.5-posix",
+    "build_run": 35979726303,
+    "ci_run": 35979733448,
+    "windows_tests": {
+      "passed": 710,
+      "skipped": 1
+    },
+    "linux_tests": {
+      "passed": 700,
+      "skipped": 11
+    },
+    "artifacts": [
+      "macos_arm64.dmg",
+      "macos_x64.dmg",
+      "linux_x64.deb",
+      "linux_x64.tar.gz"
+    ],
+    "verified": [
+      "native Cocoa/X11 frozen startup",
+      "HTTP and graceful IPC shutdown",
+      "package library links",
+      "Linux X11 real Qt image-then-text receiver and capture",
+      "85 Linux system-library copyright/source records",
+      "downloaded artifact SHA256 and source identity"
+    ],
+    "not_verified": [
+      "macOS permission-granted Codex/Cursor insertion",
+      "physical phones",
+      "multi-monitor acceptance"
+    ],
+    "limits": [
+      "macOS not Developer ID signed or notarized",
+      "Wayland edit/sync/copy only",
+      "login autostart unavailable"
+    ]
   }
 }
