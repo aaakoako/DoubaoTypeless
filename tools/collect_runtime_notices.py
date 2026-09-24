@@ -18,7 +18,7 @@ def qt_binary_allowed(destination):
 def collect(module_names, binary_destinations, root, output):
     output.mkdir(parents=True, exist_ok=True)
     mapping = metadata.packages_distributions()
-    packages = {'PySide6','PySide6_Essentials','PySide6_Addons','shiboken6'}
+    packages = {'PySide6','PySide6_Essentials','PySide6_Addons','shiboken6','pyinstaller'}
     for name in module_names:
         packages.update(mapping.get(name.split('.')[0], []))
     for name in binary_destinations:

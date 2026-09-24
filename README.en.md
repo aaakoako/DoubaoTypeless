@@ -52,7 +52,7 @@ Jev supports TypeSafe, OpenRouter, Vercel and compatible custom endpoints. Rewri
 ## Downloads, data and compatibility
 
 - [Releases](https://github.com/aaakoako/DoubaoTypeless/releases) include a per-user installer and a complete portable archive. Extract the entire portable folder.
-- A browser on your phone and Windows 10/11 on desktop. Compatibility depends on your browser, input method and target application.
+- The app UI is currently primarily Simplified Chinese. A browser on your phone and Windows 10/11 on desktop. Compatibility depends on your browser, input method and target application.
 - A user has confirmed sequential image/text insertion in Codex desktop. **Automatic detection is not guaranteed for every composer.** Cursor, multi-monitor setups and physical mobile keyboards need further validation.
 - Drafts, images and settings are stored locally. Offline writing and reconnection reconciliation are supported. Upgrades retain the workspace; uninstalling does not intentionally remove drafts.
 - Use the bridge on trusted networks. Enabling model features sends relevant text to your selected provider.

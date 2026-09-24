@@ -7,6 +7,7 @@ DoubaoTypeless 源码及原创文档采用 MIT。第三方组件保留各自许�
 | Component / 组件 | Purpose / 用途 | License family / 许可 |
 |---|---|---|
 | Python | Runtime / 运行时 | Python Software Foundation and included notices |
+| PyInstaller bootloader | Frozen executable / 可执行文件加载器 | GPL with the upstream distribution exception; see shipped COPYING |
 | Qt, PySide6, Shiboken | Windows UI / 桌面界面 | Open-source LGPLv3 option for included runtime modules; component notices also apply |
 | pynput | Input integration / 输入集成 | LGPLv3 |
 | Pillow | Image processing / 图像处理 | MIT-CMU and bundled image-library notices |
