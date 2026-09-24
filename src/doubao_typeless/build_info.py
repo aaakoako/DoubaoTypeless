@@ -3,7 +3,7 @@ from pathlib import Path
 import json
 import sys
 
-VERSION = "0.5.4"
+VERSION = "0.5.5"
 
 
 def build_info() -> dict:
@@ -26,3 +26,4 @@ def build_info() -> dict:
 
 def release_layout() -> bool:
     return build_info()["channel"] in {"release-candidate", "stable"}
+

@@ -13,6 +13,8 @@ QWidget#appWindow, QDialog {{ background:{C['bg']}; }}
 QWidget#hudWindow {{ background:transparent; border:0; }}
 QFrame#card {{ background:{C['surface']}; border:1px solid {C['line']}; border-radius:{M['radius_card']}px; }}
 QLabel {{ background:transparent; border:0; }}
+QWidget#referencePanel {{ background:{C['soft']}; border-radius:10px; }}
+QLabel#referenceObservation {{ font-size:12px; }}
 QLabel#muted {{ color:{C['muted']}; }}
 QLabel#error {{ color:{C['danger']}; }}
 QLabel[role='title'] {{ font-size:{M['title_size']}px; font-weight:600; }}

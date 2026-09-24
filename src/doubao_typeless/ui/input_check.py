@@ -9,7 +9,7 @@ from doubao_typeless.ui.icons import icon, judgment_icon, ToneBadge
 
 class InputCheckSettings:
     def __init__(self, form, stored, parent):
-        self.enabled = QCheckBox('输入检查 · Jev')
+        self.enabled = QCheckBox('输入参考 · Jev')
         self.enabled.setIcon(icon('inspect'))
         self.enabled.setChecked(bool(stored.get('jev_enabled')))
         form.addRow(self.enabled)
@@ -141,6 +141,9 @@ class InputCheckSettings:
                 'jev_emotion': self.emotion.isChecked(), 'jev_voice_note': self.note.isChecked()}
 
 
+from doubao_typeless.ui.reference_chart import ReferenceChart as ReferencePanel
+
+
 class InputCheckDetails(QWidget):
     def __init__(self, app, parent,feedback=None):
         super().__init__(parent)
@@ -157,7 +160,15 @@ class InputCheckDetails(QWidget):
         header=QHBoxLayout()
         self.symbol=QLabel();self.tone=ToneBadge()
         header.addWidget(self.symbol);header.addWidget(self.summary,1);header.addWidget(self.tone)
-        layout.addLayout(header); layout.addWidget(self.details)
+        layout.addLayout(header)
+        self.expand = QPushButton('参考图')
+        self.expand.setIcon(icon('inspect'))
+        self.expand.setCheckable(True)
+        header.addWidget(self.expand)
+        self.references = ReferencePanel(self)
+        self.references.presentation_enabled = False
+        layout.addWidget(self.references)
+        layout.addWidget(self.details)
         actions = QHBoxLayout(); actions.addWidget(self.note); actions.addWidget(self.retry)
         layout.addLayout(actions)
         self._timer = QTimer(self); self._timer.setInterval(250)
@@ -166,16 +177,23 @@ class InputCheckDetails(QWidget):
             if feedback is not None:
                 feedback.configure(app.input_check.options.get('ui_motion',True))
                 feedback.set_tone(result.get('tone_kind',''))
+            self.references.presentation_enabled = self.expand.isChecked()
+            self.references.set_motion(app.input_check.options.get("ui_motion", True))
+            self.references.set_result(result)
             summary, details = presentation(result)
             self.setVisible(bool(summary))
             self.summary.setText(summary)
             self.symbol.setPixmap(icon(judgment_icon(result)).pixmap(18,18))
             self.tone.set_tone(result.get('tone',''))
             if self.details.toPlainText()!=details:self.details.setPlainText(details)
-            self.details.setVisible(bool(details))
+            self.details.setVisible(bool(details) and self.expand.isChecked())
+            self.expand.setVisible(bool(result.get("references") or details))
+            self.expand.setText("收起参考" if self.expand.isChecked() else "参考图")
+            if not summary: self.expand.setChecked(False)
             self.note.setVisible(bool(result.get('note') or result.get('suppressed')))
             self.note.setText('附注已关' if result.get('suppressed') else '附注已开')
             self.note.setChecked(bool(result.get('note')))
             self.note.setIcon(icon('note_off' if result.get('suppressed') else 'mic'))
             self.retry.setVisible(result.get('status') == 'error')
+        self.expand.toggled.connect(lambda _checked: refresh())
         self._timer.timeout.connect(refresh); self._timer.start(); refresh()
