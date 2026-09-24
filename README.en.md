@@ -2,7 +2,7 @@
 
 # Pocket Composer
 ### Speak it. Sketch it. Bring it to your computer.
-**DoubaoTypeless · A phone-to-Windows text and image companion**
+**A phone-to-Windows text and image companion**
 
 [简体中文](README.md) · [Stable download](https://github.com/aaakoako/DoubaoTypeless/releases/latest) · [Installation](docs/release/INSTALL.en.md) · [Feedback](https://github.com/aaakoako/DoubaoTypeless/issues)
 
@@ -51,7 +51,7 @@ Jev supports TypeSafe, OpenRouter, Vercel and compatible custom endpoints. Rewri
 
 ## Downloads, data and compatibility
 
-- [Releases](https://github.com/aaakoako/DoubaoTypeless/releases) include a per-user installer and a complete portable archive. Extract the entire portable folder.
+- [Releases](https://github.com/aaakoako/DoubaoTypeless/releases) include a per-user installer and a complete portable archive. Extract the entire portable folder. Installer filenames and existing data paths retain the legacy DoubaoTypeless identifier for upgrade compatibility.
 - The app UI is currently primarily Simplified Chinese. A browser on your phone and Windows 10/11 on desktop. Compatibility depends on your browser, input method and target application.
 - A user has confirmed sequential image/text insertion in Codex desktop. **Automatic detection is not guaranteed for every composer.** Cursor, multi-monitor setups and physical mobile keyboards need further validation.
 - Drafts, images and settings are stored locally. Offline writing and reconnection reconciliation are supported. Upgrades retain the workspace; uninstalling does not intentionally remove drafts.
@@ -65,7 +65,7 @@ Jev supports TypeSafe, OpenRouter, Vercel and compatible custom endpoints. Rewri
 
 [Commercial use](docs/legal/COMMERCIAL_USE.md) · [Third-party notices](THIRD_PARTY_NOTICES.md)
 
-DoubaoTypeless is independent and does not claim affiliation with Doubao, ByteDance, OpenAI, Cursor or any model provider.
+Pocket Composer is independent and does not claim affiliation with Doubao, ByteDance, OpenAI, Cursor or any model provider.
 
 ## Contribute
 

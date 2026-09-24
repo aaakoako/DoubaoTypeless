@@ -488,5 +488,12 @@
     "runtime_component_records": 52,
     "release_ready": false,
     "local_delivery": "G:/AgentStorage/Deliveries/DoubaoTypeless-0.5.5-preview"
+  },
+  "public_brand": {
+    "name": "Pocket Composer",
+    "scope": "README, bilingual notices, desktop visible titles, tray and future executable product metadata",
+    "compatibility_identifiers": "existing repository URL, executable filename, update identity and data paths retained",
+    "validation": "15 existing update UI/delivery tests passed",
+    "published_binary_note": "already published 0.5.5 preview assets are not replaced"
   }
 }

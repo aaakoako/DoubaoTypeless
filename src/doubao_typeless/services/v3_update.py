@@ -27,7 +27,7 @@ def preview_version_label() -> str:
     from doubao_typeless.build_info import build_info
     info = build_info()
     label = {"v3-private-trial":"隔离体验版", "release-candidate":"发布候选", "stable":"正式版"}[info["channel"]]
-    return f"DoubaoTypeless {info['version']} · {label} · {info['source_sha'][:8]}"
+    return f"Pocket Composer {info['version']} · {label} · {info['source_sha'][:8]}"
 
 
 def check_preview_update(*, get_json: Callable[[str], dict[str, Any]] | None = None) -> dict[str, Any]:

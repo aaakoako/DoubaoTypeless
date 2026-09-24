@@ -1,8 +1,8 @@
 # Third-party notices / 第三方声明
 
-DoubaoTypeless source and original documentation are MIT licensed. Dependencies keep their own licenses; MIT is not a replacement license for them.
+Pocket Composer source and original documentation are MIT licensed. Dependencies keep their own licenses; MIT is not a replacement license for them.
 
-DoubaoTypeless 源码及原创文档采用 MIT。第三方组件保留各自许可证，不能把整个安装目录笼统视为 MIT。
+Pocket Composer 源码及原创文档采用 MIT。第三方组件保留各自许可证，不能把整个安装目录笼统视为 MIT。
 
 | Component / 组件 | Purpose / 用途 | License family / 许可 |
 |---|---|---|

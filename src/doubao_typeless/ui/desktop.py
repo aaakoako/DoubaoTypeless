@@ -906,7 +906,7 @@ class ClientWindow:
         from doubao_typeless.ui.single_instance import pipe_name
         package = getattr(self, '_update_package', None)
         if not package or getattr(self, '_updating', False):return
-        if QMessageBox.question(self.widget, '更新 DoubaoTypeless',
+        if QMessageBox.question(self.widget, '更新 Pocket Composer',
                 f"下载并更新到 {package['version']}？下载完成后程序会正常退出并自动重启。\n"
                 "当前工作区会保留；不会自动迁移旧框架的数据。") != QMessageBox.Yes:
             return
@@ -1316,7 +1316,7 @@ class DesktopShell:
         menu.addSeparator()
         menu.addAction("退出", self.quit)
         self.tray.setContextMenu(menu)
-        self.tray.setToolTip("DoubaoTypeless")
+        self.tray.setToolTip("Pocket Composer")
         self.tray.activated.connect(self._tray_activated)
         self.tray.show()
         self._wake = listen_for_commands(self._on_ipc)
@@ -1324,7 +1324,7 @@ class DesktopShell:
 
     def _explained_tray(self) -> None:
         if not load_settings(self.app.data_dir).get("tray_explained"):
-            self.tray.showMessage("DoubaoTypeless", "已在托盘运行。点图标可再打开窗口。")
+            self.tray.showMessage("Pocket Composer", "已在托盘运行。点图标可再打开窗口。")
             save_settings(self.app.data_dir, {"tray_explained": True})
 
     def _on_ipc(self, command: str) -> None:
@@ -1447,7 +1447,7 @@ class DesktopShell:
             return
         self._quit_pending = True
         future = asyncio.run_coroutine_threadsafe(self.app.stop(), loop)
-        self.tray.showMessage("DoubaoTypeless", "正在结束当前操作，草稿已保留")
+        self.tray.showMessage("Pocket Composer", "正在结束当前操作，草稿已保留")
 
         def check() -> None:
             if not future.done():
@@ -1483,7 +1483,7 @@ def _show_startup_error(exc: BaseException) -> None:
         from PySide6.QtWidgets import QApplication, QMessageBox
 
         qt = QApplication.instance() or QApplication([])
-        QMessageBox.critical(None, "无法启动 DoubaoTypeless", text)
+        QMessageBox.critical(None, "无法启动 Pocket Composer", text)
         if qt is not None:
             pass
     except Exception:

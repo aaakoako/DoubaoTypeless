@@ -24,8 +24,8 @@ def prepare(channel, tag=None):
     number=tuple(map(int,VERSION.split('.')))+(0,)
     resource=VSVersionInfo(ffi=FixedFileInfo(filevers=number,prodvers=number,mask=0x3f,flags=0,OS=0x40004,fileType=1,subtype=0,date=(0,0)),
         kids=[StringFileInfo([StringTable('040904B0',[
-            StringStruct('FileDescription',f'DoubaoTypeless {channel} {sha[:8]}'),
-            StringStruct('FileVersion',VERSION),StringStruct('ProductName','DoubaoTypeless'),
+            StringStruct('FileDescription',f'Pocket Composer {channel} {sha[:8]}'),
+            StringStruct('FileVersion',VERSION),StringStruct('ProductName','Pocket Composer'),
             StringStruct('ProductVersion',VERSION),StringStruct('OriginalFilename','DoubaoTypeless.exe')])]),
             VarFileInfo([VarStruct('Translation',[1033,1200])])])
     resource_path=ROOT/'build/v3-version.txt';resource_path.parent.mkdir(exist_ok=True)

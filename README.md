@@ -2,7 +2,7 @@
 
 # Pocket Composer
 ### 手机说清楚，圈出来，画明白。电脑接着做。
-**DoubaoTypeless · 手机到 Windows 的图文输入工具**
+**手机到 Windows 的图文输入工具**
 
 [English](README.en.md) · [下载稳定版](https://github.com/aaakoako/DoubaoTypeless/releases/latest) · [安装指南](docs/release/v3-installation.md) · [反馈](https://github.com/aaakoako/DoubaoTypeless/issues)
 
@@ -51,7 +51,7 @@ Jev 支持 TypeSafe、OpenRouter、Vercel 和兼容自定义接口；纠错/改�
 
 ## 下载、数据与兼容性
 
-- [Releases](https://github.com/aaakoako/DoubaoTypeless/releases)提供当前用户安装包和完整便携包；便携包须整体解压。
+- [Releases](https://github.com/aaakoako/DoubaoTypeless/releases)提供当前用户安装包和完整便携包；便携包须整体解压。安装文件与既有数据目录沿用 DoubaoTypeless 标识，以兼容已有更新。
 - 手机使用浏览器，电脑面向 Windows 10/11。浏览器、输入法和目标应用的兼容性以实际体验为准。
 - 已收到 Codex 桌面连续图文插入的用户反馈；**不保证所有输入框都可自动识别**。Cursor、多屏和实体手机输入法仍需进一步验证。
 - 草稿、图片和设置本地保存。支持断线续写和重连核对，升级保留工作区，卸载不主动删除草稿。
@@ -65,7 +65,7 @@ Jev 支持 TypeSafe、OpenRouter、Vercel 和兼容自定义接口；纠错/改�
 
 [商用条件 · 中文 / English](docs/legal/COMMERCIAL_USE.md) · [第三方声明](THIRD_PARTY_NOTICES.md)
 
-DoubaoTypeless 是独立项目，不声称与豆包、字节跳动、OpenAI、Cursor 或模型服务商存在官方合作。
+Pocket Composer 是独立项目，不声称与豆包、字节跳动、OpenAI、Cursor 或模型服务商存在官方合作。
 
 ## 参与项目
 

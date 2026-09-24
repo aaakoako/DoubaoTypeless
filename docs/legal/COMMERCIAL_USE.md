@@ -15,7 +15,7 @@
 
 MIT不意味着第三方库也都是MIT，不保证所有衍生产品在所有分发渠道自动合规。尤其是Qt/PySide6及pynput的LGPL要求，请阅读[第三方声明](../../THIRD_PARTY_NOTICES.md)及包内许可证。模型服务的API、额度、内容处理规则由各服务商决定；原文输入、图片传输和插入不要求启用Jev或填写模型Key。
 
-本项目没有授予第三方商标或官方背书。DoubaoTypeless是独立项目，名称不表示与豆包、字节跳动、OpenAI、Cursor或模型服务商存在官方合作。截图中的输入框名称仅用于描述兼容场景。
+本项目没有授予第三方商标或官方背书。Pocket Composer是独立项目，名称不表示与豆包、字节跳动、OpenAI、Cursor或模型服务商存在官方合作。截图中的输入框名称仅用于描述兼容场景。
 
 ## English
 
@@ -25,4 +25,4 @@ Redistributing binaries also requires compliance with the licenses of their incl
 
 Model APIs and credits are supplied under the selected provider's own terms. Core text/image input and insertion do not require Jev or an API key. Paid support or provider charges are separate from this repository's license.
 
-DoubaoTypeless is an independent project. Its name does not imply affiliation with Doubao, ByteDance, OpenAI, Cursor or any model provider. Product names in examples describe compatibility targets, not endorsements.
+Pocket Composer is an independent project. Its name does not imply affiliation with Doubao, ByteDance, OpenAI, Cursor or any model provider. Product names in examples describe compatibility targets, not endorsements.
