@@ -25,6 +25,8 @@ a = Analysis([str(ROOT / 'tools/run_v3.py')], pathex=[str(ROOT / 'src')],
            (str(ROOT / 'docs/release/CROSS_PLATFORM.md'), 'docs/release')],
     hiddenimports=hidden, excludes=['customtkinter', 'comtypes', 'win32api', 'win32gui'])
 a.binaries = [entry for entry in a.binaries if qt_binary_allowed(entry[0])]
+# Analysis also puts SONAME symlinks in datas; filter them with their libraries.
+a.datas = [entry for entry in a.datas if qt_binary_allowed(entry[0])]
 a.datas += collect([entry[0] for entry in a.pure], [entry[0] for entry in a.binaries],
                    ROOT, ROOT / 'build/runtime-notices')
 pyz = PYZ(a.pure)

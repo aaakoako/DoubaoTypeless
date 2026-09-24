@@ -1032,9 +1032,9 @@ class V3App:
                     if old.get("asset_id") in valid_ids and old.get("state") == "observed":
                         attempt.steps.append(Step(len(attempt.steps), "image", old["asset_id"], "observed", old["evidence"]))
                 activity = None
-                if hydrated.get('assets') and sys.platform == 'win32':
-                    from doubao_typeless.platform.windows.input_activity import InputActivityMonitor
-                    activity = InputActivityMonitor().start()
+                if hydrated.get('assets'):
+                    from doubao_typeless.platform.desktop import start_input_activity
+                    activity = start_input_activity()
                 self._delivery_input_activity = activity
                 self._delivery_input_baseline = None
                 try:

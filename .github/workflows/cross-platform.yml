@@ -46,7 +46,10 @@ jobs:
       - run: python tools/prepare_v3_release.py --channel release-candidate
       - if: runner.os == 'macOS'
         run: python -c "from PIL import Image; from pathlib import Path; Path('build').mkdir(exist_ok=True); Image.open('assets/icon.ico').convert('RGBA').resize((1024,1024)).save('build/icon.icns')"
-      - run: python -m PyInstaller --noconfirm packaging/posix.spec
+      - if: runner.os == 'Linux'
+        run: xvfb-run -a python -m PyInstaller --noconfirm packaging/posix.spec
+      - if: runner.os == 'macOS'
+        run: python -m PyInstaller --noconfirm packaging/posix.spec
       - name: Frozen Linux startup
         if: runner.os == 'Linux'
         run: python tools/smoke_posix.py dist/PocketComposer/PocketComposer

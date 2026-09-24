@@ -118,6 +118,13 @@ def target_above_ours():
     return False
 
 
+def start_input_activity():
+    if sys.platform == 'win32':
+        from .windows.input_activity import InputActivityMonitor
+        return InputActivityMonitor().start()
+    return None
+
+
 def grab_primary(scope='primary', *, hide=None):
     if sys.platform == 'win32':
         from .windows.capture import grab_primary as impl

@@ -97,7 +97,7 @@ def test_inspection_failure_never_becomes_an_empty_allowed_target(app):
 def test_owned_restore_failure_is_no_steps(app,monkeypatch):
     platform(app); prepare(app)
     app._read_focus=lambda:FocusSnapshot('QtQWindowIcon','当前图文',123,os.getpid())
-    import doubao_typeless.platform.windows.focus as f
+    import doubao_typeless.platform.desktop as f
     monkeypatch.setattr(f,'restore_target',lambda _:False)
     assert app.request_insert().result(3)['error_code']=='OWN_WINDOW'
     assert app.draft.text=='A'

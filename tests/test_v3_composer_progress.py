@@ -112,7 +112,7 @@ def test_same_runtime_other_process_is_not_remembered():
     assert choose_candidate([candidate(1),candidate(2)],complete=True,remembered=saved)['status']=='ambiguous'
 
 def test_locate_ambiguous_does_not_focus_or_paste(app,monkeypatch):
-    from doubao_typeless.platform.windows import composer_locator, focus
+    from doubao_typeless.platform import desktop as composer_locator, desktop as focus
     calls=[]
     monkeypatch.setattr(composer_locator,'locate_current',lambda _: {'status':'ambiguous','candidates':[candidate(1),candidate(2)]})
     monkeypatch.setattr(focus,'restore_target',lambda _:calls.append('focus'))
@@ -121,7 +121,7 @@ def test_locate_ambiguous_does_not_focus_or_paste(app,monkeypatch):
     assert calls==[]
 
 def test_locate_unique_restores_without_inserting_or_clearing(app,monkeypatch):
-    from doubao_typeless.platform.windows import composer_locator, focus
+    from doubao_typeless.platform import desktop as composer_locator, desktop as focus
     monkeypatch.setattr(composer_locator,'locate_current',lambda _: {'status':'found','candidate':candidate(),'reason':'unique_in_window'})
     calls=[]
     monkeypatch.setattr(focus,'restore_target',lambda _:calls.append('focus') or True)
@@ -149,7 +149,7 @@ def test_locate_while_busy_explains_rejection_without_queuing(app):
         future.result(2)
 
 def test_locate_does_not_steal_after_user_changes_application(app,monkeypatch):
-    from doubao_typeless.platform.windows import composer_locator, focus
+    from doubao_typeless.platform import desktop as composer_locator, desktop as focus
     monkeypatch.setattr(composer_locator,'locate_current',lambda _: {'status':'found','candidate':candidate(),'reason':'unique_in_window'})
     calls=[]
     monkeypatch.setattr(focus,'restore_target',lambda _:calls.append('focus') or True)
@@ -158,7 +158,7 @@ def test_locate_does_not_steal_after_user_changes_application(app,monkeypatch):
     assert calls==[]
 
 def test_locate_aborts_if_user_changes_control_in_same_window(app,monkeypatch):
-    from doubao_typeless.platform.windows import composer_locator, focus
+    from doubao_typeless.platform import desktop as composer_locator, desktop as focus
     monkeypatch.setattr(composer_locator,'locate_current',lambda _: {'status':'found','candidate':candidate(),'reason':'unique_in_window'})
     calls=[]
     monkeypatch.setattr(focus,'restore_target',lambda _:calls.append('focus') or True)

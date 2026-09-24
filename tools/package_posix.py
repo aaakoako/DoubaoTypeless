@@ -37,7 +37,7 @@ def main():
             archive.add(payload, arcname='PocketComposer')
         deb = ROOT / 'build/deb'
         target = deb / 'opt/pocket-composer'
-        shutil.copytree(payload, target)
+        shutil.copytree(payload, target, symlinks=True)
         control = deb / 'DEBIAN'
         control.mkdir()
         (control / 'control').write_text(f'''Package: pocket-composer

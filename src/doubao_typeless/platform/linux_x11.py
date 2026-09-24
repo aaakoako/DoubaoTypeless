@@ -39,6 +39,7 @@ class Accessibility:
             'accessible_get_role_name': (C.c_void_p, [C.c_void_p, C.c_void_p]),
             'accessible_get_name': (C.c_void_p, [C.c_void_p, C.c_void_p]),
             'accessible_get_description': (C.c_void_p, [C.c_void_p, C.c_void_p]),
+            'accessible_get_accessible_id': (C.c_void_p, [C.c_void_p, C.c_void_p]),
             'accessible_get_component_iface': (C.c_void_p, [C.c_void_p]),
             'component_grab_focus': (C.c_int, [C.c_void_p, C.c_void_p]),
         }
@@ -70,6 +71,7 @@ class Accessibility:
         root = self.fn('get_desktop', 0)
         if not root:
             return None
+        self.fn('accessible_set_cache_mask', root, 0)
         todo = []
         found = None
         deadline = time.monotonic() + 1.2
@@ -84,8 +86,6 @@ class Accessibility:
             while todo and visited < 600 and time.monotonic() < deadline:
                 ptr = todo.pop()
                 visited += 1
-                # No GLib event loop drives cache invalidations in the delivery worker.
-                self.fn('accessible_set_cache_mask', ptr, 0)
                 states = self.fn('accessible_get_state_set', ptr)
                 # AtspiStateType: EDITABLE=7, ENABLED=8, FOCUSED=12.
                 focused = states and self.fn('state_set_contains', states, 12)
@@ -93,7 +93,7 @@ class Accessibility:
                 self.unref(states)
                 if focused:
                     role = self.string('role_name', ptr)
-                    description = self.string('name', ptr) + ' ' + self.string('description', ptr)
+                    description = ' '.join(self.string(key, ptr) for key in ('name', 'description', 'accessible_id'))
                     kind = input_kind(role, description, editable=bool(editable))
                     if ptr in self.saved:
                         self.unref(ptr)  # The saved reference already owns it.

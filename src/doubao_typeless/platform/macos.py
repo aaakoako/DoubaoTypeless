@@ -43,7 +43,7 @@ def read_target():
         role = str(attribute(element, 'AXRole') or '')
         subrole = str(attribute(element, 'AXSubrole') or '')
         description = ' '.join(str(attribute(element, key) or '') for key in
-                               ('AXDescription', 'AXHelp', 'AXIdentifier'))
+                               ('AXDescription', 'AXHelp', 'AXIdentifier', 'AXTitle'))
         error, settable = AX.AXUIElementIsAttributeSettable(element, 'AXValue', None)
         editable = role in {'AXTextField', 'AXTextArea', 'AXComboBox'} and error == 0 and bool(settable)
         kind = input_kind(role + subrole, description, editable=editable)

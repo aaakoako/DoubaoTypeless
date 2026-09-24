@@ -194,13 +194,13 @@ def test_external_input_during_restore_stops_without_another_focus_attempt(app,m
 
 
 def test_mixed_delivery_closes_activity_observer_even_when_paste_fails(app,monkeypatch):
-    from doubao_typeless.platform.windows import input_activity
+    from doubao_typeless.platform import desktop as input_activity
     calls=[]
     class Monitor:
         def start(self):calls.append('start');return self
         def snapshot(self):return 0
         def close(self):calls.append('close')
-    monkeypatch.setattr(input_activity,'InputActivityMonitor',Monitor)
+    monkeypatch.setattr(input_activity,'start_input_activity',lambda:Monitor().start())
     platform(app)
     bundle=mixed(app)
     def fail(*args,**kw):raise OSError('synthetic')
@@ -227,7 +227,7 @@ def test_user_input_during_timestamp_read_never_reaches_focus_helper(app,monkeyp
 
 
 def test_target_change_during_initial_input_barrier_prevents_any_paste(app,monkeypatch):
-    from doubao_typeless.platform.windows import input_activity
+    from doubao_typeless.platform import desktop as input_activity
     written=platform(app)
     target={'focus':FOCUS}
     app._read_focus=lambda:target['focus']
@@ -237,7 +237,7 @@ def test_target_change_during_initial_input_barrier_prevents_any_paste(app,monke
         def start(self):return self
         def snapshot(self):target['focus']=FOCUS._replace(runtime_id=(99,));return 0
         def close(self):pass
-    monkeypatch.setattr(input_activity,'InputActivityMonitor',Monitor)
+    monkeypatch.setattr(input_activity,'start_input_activity',lambda:Monitor().start())
     app.delivery._paste=lambda:pytest.fail('must recheck target after barrier')
     result=app.deliver_and_finish({'intent_id':'barrier-target-change'},mixed(app))
     assert result['error_code']=='TARGET_CHANGED' and not result['steps'] and not written

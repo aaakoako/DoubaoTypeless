@@ -1,5 +1,6 @@
 """Shared accessibility policy; application names alone never imply a composer."""
 from doubao_typeless.core.policy import classify_focus
+import re
 
 
 def input_kind(role, description, *, editable, protected=False):
@@ -10,4 +11,7 @@ def input_kind(role, description, *, editable, protected=False):
         return special
     if not editable:
         return 'readonly'
-    return 'composer' if special == 'composer' else 'edit'
+    if any(term in description.casefold() for term in ('search', '搜索', 'history', '历史')):
+        return 'edit'
+    explicit = re.search(r'composer|chat[-_ ]?input|prompt[-_ ]?(?:input|textarea)|ask (?:anything|codex)|send a message|输入消息|输入你的问题', description, re.I)
+    return 'composer' if explicit else 'edit'

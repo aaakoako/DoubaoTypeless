@@ -18,7 +18,7 @@ def qt_binary_allowed(destination):
     match = re.match(r'libqt6(\w+)\.so(?:\.|$)', name)
     if match:
         return match[1] in allowed
-    framework = re.search(r'/Qt(\w+)\.framework/', destination.replace('\\', '/'))
+    framework = re.search(r'/Qt(\w+)\.framework/', '/' + destination.replace('\\', '/'))
     if framework:
         return framework[1].lower() in allowed
     if name.startswith('qt6') and name.endswith('.dll'):
