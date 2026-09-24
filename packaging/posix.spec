@@ -28,7 +28,7 @@ a.binaries = [entry for entry in a.binaries if qt_binary_allowed(entry[0])]
 # Analysis also puts SONAME symlinks in datas; filter them with their libraries.
 a.datas = [entry for entry in a.datas if qt_binary_allowed(entry[0])]
 a.datas += collect([entry[0] for entry in a.pure], [entry[0] for entry in a.binaries],
-                   ROOT, ROOT / 'build/runtime-notices')
+                   ROOT, ROOT / 'build/runtime-notices', native_binaries=a.binaries)
 pyz = PYZ(a.pure)
 exe = EXE(pyz, a.scripts, [], exclude_binaries=True, name='PocketComposer',
           console=sys.platform != 'darwin', strip=False, upx=False)
