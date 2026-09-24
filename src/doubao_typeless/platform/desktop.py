@@ -76,7 +76,7 @@ def set_clipboard_png(data):
 
 def send_paste():
     if sys.platform == 'win32':
-        from .windows.native_input import send_paste as impl
+        from .windows.clipboard import send_paste as impl
         return impl()
     return native().send_paste()
 

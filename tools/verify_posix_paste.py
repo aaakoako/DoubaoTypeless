@@ -43,8 +43,23 @@ def verify():
     from PIL import Image
     app = QApplication([])
     initialize()
-    manager = subprocess.Popen(['openbox'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    manager = subprocess.Popen(['openbox'])
     try:
+        from Xlib.display import Display
+        display = Display()
+        try:
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                if manager.poll() is not None:
+                    raise RuntimeError('X11 window manager exited')
+                prop = display.screen().root.get_full_property(display.intern_atom('_NET_SUPPORTING_WM_CHECK'), 0)
+                if prop is not None:
+                    break
+                time.sleep(.1)
+            else:
+                raise RuntimeError('X11 window manager not ready')
+        finally:
+            display.close()
         with tempfile.TemporaryDirectory() as temp:
             receipt = Path(temp) / 'receipt.json'
             child = subprocess.Popen([sys.executable, __file__, '--receiver', str(receipt)])

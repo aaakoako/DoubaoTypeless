@@ -266,7 +266,7 @@ def test_icon_uses_same_accent():
 def test_production_paste_records_stamp_only_after_one_native_call(monkeypatch):
     # Exercise the production wrapper itself; platform fixture otherwise replaces it.
     from doubao_typeless.app import V3App
-    from doubao_typeless.platform.windows import clipboard
+    from doubao_typeless.platform import desktop as clipboard
     import types
     calls=[]
     monkeypatch.setattr(clipboard,'send_paste',lambda:calls.append('paste'))

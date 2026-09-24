@@ -634,6 +634,10 @@ class ClientWindow:
         sl.addRow("截图给手机", self.hotkey_capture)
         self.autostart = QCheckBox("登录 Windows 时启动（到托盘）")
         self.autostart.setChecked(bool(stored.get("autostart")))
+        if sys.platform != 'win32':
+            self.autostart.setText('登录启动（此平台暂未提供）')
+            self.autostart.setChecked(False)
+            self.autostart.setEnabled(False)
         self.start_min = QCheckBox("启动后先到托盘")
         self.start_min.setChecked(bool(stored.get("start_minimized")))
         sl.addRow(self.autostart)
