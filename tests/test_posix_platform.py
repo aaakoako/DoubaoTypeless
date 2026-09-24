@@ -81,6 +81,9 @@ def test_macos_and_linux_exclude_unused_qt_modules():
     assert not qt_binary_allowed('PySide6/Qt/lib/libQt6VirtualKeyboard.so.6')
     assert not qt_binary_allowed('PySide6/Qt/plugins/platforminputcontexts/libqtvirtualkeyboardplugin.so')
     assert not qt_binary_allowed('PySide6/Qt/lib/QtQuick.framework/Versions/A/QtQuick')
+    assert not qt_binary_allowed('QtQml')
+    assert not qt_binary_allowed('QtQml.framework')
+    assert qt_binary_allowed('QtCore')
 
 
 @pytest.mark.skipif(sys.platform != 'darwin', reason='Native macOS frameworks')
