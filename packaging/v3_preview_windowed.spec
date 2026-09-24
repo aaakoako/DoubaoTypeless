@@ -60,6 +60,15 @@ a.binaries = [entry for entry in a.binaries
               if Path(entry[0]).name.lower() not in {"icuuc.dll", "icuin.dll"}
               and not re.fullmatch(r"icudt\d+\.dll", Path(entry[0]).name.lower())]
 
+# Keep only the Qt libraries this QWidget application uses. In particular, the
+# optional GPL/commercial virtual-keyboard plugin must not enter the LGPL build.
+import sys
+sys.path.insert(0, str(ROOT/'tools'))
+from collect_runtime_notices import collect, qt_binary_allowed
+a.binaries = [entry for entry in a.binaries if qt_binary_allowed(entry[0])]
+a.datas += collect([entry[0] for entry in a.pure], [entry[0] for entry in a.binaries],
+                   ROOT, ROOT/'build/runtime-notices')
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
