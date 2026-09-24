@@ -14,7 +14,7 @@ def main():
     executable = str(Path(sys.argv[1]).resolve())
     with tempfile.TemporaryDirectory(prefix='pocket-smoke-') as temp:
         data = Path(temp)
-        env = {**os.environ, 'QT_QPA_PLATFORM': 'offscreen', 'DT_V3_DISABLE_HOTKEYS': '1',
+        env = {**os.environ, 'QT_QPA_PLATFORM': os.environ.get('DT_SMOKE_QPA', 'offscreen'), 'DT_V3_DISABLE_HOTKEYS': '1',
                'DT_V3_DATA_DIR': temp, 'DT_V3_PIPE': 'PocketSmoke-' + uuid.uuid4().hex}
         with (data / 'process.log').open('wb') as log:
             child = subprocess.Popen([executable, '--minimized'], env=env, stdout=log, stderr=log)

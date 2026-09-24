@@ -52,9 +52,13 @@ jobs:
         run: python -m PyInstaller --noconfirm packaging/posix.spec
       - name: Frozen Linux startup
         if: runner.os == 'Linux'
-        run: python tools/smoke_posix.py dist/PocketComposer/PocketComposer
+        env:
+          DT_SMOKE_QPA: xcb
+        run: xvfb-run -a python tools/smoke_posix.py dist/PocketComposer/PocketComposer
       - name: Frozen macOS startup
         if: runner.os == 'macOS'
+        env:
+          DT_SMOKE_QPA: cocoa
         run: python tools/smoke_posix.py 'dist/Pocket Composer.app/Contents/MacOS/PocketComposer'
       - run: python tools/package_posix.py
       - uses: actions/upload-artifact@v4
