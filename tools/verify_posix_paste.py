@@ -69,8 +69,14 @@ def verify():
                 def work():
                     try:
                         deadline = time.monotonic() + 25
+                        focus = None
                         while time.monotonic() < deadline:
-                            focus = desktop.read_target()
+                            from doubao_typeless.platform.errors import PlatformUnavailable
+                            try:
+                                focus = desktop.read_target()
+                            except PlatformUnavailable:
+                                time.sleep(.25)
+                                continue
                             if focus.pid == child.pid and focus.kind == 'composer':
                                 break
                             time.sleep(.25)

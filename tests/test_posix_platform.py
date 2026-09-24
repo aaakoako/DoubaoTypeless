@@ -1,5 +1,6 @@
 """Cross-platform safety contracts; no native user input on developer machines."""
 from types import SimpleNamespace
+import sys
 import pytest
 
 from doubao_typeless.platform.accessible import input_kind
@@ -17,6 +18,8 @@ from doubao_typeless.storage import secret_store
     ('text', 'terminal', True, 'terminal'),
     ('label', 'chatinput', False, 'readonly'),
     ('text', 'Codex', True, 'edit'),
+    ('text', 'Ask anything', True, 'composer'),
+    ('text', 'Search chatinput', True, 'edit'),
 ])
 def test_accessible_policy(role, description, editable, kind):
     assert input_kind(role, description, editable=editable) == kind
@@ -78,3 +81,30 @@ def test_macos_and_linux_exclude_unused_qt_modules():
     assert not qt_binary_allowed('PySide6/Qt/lib/libQt6VirtualKeyboard.so.6')
     assert not qt_binary_allowed('PySide6/Qt/plugins/platforminputcontexts/libqtvirtualkeyboardplugin.so')
     assert not qt_binary_allowed('PySide6/Qt/lib/QtQuick.framework/Versions/A/QtQuick')
+
+
+@pytest.mark.skipif(sys.platform != 'darwin', reason='Native macOS frameworks')
+def test_macos_native_framework_exports_without_injecting():
+    import ApplicationServices as AX
+    import Quartz as Q
+    from CoreFoundation import CFHash
+    from doubao_typeless.platform import macos
+    for name in ('AXUIElementCreateApplication', 'AXUIElementSetMessagingTimeout',
+                 'AXUIElementCopyAttributeValue', 'AXUIElementIsAttributeSettable',
+                 'AXUIElementSetAttributeValue'):
+        assert callable(getattr(AX, name))
+    assert callable(Q.CGPreflightScreenCaptureAccess)
+    assert callable(Q.CGEventCreateKeyboardEvent)
+    assert callable(CFHash)
+    assert isinstance(macos.trusted(), bool)
+    assert isinstance(macos.modifiers_down(), bool)
+
+
+def test_timed_out_gui_request_cannot_later_change_clipboard():
+    from concurrent.futures import Future
+    from doubao_typeless.platform.qt_bridge import Dispatcher
+    future = Future()
+    future.cancel()
+    called = []
+    Dispatcher.execute(None, future, lambda: called.append('write'))
+    assert called == []

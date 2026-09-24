@@ -5,6 +5,7 @@ import time
 from collections import OrderedDict
 
 from .accessible import input_kind
+from .errors import PlatformUnavailable
 from .windows.focus import FocusSnapshot, same_target
 
 _elements = OrderedDict()
@@ -34,7 +35,7 @@ def read_target():
         if pid == os.getpid():
             return FocusSnapshot('dt-v3-hud', '', pid, pid)
         if not trusted():
-            return FocusSnapshot('', '', pid, pid)
+            raise PlatformUnavailable('ACCESSIBILITY_REQUIRED')
         app = AX.AXUIElementCreateApplication(pid)
         AX.AXUIElementSetMessagingTimeout(app, .3)
         element = attribute(app, 'AXFocusedUIElement')

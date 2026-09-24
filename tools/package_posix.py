@@ -21,6 +21,10 @@ def main():
     output = ROOT / 'release-posix'
     output.mkdir(exist_ok=True)
     name = f'PocketComposer_{info["version"]}_{system}_{arch}'
+    payload_root = ROOT / ('dist/Pocket Composer.app' if system == 'macos' else 'dist/PocketComposer')
+    broken = [str(p.relative_to(payload_root)) for p in payload_root.rglob('*') if p.is_symlink() and not p.exists()]
+    if broken:
+        raise RuntimeError('Broken packaged library links: ' + ', '.join(broken))
     if system == 'macos':
         app = ROOT / 'dist/Pocket Composer.app'
         stage = ROOT / 'build/dmg'

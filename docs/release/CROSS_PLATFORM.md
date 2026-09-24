@@ -23,6 +23,8 @@ Pocket Composer 将手机上的文字、图片和白板同步到电脑，再插�
 
 关闭应用后，用新包替换应用本体；不会下载或执行 Windows 升级程序。数据独立保存于用户目录的 `DoubaoTypeless/workspace-v3`（历史内部目录名保留）。不要删除数据目录来升级。
 
+此体验版尚未提供 macOS/Linux 登录自启动；设置中的对应选项已禁用。
+
 构建启动、桌面图文粘贴和真实 Codex/Cursor 接收属于不同验证项。请以对应发布页列出的实测结果为准；未实测的平台、输入框和多屏行为不宣称完成验收。
 
 ## English
@@ -34,3 +36,5 @@ This is an experimental macOS/Linux build of Pocket Composer, not a replacement 
 **Linux:** Ubuntu 22.04+ x64, X11. Install the DEB with your software installer or `sudo apt install ./PocketComposer_*_linux_x64.deb`. The tarball needs the system libraries listed in the DEB dependencies, including AT-SPI2 and Qt X11 libraries. Enable desktop accessibility; some Electron apps also require accessibility support enabled. Wayland currently supports editing, sync and copy, but not automatic insertion, global shortcuts or capture. API keys use Secret Service; without a working keyring they remain in memory only.
 
 **Updates:** quit and replace the application using the matching OS package. Keep the user data directory `~/DoubaoTypeless/workspace-v3`; the historical internal name is intentional. macOS/Linux never run the Windows updater. Frozen startup, native paste tests and real Codex/Cursor acceptance are separate checks: see each release's evidence and limitations.
+
+Login autostart is not yet available on macOS/Linux; its setting is disabled in this preview.

@@ -7,6 +7,7 @@ from collections import OrderedDict
 from ctypes.util import find_library
 
 from .accessible import input_kind
+from .errors import PlatformUnavailable
 from .windows.focus import FocusSnapshot, same_target
 
 _lock = threading.RLock()
@@ -15,7 +16,7 @@ _api = None
 
 def require_x11():
     if os.environ.get('XDG_SESSION_TYPE') == 'wayland' or not os.environ.get('DISPLAY'):
-        raise RuntimeError('自动插入需要 X11 桌面会话')
+        raise PlatformUnavailable('X11_REQUIRED')
 
 
 class Accessibility:
@@ -148,7 +149,7 @@ def read_target():
             if after is None or after.id != win.id:
                 return FocusSnapshot('', '', 0)
             if not focused:
-                return FocusSnapshot('', '', win.id, pid)
+                raise PlatformUnavailable('ACCESSIBILITY_REQUIRED')
             token, role, kind = focused
             return FocusSnapshot(role, '', win.id, pid, token, (pid, token), kind)
         finally:

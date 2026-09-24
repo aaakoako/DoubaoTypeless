@@ -1204,7 +1204,7 @@ class ClientWindow:
             self.byok_status.setText(f"设置已保存。开机自启未写入：{err}")
             self.byok_status.setObjectName("error")
         elif failures:
-            self.byok_status.setText("已保存 · 热键冲突，请改键")
+            self.byok_status.setText("已保存 · " + str(failures[0]))
             self.byok_status.setObjectName("error")
         else:
             self.byok_status.setText("设置已保存")

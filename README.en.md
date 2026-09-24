@@ -2,7 +2,7 @@
 
 # Pocket Composer
 ### Speak it. Sketch it. Bring it to your computer.
-**A phone-to-Windows text and image companion**
+**A phone-to-desktop text and image companion · Windows stable / macOS and Linux previews**
 
 [简体中文](README.md) · [Stable download](https://github.com/aaakoako/Pocket-Composer/releases/latest) · [Installation](docs/release/INSTALL.en.md) · [Feedback](https://github.com/aaakoako/Pocket-Composer/issues)
 
@@ -50,6 +50,14 @@ No model service is required. A failed insertion keeps the draft available for c
 Jev supports TypeSafe, OpenRouter, Vercel and compatible custom endpoints. Rewriting uses a separately configured model. Bring your own key and credits; provider charges apply. References use the current text only, **not the target agent's history or results**. App animations have their own switch.
 
 ## Downloads, data and compatibility
+
+| Desktop | Download and status |
+|---|---|
+| Windows 10 / 11 | [Stable](https://github.com/aaakoako/Pocket-Composer/releases/latest) / [0.5.5 preview](https://github.com/aaakoako/Pocket-Composer/releases/tag/preview-0.5.5) |
+| macOS · Apple Silicon / Intel | [DMG previews](https://github.com/aaakoako/Pocket-Composer/releases/tag/preview-0.5.5-posix); Accessibility permission required; not Apple notarized |
+| Linux x64 · X11 | [DEB / tar.gz previews](https://github.com/aaakoako/Pocket-Composer/releases/tag/preview-0.5.5-posix); Ubuntu 22.04+; no automatic insertion on Wayland yet |
+
+[macOS / Linux setup, permissions and limitations](docs/release/CROSS_PLATFORM.md). Cross-platform packages do not imply real Codex/Cursor or physical-phone acceptance.
 
 - [Releases](https://github.com/aaakoako/Pocket-Composer/releases) include a per-user installer and a complete portable archive. Extract the entire portable folder. The repository is now Pocket-Composer. Older in-app updaters are no longer maintained; download manually from the new repository. Installer filenames and existing data paths retain the legacy DoubaoTypeless identifier to preserve existing drafts.
 - The app UI is currently primarily Simplified Chinese. A browser on your phone and Windows 10/11 on desktop. Compatibility depends on your browser, input method and target application.
