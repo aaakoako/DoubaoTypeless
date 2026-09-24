@@ -68,6 +68,32 @@ def verify():
                 evidence = {}
                 def work():
                     try:
+                        # Select the receiver explicitly, like the user clicking
+                        # their composer. Mapping a window alone need not activate it.
+                        from Xlib import X, protocol
+                        display = Display()
+                        try:
+                            deadline = time.monotonic() + 10
+                            selected = False
+                            while time.monotonic() < deadline and not selected:
+                                clients = display.screen().root.get_full_property(display.intern_atom('_NET_CLIENT_LIST'), 0)
+                                for wid in ([] if clients is None else clients.value):
+                                    win = display.create_resource_object('window', int(wid))
+                                    prop = win.get_full_property(display.intern_atom('_NET_WM_PID'), 0)
+                                    if prop is not None and int(prop.value[0]) == child.pid:
+                                        event = protocol.event.ClientMessage(window=win.id,
+                                            client_type=display.intern_atom('_NET_ACTIVE_WINDOW'),
+                                            data=(32, [2, X.CurrentTime, 0, 0, 0]))
+                                        display.screen().root.send_event(event,
+                                            event_mask=X.SubstructureRedirectMask | X.SubstructureNotifyMask)
+                                        display.sync()
+                                        selected = True
+                                        break
+                                if not selected:
+                                    time.sleep(.1)
+                            assert selected, 'Receiver window was not mapped'
+                        finally:
+                            display.close()
                         deadline = time.monotonic() + 25
                         focus = None
                         while time.monotonic() < deadline:
