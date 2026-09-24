@@ -10,6 +10,15 @@ SERVICE = "DoubaoTypelessV3Preview"
 _MEMORY: dict[str, str] = {}
 
 
+def _native_keyring():
+    # Select OS stores explicitly: never pick a third-party plaintext backend.
+    if sys.platform == 'darwin':
+        from keyring.backends.macOS import Keyring
+    else:
+        from keyring.backends.SecretService import Keyring
+    return Keyring()
+
+
 def _target(data_dir: Path, name: str) -> str:
     digest = hashlib.sha256(str(Path(data_dir).resolve()).encode("utf-8")).hexdigest()[:16]
     return f"{SERVICE}/{digest}/{name}"
@@ -53,6 +62,13 @@ def put_secret(data_dir: Path, name: str, value: str) -> str:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(value, encoding="utf-8")
         return "file"
+    if sys.platform != 'win32':
+        try:
+            _native_keyring().set_password(SERVICE, _target(data_dir, name), value)
+            _MEMORY.pop(_target(data_dir, name), None)
+            return 'os'
+        except Exception:
+            pass
     _MEMORY[_target(data_dir, name)] = value
     return "memory"
 
@@ -77,6 +93,11 @@ def get_secret(data_dir: Path, name: str) -> str:
         path = _file_path(data_dir, name)
         if path.is_file():
             return path.read_text(encoding="utf-8").strip()
+    elif sys.platform != 'win32':
+        try:
+            return _native_keyring().get_password(SERVICE, key) or ''
+        except Exception:
+            return ''
     return ""
 
 
@@ -87,6 +108,11 @@ def delete_secret(data_dir: Path, name: str) -> None:
         try:
             import win32cred
             win32cred.CredDelete(key, win32cred.CRED_TYPE_GENERIC)
+        except Exception:
+            failed = True
+    elif os.environ.get('DT_V3_SECRET_FILE') != '1':
+        try:
+            _native_keyring().delete_password(SERVICE, key)
         except Exception:
             failed = True
     path = _file_path(data_dir, name)

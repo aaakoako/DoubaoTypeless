@@ -737,6 +737,12 @@ class ClientWindow:
             from PySide6.QtGui import QDesktopServices
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.app.data_dir.resolve())))
         data_folder.clicked.connect(open_data_folder)
+        from doubao_typeless.platform.desktop import platform_hint
+        hint = platform_hint()
+        if hint:
+            platform_note = QLabel(hint)
+            platform_note.setWordWrap(True)
+            sl.addRow(platform_note)
         self.update_status = QLabel("")
         self.update_status.setWordWrap(True)
         self.update_status.hide()
@@ -1501,6 +1507,8 @@ def run_desktop(argv: list[str] | None = None) -> int:
         raise SystemExit(1) from exc
 
     qt = QApplication.instance() or QApplication(argv)
+    from doubao_typeless.platform.qt_bridge import initialize
+    initialize()
     qt.setQuitOnLastWindowClosed(False)
     qt.setStyleSheet(STYLESHEET)
     apply_ui_font(qt)
@@ -1552,7 +1560,7 @@ def run_desktop(argv: list[str] | None = None) -> int:
         loop = app.start_background(start_hud=False)
         app._loop = loop
         try:
-            from doubao_typeless.platform.windows.hotkeys import start_hotkeys
+            from doubao_typeless.platform.desktop import start_hotkeys
 
             stored = load_settings(app.data_dir)
             start = start_hotkeys(

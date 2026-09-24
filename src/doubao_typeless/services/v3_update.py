@@ -71,7 +71,7 @@ def check_preview_update(*, get_json: Callable[[str], dict[str, Any]] | None = N
             out['message'] = (f'发现正式版 {tag}，可打开下载页获取安装程序；不会自动替换。' if out['update_available']
                               else f'当前 {current} 已是最新可用版本。')
             if out['update_available']:
-                out['package'] = release_package(body)
+                out['package'] = release_package(body) if sys.platform == 'win32' else None
                 if out['package']:
                     out['message'] = (f'可从候选版切换至正式版 {tag}。' if switch_to_stable else f'发现正式版 {tag}。')+'下载后退出并重启，保留当前工作区。'
         else:

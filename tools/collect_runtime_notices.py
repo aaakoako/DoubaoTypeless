@@ -4,12 +4,23 @@ import json
 from pathlib import Path
 import shutil
 import sys
+import re
 
 
 def qt_binary_allowed(destination):
     name = Path(destination).name.lower()
     if name in {'qtvirtualkeyboardplugin.dll', 'qpdf.dll'}:
         return False
+    if 'virtualkeyboard' in name or name in {'libqpdf.so', 'libqpdf.dylib'}:
+        return False
+    allowed = {'core', 'gui', 'widgets', 'network', 'svg', 'opengl', 'dbus', 'xcbqpa',
+               'waylandclient', 'waylandeglclienthw'}
+    match = re.match(r'libqt6(\w+)\.so(?:\.|$)', name)
+    if match:
+        return match[1] in allowed
+    framework = re.search(r'/Qt(\w+)\.framework/', destination.replace('\\', '/'))
+    if framework:
+        return framework[1].lower() in allowed
     if name.startswith('qt6') and name.endswith('.dll'):
         return name in {'qt6core.dll','qt6gui.dll','qt6widgets.dll','qt6network.dll','qt6svg.dll','qt6opengl.dll'}
     return True

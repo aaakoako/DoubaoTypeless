@@ -5,5 +5,9 @@ qrcode==8.2
 PySide6==6.11.2
 comtypes==1.4.17; sys_platform == "win32"
 pywin32==311; sys_platform == "win32"
-pynput==1.8.2; sys_platform == "win32"
+pynput==1.8.2
+python-xlib==0.33; sys_platform == "linux"
+pyobjc-framework-ApplicationServices==12.2.2; sys_platform == "darwin"
+pyobjc-framework-Quartz==12.2.2; sys_platform == "darwin"
+keyring==25.7.0; sys_platform != "win32"
 pyinstaller==6.22.3
