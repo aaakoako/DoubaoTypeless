@@ -132,6 +132,7 @@ class V3App:
             position=stored.get("hud_position"),
             on_position=lambda pos: save_settings(self.data_dir, {"hud_position": pos}),
             on_expand=lambda: self._notify_ui("expand"),
+            on_reference=lambda: self._notify_ui("expand_reference"),
         )
         self._observer = observer_from_env()
         self._last_attempt: Attempt | None = None

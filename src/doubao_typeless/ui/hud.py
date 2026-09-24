@@ -29,6 +29,7 @@ class HudController:
         on_insert: Callable[[], None] | None = None,
         on_expand: Callable[[], None] | None = None,
         on_copy: Callable[[], None] | None = None,
+        on_reference: Callable[[], None] | None = None,
         on_recover: Callable[[], None] | None = None,
         position: list | None = None,
         on_position: Callable | None = None,
@@ -38,6 +39,7 @@ class HudController:
         self._on_insert = on_insert
         self._on_expand = on_expand
         self._on_copy = on_copy
+        self._on_reference = on_reference
         self._on_recover = on_recover
         self._on_position = on_position
         self._on_toggle_note = on_toggle_note
@@ -147,7 +149,7 @@ class HudController:
         self._status.installEventFilter(self._drag_filter)
         self._body = QTextEdit()
         self._body.setReadOnly(True)
-        self._body.setMinimumHeight(40)
+        self._body.setMinimumHeight(88)
         try:
             from PySide6.QtWidgets import QSizePolicy
 
@@ -210,6 +212,7 @@ class HudController:
         for action in (expand, copy, btn, dismiss):
             action.setFocusPolicy(Qt.NoFocus)
         header = QHBoxLayout()
+        self._header = header
         self._activity=ActivityIndicator();header.addWidget(self._activity)
         header.addWidget(self._status, 1)
         self._latest = QPushButton("回到最新 ↓")
@@ -239,7 +242,7 @@ class HudController:
         self._check_button.setMinimumHeight(32)
         self._check_button.setObjectName('DTInputCheck')
         self._check_button.setFocusPolicy(Qt.NoFocus)
-        self._check_button.clicked.connect(lambda: self._on_expand and self._on_expand())
+        self._check_button.clicked.connect(lambda: (self._on_reference or self._on_expand) and (self._on_reference or self._on_expand)())
         self._note_button = QPushButton('附注已开')
         self._note_button.setCheckable(True)
         from doubao_typeless.services.input_check import VOICE_NOTE
@@ -247,15 +250,15 @@ class HudController:
         self._note_button.setFocusPolicy(Qt.NoFocus)
         self._note_button.clicked.connect(lambda: self._on_toggle_note and self._on_toggle_note())
         check_layout.addWidget(self._check_button)
+        from doubao_typeless.ui.reference_chart import ReferenceStrip
+        self._references = ReferenceStrip(check_row)
+        check_layout.addWidget(self._references)
         self._tone_badge = ToneBadge()
         check_layout.addWidget(self._tone_badge)
         check_layout.addWidget(self._note_button)
         self._check_row = check_row
         check_row.hide()
         layout.addWidget(check_row)
-        from doubao_typeless.ui.input_check import ReferencePanel
-        self._references = ReferencePanel(card, compact=True)
-        layout.addWidget(self._references)
         layout.addWidget(bar, 0, Qt.AlignBottom)
         self._bar = bar
         w.hide()
@@ -502,7 +505,7 @@ class HudController:
 
 
     def _max_height(self) -> int:
-        ceiling = 420 if getattr(self, "_references", None) is not None and not self._references.isHidden() else TOKENS["max_h"]
+        ceiling = max(TOKENS["max_h"], self._chrome_height() + 100)
         max_h = ceiling
         try:
             from PySide6.QtGui import QGuiApplication
@@ -528,9 +531,9 @@ class HudController:
         self._check_button.setIcon(icon(judgment_icon(result)))
         self._tone_badge.set_tone(result.get('tone',''))
         self._feedback.set_tone(result.get('tone_kind',''))
-        self._check_button.setText(summary)
+        self._check_button.setText('参考')
         import html
-        self._check_button.setToolTip(html.escape(details).replace('\n', '<br>'))
+        self._check_button.setToolTip(html.escape(summary + ('\n' + details if details else '')).replace('\n', '<br>'))
         self._note_button.setVisible(bool(result.get('note') or result.get('suppressed')))
         self._note_button.setText('附注已关' if result.get('suppressed') else '附注已开')
         self._note_button.setChecked(bool(result.get('note')))
@@ -538,15 +541,15 @@ class HudController:
         self._check_row.setVisible(bool(summary))
         if self._widget.isVisible():
             chrome = self._chrome_height()
-            body_height = max(40, min(self._text_height(self._body.toPlainText()), self._max_height() - chrome))
+            body_height = max(88, min(self._text_height(self._body.toPlainText()), self._max_height() - chrome))
             self._body.setMaximumHeight(body_height)
             self._widget.resize(self._widget.width(), min(self._max_height(), body_height + chrome))
             self._place()
         # Never reopen, steal focus, reset idle or rewrite the body on response.
 
     def _chrome_height(self) -> int:
-        status_h = self._status.sizeHint().height() if getattr(self, "_status", None) else 18
-        available = max(1, self._widget.width() - 34)
+        status_h = self._header.sizeHint().height() if getattr(self, "_header", None) else 28
+        available = max(1, self._widget.width() - 36)
         bar_h = self._bar.layout().heightForWidth(available) if getattr(self, "_bar", None) is not None else 40
         margins = 18
         spacing = 12
@@ -554,12 +557,12 @@ class HudController:
             layout = self._card.layout() if getattr(self, "_card", None) is not None else None
             if layout is not None:
                 box = layout.contentsMargins()
-                margins = box.top() + box.bottom()
+                margins = box.top() + box.bottom() + 2
                 spacing = max(layout.spacing(), 0) * 2
         except Exception:
             pass
         check_h = self._check_row.layout().heightForWidth(available) + 8 if self._check_row is not None and not self._check_row.isHidden() else 0
-        reference_h = self._references.sizeHint().height() + 8 if not self._references.isHidden() else 0
+        reference_h = 0
         return status_h + bar_h + margins + spacing + (68 if self.assets else 0) + check_h + reference_h
 
     def _text_height(self, text: str) -> int:
@@ -743,7 +746,7 @@ class HudController:
         max_h = self._max_height()
         doc_h = self._text_height(body)
         min_h = TOKENS["min_image_h"] if self.image_count else TOKENS["min_text_h"]
-        body_h = max(40, min(doc_h, max_h - chrome))
+        body_h = max(88, min(doc_h, max_h - chrome))
         height = max(min_h, min(max_h, body_h + chrome))
         self._body.setMaximumHeight(body_h)
         self._widget.setFixedWidth(TOKENS["width"])

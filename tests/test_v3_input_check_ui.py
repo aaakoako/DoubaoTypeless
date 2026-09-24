@@ -35,7 +35,7 @@ def test_settings_save_inspection_and_nonblocking_visible_controls(pair,monkeypa
     a.hud.start();a.hud.show_receiving(a.review_text())
     QTest.qWait(1200)
     try:
-        assert '处待留意' in a.hud._check_button.text()
+        assert '处待留意' in a.hud._check_button.toolTip()
         assert a.hud._tone_badge.label.text()=='急切'
         assert not a.hud._check_button.icon().isNull()
         assert a.hud._insert.isEnabled() and not a.hud._note_button.isHidden()

@@ -11,6 +11,7 @@ class ReferenceChart(QWidget):
     def __init__(self, parent=None, *, compact=False):
         super().__init__(parent)
         self.states = {}
+        self.presentation_enabled = True
         self.motion = True
         self.started = 0.
         self.phase = 1.
@@ -33,7 +34,7 @@ class ReferenceChart(QWidget):
     def set_result(self, result):
         rows = {r['id']: r.get('state', 'unknown') for r in result.get('references', [])
                 if r.get('id') in REFERENCE_DIMENSIONS}
-        self.setVisible(result.get('status') == 'ready' and bool(rows))
+        self.setVisible(self.presentation_enabled and result.get('status') == 'ready' and bool(rows))
         if rows == self.states:
             return
         self.states = rows
@@ -106,3 +107,32 @@ class ReferenceChart(QWidget):
         painter.drawText(QRectF(center.x()-30, 47, 60, 16), Qt.AlignCenter, '仅本段')
         small = QFont(font); small.setPixelSize(10); painter.setFont(small)
         painter.drawText(QRectF(center.x()-30, 63, 60, 14), Qt.AlignCenter, '上文未读')
+
+
+class ReferenceStrip(ReferenceChart):
+    """Four quiet markers in the HUD toolbar; full diagram belongs in details."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumHeight(24)
+        self.setFixedSize(88, 24)
+
+    def sizeHint(self):
+        return QSize(88, 24)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        for i, key in enumerate(REFERENCE_DIMENSIONS):
+            state = self.states.get(key, 'unknown')
+            x = 11 + i * 22
+            unknown = state in {'unknown', 'na', 'tentative_na'}
+            color = '#8b94aa' if unknown else '#6156dc'
+            painter.setPen(QPen(QColor(color), 1, Qt.DashLine if unknown or state.startswith('tentative_') else Qt.SolidLine))
+            painter.setBrush(Qt.NoBrush)
+            painter.drawEllipse(QPointF(x, 12), 8, 8)
+            symbol = ('check' if state == 'clear' else 'help' if 'partial' in state else
+                      'link' if 'context' in state else 'inspect' if state == 'tentative_clear' else None)
+            if symbol:
+                painter.setOpacity(.65 + .35 * self.phase)
+                icon(symbol, color).paint(painter, x-6, 6, 12, 12)
+                painter.setOpacity(1.)

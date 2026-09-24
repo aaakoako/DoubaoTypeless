@@ -176,3 +176,40 @@ def test_sync_graph_never_marks_failed_image_as_received(tmp_path):
             assert await page.locator('.asset-progress').count() == 1
             assert await page.locator('#text').input_value() == '文字已同步，图片传输独立判断'
     asyncio.run(run())
+
+
+def test_optional_jev_has_no_space_when_disabled_and_chart_opens_on_request(pair, monkeypatch):
+    from PySide6.QtTest import QTest
+    from tests.test_v3_input_check import OPTIONS
+    a, _, review = pair
+    a.hud.start()
+    try:
+        a.update_pc_text('输入始终是主角')
+        a.hud.show_receiving(a.review_text())
+        a.hud.set_input_check({'status':'disabled'})
+        QTest.qWait(20)
+        assert a.hud._check_row.isHidden() and a.hud._references.isHidden()
+        assert a.hud._insert.isEnabled()
+        a.input_check.configure(OPTIONS)
+        a.input_check.observe(a.input_check_identity(),a.review_text())
+        request, spans = make_request(a.review_text())
+        result = parse_response(response(request),request,spans)
+        a.input_check.result = result
+        a.hud.set_input_check(result)
+        assert a.hud._references.height() == 24
+        events = []
+        monkeypatch.setattr(a, '_notify_ui', lambda event, **payload: events.append(event))
+        a.hud._check_button.click()
+        assert events[-1] == 'expand_reference'
+        a.hud._expand.click()
+        assert events[-1] == 'expand'
+        review.show();QTest.qWait(300)
+        assert review.input_check_details.references.isHidden()
+        review.input_check_details.expand.click();QTest.qWait(300)
+        assert not review.input_check_details.references.isHidden()
+        review.input_check_details.expand.click();QTest.qWait(300)
+        assert review.input_check_details.references.isHidden()
+        a.input_check.configure({**OPTIONS,'jev_enabled':False})
+        QTest.qWait(300)
+        assert review.input_check_details.isHidden()
+    finally:a.hud.dismiss();a.hud._widget.deleteLater()

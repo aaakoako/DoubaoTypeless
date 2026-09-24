@@ -1398,6 +1398,11 @@ class DesktopShell:
                 if self.review.widget.isVisible() and not self.review._editing:
                     self.review.reload()
             QTimer.singleShot(0, self.review.widget, refresh_visible_review)
+        elif event == "expand_reference":
+            def open_reference():
+                self.review.input_check_details.expand.setChecked(True)
+                self.review.show()
+            QTimer.singleShot(0, host, open_reference)
         elif event == "expand":
             QTimer.singleShot(0, host, self.review.show)
         elif event in {"hide_after_insert", "new_draft"}:

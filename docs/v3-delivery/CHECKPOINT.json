@@ -438,6 +438,13 @@
       "validation": "35 related and 64 broader checks passed",
       "evidence": "G:/AgentStorage/Deliveries/typeless-redesign-20260924/graphics/reference-chart.gif",
       "final_validation": "19 checks after hidden-state fix; 17 after provisional-outline and retry-label corrections; build/typecheck passed"
+    },
+    "input_first": {
+      "jev_optional": true,
+      "new_profile_default": "disabled",
+      "hud": "compact markers; full graph only on request",
+      "existing_settings": "preserved",
+      "validation": "49 related checks; 2 final entry/screenshot checks passed"
     }
   }
 }
