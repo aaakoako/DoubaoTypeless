@@ -495,5 +495,14 @@
     "compatibility_identifiers": "existing repository URL, executable filename, update identity and data paths retained",
     "validation": "15 existing update UI/delivery tests passed",
     "published_binary_note": "already published 0.5.5 preview assets are not replaced"
+  },
+  "repository_rename": {
+    "name": "Pocket-Composer",
+    "url": "https://github.com/aaakoako/Pocket-Composer",
+    "previous_url": "https://github.com/aaakoako/DoubaoTypeless",
+    "legacy_updater_support": "not maintained, explicitly accepted by user",
+    "source_update_urls": "updated",
+    "published_binaries": "unchanged; existing clients should use manual download",
+    "validation": "15 update UI/delivery checks passed"
   }
 }

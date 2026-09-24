@@ -1,5 +1,7 @@
 # 安装与使用 DoubaoTypeless 0.5.4
 
+> 仓库现已更名为 [Pocket-Composer](https://github.com/aaakoako/Pocket-Composer)。旧版内置自动更新不再维护；请从新仓库手动下载安装。现有数据目录保持不变。
+
 安装包和便携包包含同一套 Windows 客户端与手机页面。版本标注“发布候选”时，仍需完成真实手机和目标输入框验收；这不代表已经公开发布。
 
 ## 开始使用

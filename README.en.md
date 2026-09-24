@@ -4,7 +4,7 @@
 ### Speak it. Sketch it. Bring it to your computer.
 **A phone-to-Windows text and image companion**
 
-[简体中文](README.md) · [Stable download](https://github.com/aaakoako/DoubaoTypeless/releases/latest) · [Installation](docs/release/INSTALL.en.md) · [Feedback](https://github.com/aaakoako/DoubaoTypeless/issues)
+[简体中文](README.md) · [Stable download](https://github.com/aaakoako/Pocket-Composer/releases/latest) · [Installation](docs/release/INSTALL.en.md) · [Feedback](https://github.com/aaakoako/Pocket-Composer/issues)
 
 ![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-5b5ce2) [![MIT](https://img.shields.io/badge/License-MIT-6254e8)](LICENSE)
 
@@ -12,7 +12,7 @@
 
 Explaining a UI problem, describing a coding task or sketching an idea can be easier on your phone. Pocket Composer combines your phone keyboard, screenshot annotation and a whiteboard, then inserts prepared images and text into a Windows input field.
 
-**Stable: 0.5.4. The visuals below show the 0.5.5 preview.** [Preview notes](docs/release/0.5.5.md) · [Stable release](https://github.com/aaakoako/DoubaoTypeless/releases/tag/v0.5.4)
+**Stable: 0.5.4. The visuals below show the 0.5.5 preview.** [Preview notes](docs/release/0.5.5.md) · [Stable release](https://github.com/aaakoako/Pocket-Composer/releases/tag/v0.5.4)
 
 <table><tr><th>Express on your phone</th><th>Continue on your computer</th></tr><tr><td align="center"><img src="docs/images/product/phone.png" width="270" alt="0.5.5 preview phone composer and sync status" /></td><td align="center"><img src="docs/images/product/hud.png" width="430" alt="0.5.5 preview input-first desktop overlay" /><br/><br/>Read, edit, copy and insert.<br/>Expand assistance only when wanted.</td></tr></table>
 
@@ -51,7 +51,7 @@ Jev supports TypeSafe, OpenRouter, Vercel and compatible custom endpoints. Rewri
 
 ## Downloads, data and compatibility
 
-- [Releases](https://github.com/aaakoako/DoubaoTypeless/releases) include a per-user installer and a complete portable archive. Extract the entire portable folder. Installer filenames and existing data paths retain the legacy DoubaoTypeless identifier for upgrade compatibility.
+- [Releases](https://github.com/aaakoako/Pocket-Composer/releases) include a per-user installer and a complete portable archive. Extract the entire portable folder. The repository is now Pocket-Composer. Older in-app updaters are no longer maintained; download manually from the new repository. Installer filenames and existing data paths retain the legacy DoubaoTypeless identifier to preserve existing drafts.
 - The app UI is currently primarily Simplified Chinese. A browser on your phone and Windows 10/11 on desktop. Compatibility depends on your browser, input method and target application.
 - A user has confirmed sequential image/text insertion in Codex desktop. **Automatic detection is not guaranteed for every composer.** Cursor, multi-monitor setups and physical mobile keyboards need further validation.
 - Drafts, images and settings are stored locally. Offline writing and reconnection reconciliation are supported. Upgrades retain the workspace; uninstalling does not intentionally remove drafts.
@@ -69,6 +69,6 @@ Pocket Composer is independent and does not claim affiliation with Doubao, ByteD
 
 ## Contribute
 
-Include your versions, browser/input method, steps and sanitized screenshots in [issues](https://github.com/aaakoako/DoubaoTypeless/issues). Do not include API keys, pairing credentials or private drafts.
+Include your versions, browser/input method, steps and sanitized screenshots in [issues](https://github.com/aaakoako/Pocket-Composer/issues). Do not include API keys, pairing credentials or private drafts.
 
 [Build and verify](docs/release/v3-build.md) · [Changelog](CHANGELOG.md)

@@ -4,7 +4,7 @@ import pytest
 import httpx
 from doubao_typeless.services.v3_update import release_package, download_upgrade, acknowledge_update_launch
 
-BASE='https://github.com/aaakoako/DoubaoTypeless/releases/download/v0.5.2/'
+BASE='https://github.com/aaakoako/Pocket-Composer/releases/download/v0.5.2/'
 EXE=b'MZ'+b'full native package fixture'*10
 
 def release(digest=True):

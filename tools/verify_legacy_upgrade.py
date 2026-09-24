@@ -44,7 +44,7 @@ class ReleaseProxy:
         context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);context.load_cert_chain(self.cert,private)
         payload=package.read_bytes();calls=[]
         release={'tag_name':'v'+version,'assets':[{'name':'DoubaoTypeless.exe',
-            'browser_download_url':f'https://github.com/aaakoako/DoubaoTypeless/releases/download/v{version}/DoubaoTypeless.exe',
+            'browser_download_url':f'https://github.com/aaakoako/Pocket-Composer/releases/download/v{version}/DoubaoTypeless.exe',
             'size':len(payload),'digest':'sha256:'+hashlib.sha256(payload).hexdigest()}]}
         class Handler(http.server.BaseHTTPRequestHandler):
             def log_message(self,*args):pass
@@ -86,7 +86,7 @@ def verify(payload, compiler, report):
     with tempfile.TemporaryDirectory(prefix='legacy-upgrade-',dir=report.parent.resolve()) as temp:
         root=Path(temp);old=root/'old app';old.mkdir();install=root/'installed';data=root/'new-data';data.mkdir()
         original=old/'DoubaoTypeless.exe'
-        with urlopen('https://github.com/aaakoako/DoubaoTypeless/releases/download/v0.4.2/DoubaoTypeless.exe',timeout=60) as response:
+        with urlopen('https://github.com/aaakoako/Pocket-Composer/releases/download/v0.4.2/DoubaoTypeless.exe',timeout=60) as response:
             original.write_bytes(response.read())
         result['published_exe_sha256']=hashlib.sha256(original.read_bytes()).hexdigest()
         config={'llm_enabled':False,'learn_enabled':False,'start_with_windows':False,'bridge_port':0,

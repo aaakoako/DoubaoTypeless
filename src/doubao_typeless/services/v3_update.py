@@ -16,7 +16,7 @@ try:
 except ImportError:
     APP_VERSION = "0.4.2"
     GITHUB_REPO_OWNER = "aaakoako"
-    GITHUB_REPO_NAME = "DoubaoTypeless"
+    GITHUB_REPO_NAME = "Pocket-Composer"
 
 CHANNEL = "v3-preview"
 DOWNLOAD_PAGE = f"https://github.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/releases"

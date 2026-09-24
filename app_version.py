@@ -3,4 +3,4 @@
 APP_VERSION = "0.4.2"
 
 GITHUB_REPO_OWNER = "aaakoako"
-GITHUB_REPO_NAME = "DoubaoTypeless"
+GITHUB_REPO_NAME = "Pocket-Composer"

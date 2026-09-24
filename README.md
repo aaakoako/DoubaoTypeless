@@ -4,7 +4,7 @@
 ### 手机说清楚，圈出来，画明白。电脑接着做。
 **手机到 Windows 的图文输入工具**
 
-[English](README.en.md) · [下载稳定版](https://github.com/aaakoako/DoubaoTypeless/releases/latest) · [安装指南](docs/release/v3-installation.md) · [反馈](https://github.com/aaakoako/DoubaoTypeless/issues)
+[English](README.en.md) · [下载稳定版](https://github.com/aaakoako/Pocket-Composer/releases/latest) · [安装指南](docs/release/v3-installation.md) · [反馈](https://github.com/aaakoako/Pocket-Composer/issues)
 
 ![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-5b5ce2) [![MIT](https://img.shields.io/badge/License-MIT-6254e8)](LICENSE)
 
@@ -12,7 +12,7 @@
 
 向 Agent 描述界面问题、解释代码需求或画一个布局时，手机往往比键盘更顺手。Pocket Composer 把手机输入法、截图标注和白板放在一起，将整理好的图片与文字插入 Windows 上的目标输入框。
 
-**稳定版：0.5.4。下图展示 0.5.5 体验候选。** [候选说明](docs/release/0.5.5.md) · [稳定版说明](https://github.com/aaakoako/DoubaoTypeless/releases/tag/v0.5.4)
+**稳定版：0.5.4。下图展示 0.5.5 体验候选。** [候选说明](docs/release/0.5.5.md) · [稳定版说明](https://github.com/aaakoako/Pocket-Composer/releases/tag/v0.5.4)
 
 <table><tr><th>手机负责表达</th><th>电脑接着做</th></tr><tr><td align="center"><img src="docs/images/product/phone.png" width="270" alt="0.5.5候选手机图文输入与同步" /></td><td align="center"><img src="docs/images/product/hud.png" width="430" alt="0.5.5候选正文优先的电脑浮窗" /><br/><br/>查看、修改、复制、插入。<br/>辅助参考按需展开。</td></tr></table>
 
@@ -51,7 +51,7 @@ Jev 支持 TypeSafe、OpenRouter、Vercel 和兼容自定义接口；纠错/改�
 
 ## 下载、数据与兼容性
 
-- [Releases](https://github.com/aaakoako/DoubaoTypeless/releases)提供当前用户安装包和完整便携包；便携包须整体解压。安装文件与既有数据目录沿用 DoubaoTypeless 标识，以兼容已有更新。
+- [Releases](https://github.com/aaakoako/Pocket-Composer/releases)提供当前用户安装包和完整便携包；便携包须整体解压。仓库已更名为 Pocket-Composer，旧版内置自动更新不再维护，请从新仓库手动下载。安装文件和已有数据目录暂沿用 DoubaoTypeless 标识，保留现有草稿。
 - 手机使用浏览器，电脑面向 Windows 10/11。浏览器、输入法和目标应用的兼容性以实际体验为准。
 - 已收到 Codex 桌面连续图文插入的用户反馈；**不保证所有输入框都可自动识别**。Cursor、多屏和实体手机输入法仍需进一步验证。
 - 草稿、图片和设置本地保存。支持断线续写和重连核对，升级保留工作区，卸载不主动删除草稿。
@@ -69,6 +69,6 @@ Pocket Composer 是独立项目，不声称与豆包、字节跳动、OpenAI、C
 
 ## 参与项目
 
-[反馈问题](https://github.com/aaakoako/DoubaoTypeless/issues)时，请附版本、浏览器/输入法、复现步骤与脱敏截图；不要上传 Key、配对凭据或私人正文。
+[反馈问题](https://github.com/aaakoako/Pocket-Composer/issues)时，请附版本、浏览器/输入法、复现步骤与脱敏截图；不要上传 Key、配对凭据或私人正文。
 
 [构建与验证](docs/release/v3-build.md) · [更新记录](CHANGELOG.md) · [旧版指南](docs/legacy-v0.4.md)

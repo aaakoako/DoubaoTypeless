@@ -1,6 +1,8 @@
 # Install and use Pocket Composer
 
-1. Download from [GitHub Releases](https://github.com/aaakoako/DoubaoTypeless/releases). Use the stable release for normal use; preview releases are labeled separately.
+> The repository is now [Pocket-Composer](https://github.com/aaakoako/Pocket-Composer). Older in-app updaters are no longer maintained; download and install manually from the new repository. Existing data directories are unchanged.
+
+1. Download from [GitHub Releases](https://github.com/aaakoako/Pocket-Composer/releases). Use the stable release for normal use; preview releases are labeled separately.
 2. Run the Windows per-user **Setup.exe**, or extract the **entire portable ZIP** before opening DoubaoTypeless.exe. Do not copy just the executable out of its folder.
 3. Open the desktop client, put the phone on a trusted network reachable from the computer, and scan its QR code. Follow the desktop insertion permission controls.
 4. Select a target input field on the computer, compose on the phone, and tap **Insert & copy**. Check the result before sending. Jev is optional and off by default.

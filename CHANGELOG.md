@@ -10,7 +10,7 @@ Input-first layouts, optional compact Jev references, visual sync/upload feedbac
 
 ## 0.5.4 Stable
 
-[Published release](https://github.com/aaakoako/DoubaoTypeless/releases/tag/v0.5.4)
+[Published release](https://github.com/aaakoako/Pocket-Composer/releases/tag/v0.5.4)
 
 图文连续插入、手机草稿恢复、完整安装升级、可选输入检查及依赖更新。
 
@@ -18,6 +18,6 @@ Sequential image/text insertion, phone draft recovery, complete installer/upgrad
 
 ## Earlier versions
 
-[Release archive](https://github.com/aaakoako/DoubaoTypeless/releases) · [0.4 guide](docs/legacy-v0.4.md)
+[Release archive](https://github.com/aaakoako/Pocket-Composer/releases) · [0.4 guide](docs/legacy-v0.4.md)
 
 旧版与早期设计不是当前界面说明。 / Historical versions and early mockups do not describe the current UI.
