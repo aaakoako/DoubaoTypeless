@@ -584,6 +584,7 @@ export function boot(root: HTMLElement): void {
     },
   });
   function renderSyncState() {
+    $("transferStatus").dataset.transport = syncState;
     let status = syncState;
     if (status === 'synced') {
       if (state.assets.some(a => a.status === 'failed')) status = 'asset_failed';

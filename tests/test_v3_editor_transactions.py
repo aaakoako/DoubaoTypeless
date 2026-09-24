@@ -38,7 +38,7 @@ async def product(tmp_path, *, touch=False):
 
 
 async def synced(page):
-    await page.wait_for_function("document.querySelector('#transferStatus').textContent.includes('电脑已收到当前版本')")
+    await page.wait_for_function("document.querySelector('#transferStatus').dataset.transport === 'synced'")
 
 
 async def images_received(page,app):
