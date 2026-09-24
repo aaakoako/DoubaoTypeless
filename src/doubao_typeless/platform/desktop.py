@@ -36,7 +36,8 @@ def locate_current(saved=None):
         return impl(saved)
     current = read_target()
     if current.kind not in {'composer', 'edit'}:
-        if saved and restore_target(saved):
+        from doubao_typeless.core.policy import is_own_window
+        if saved and is_own_window(*current[:2]) and restore_target(saved):
             current = read_target()
         else:
             return {'status': 'not_found'}

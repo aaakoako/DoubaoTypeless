@@ -108,3 +108,13 @@ def test_timed_out_gui_request_cannot_later_change_clipboard():
     called = []
     Dispatcher.execute(None, future, lambda: called.append('write'))
     assert called == []
+
+
+def test_locate_never_switches_away_from_another_application(monkeypatch):
+    from doubao_typeless.platform.windows.focus import FocusSnapshot
+    monkeypatch.setattr(desktop, 'sys', SimpleNamespace(platform='linux'))
+    current = FocusSnapshot('button', '', 10, 20, 30, (20, 30), 'readonly')
+    saved = FocusSnapshot('text', '', 11, 21, 31, (21, 31), 'composer')
+    monkeypatch.setattr(desktop, 'read_target', lambda: current)
+    monkeypatch.setattr(desktop, 'restore_target', lambda _: pytest.fail('must not steal focus'))
+    assert desktop.locate_current(saved)['status'] == 'not_found'
