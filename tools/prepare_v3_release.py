@@ -18,6 +18,9 @@ def prepare(channel, tag=None):
     sha=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     info={'source_sha':sha,'version':VERSION,'channel':channel,'release_ready':False}
     (ROOT/'build-info.json').write_text(json.dumps(info),encoding='utf-8')
+    if sys.platform != "win32":
+        print(json.dumps(info))
+        return info
     from comtypes.client import GetModule
     GetModule('UIAutomationCore.dll')
     from PyInstaller.utils.win32.versioninfo import VSVersionInfo, FixedFileInfo, StringFileInfo, StringTable, StringStruct, VarFileInfo, VarStruct

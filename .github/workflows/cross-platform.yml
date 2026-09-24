@@ -1,0 +1,68 @@
+name: Cross-platform preview
+on:
+  push:
+    branches: ['platform/macos-linux']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            label: linux-x64
+          - os: macos-15-intel
+            label: macos-x64
+          - os: macos-15
+            label: macos-arm64
+    runs-on: ${{ matrix.os }}
+    env:
+      PYTHONPATH: .:src
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libatspi2.0-0 at-spi2-core libxcb-cursor0 libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-randr0 libxcb-shape0 libxcb-xfixes0 libxcb-sync1 xvfb openbox dbus-x11
+      - run: python -m pip install -r requirements-v3-release.txt pytest
+      - working-directory: web
+        run: npm ci && npm run typecheck && npm run build
+      - name: Platform safety tests
+        run: python -m pytest -q tests/test_posix_platform.py
+      - name: Native X11 image then text receiver
+        if: runner.os == 'Linux'
+        env:
+          QT_QPA_PLATFORM: xcb
+          QT_LINUX_ACCESSIBILITY_ALWAYS_ON: '1'
+          XDG_SESSION_TYPE: x11
+        run: xvfb-run -a dbus-run-session python tools/verify_posix_paste.py
+      - run: python tools/prepare_v3_release.py --channel release-candidate
+      - if: runner.os == 'macOS'
+        run: python -c "from PIL import Image; from pathlib import Path; Path('build').mkdir(exist_ok=True); Image.open('assets/icon.ico').convert('RGBA').resize((1024,1024)).save('build/icon.icns')"
+      - if: runner.os == 'Linux'
+        run: xvfb-run -a python -m PyInstaller --noconfirm packaging/posix.spec
+      - if: runner.os == 'macOS'
+        run: python -m PyInstaller --noconfirm packaging/posix.spec
+      - name: Frozen Linux startup
+        if: runner.os == 'Linux'
+        env:
+          DT_SMOKE_QPA: xcb
+        run: xvfb-run -a python tools/smoke_posix.py dist/PocketComposer/PocketComposer
+      - name: Frozen macOS startup
+        if: runner.os == 'macOS'
+        env:
+          DT_SMOKE_QPA: cocoa
+        run: python tools/smoke_posix.py 'dist/Pocket Composer.app/Contents/MacOS/PocketComposer'
+      - run: python tools/package_posix.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PocketComposer-${{ matrix.label }}-${{ github.sha }}
+          path: release-posix/
+          if-no-files-found: error

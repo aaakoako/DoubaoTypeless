@@ -14,7 +14,7 @@ from doubao_typeless.core.attempt import Attempt
 from doubao_typeless.core.bundle import Draft, archive_if_match, freeze_bundle, source_snapshot
 from doubao_typeless.core.intent import IntentLedger
 from doubao_typeless.core.policy import classify_focus, is_own_window
-from doubao_typeless.platform.windows.focus import same_target
+from doubao_typeless.platform.desktop import same_target
 from doubao_typeless.runtime import lan_ip, pick_port, v3_data_dir
 from doubao_typeless.services.bridge_v3 import V3Bridge
 from doubao_typeless.services.byok import ByokService
@@ -116,7 +116,7 @@ class V3App:
             "revision": self.draft.revision,
         }
         from doubao_typeless.services.phone_send import PhoneSendService
-        from doubao_typeless.platform.windows.native_input import send_submit
+        from doubao_typeless.platform.desktop import send_submit
         self.phone_send = PhoneSendService(data_dir=self.data_dir,
             options=lambda: load_settings(self.data_dir), read_focus=lambda: self._read_focus(),
             wait_modifiers=lambda: self._wait_modifiers(), emit=send_submit,
@@ -246,8 +246,8 @@ class V3App:
         return self._local_command(self._locate_composer, True)
 
     def _locate_composer(self, show_choices: bool = False) -> dict:
-        from doubao_typeless.platform.windows.composer_locator import locate_current
-        from doubao_typeless.platform.windows.focus import FocusSnapshot, restore_target
+        from doubao_typeless.platform.desktop import locate_current
+        from doubao_typeless.platform.desktop import FocusSnapshot, restore_target
         self._notify_ui("composer_locating")
         _log('[v3.locator] stage=start')
         try:
@@ -293,7 +293,7 @@ class V3App:
         # 候选只来自上次受限扫描；选择不触发插入、不清当前稿。
         if candidate not in getattr(self, "_composer_candidates", []):
             return {"status":"stale"}
-        from doubao_typeless.platform.windows.focus import FocusSnapshot,restore_target
+        from doubao_typeless.platform.desktop import FocusSnapshot,restore_target
         target=FocusSnapshot(candidate["class_name"],candidate["title"],candidate["hwnd"],candidate["pid"],
                              candidate["control_hwnd"],tuple(candidate["runtime_id"]),candidate["kind"])
         before=self._read_focus()
@@ -489,7 +489,7 @@ class V3App:
         if is_own_window(*current[:2]):
             if not self._saved_target:
                 return ("DT-V3-HUD", "无法确认原输入框")
-            from doubao_typeless.platform.windows.focus import restore_target
+            from doubao_typeless.platform.desktop import restore_target
             if not restore_target(self._saved_target):
                 return ("DT-V3-HUD", "无法恢复原输入框")
             current = self._read_focus()
@@ -646,7 +646,7 @@ class V3App:
         ]
 
     def _grab(self, scope: str) -> bytes:
-        from doubao_typeless.platform.windows.capture import grab_primary
+        from doubao_typeless.platform.desktop import grab_primary
 
         return grab_primary(scope, hide=self.hud.hide)
 
@@ -675,34 +675,34 @@ class V3App:
         return meta
 
     def _wait_modifiers(self) -> bool:
-        from doubao_typeless.platform.windows.guards import wait_modifiers_up
+        from doubao_typeless.platform.desktop import wait_modifiers_up
 
         return wait_modifiers_up()
 
     def _session_locked(self) -> bool:
-        from doubao_typeless.platform.windows.guards import session_locked
+        from doubao_typeless.platform.desktop import session_locked
 
         return session_locked()
 
     def _target_elevated(self) -> bool:
-        from doubao_typeless.platform.windows.integrity import target_above_ours
+        from doubao_typeless.platform.desktop import target_above_ours
         return target_above_ours()
 
     def _read_clipboard_text(self) -> str | None:
         try:
-            from doubao_typeless.platform.windows.clipboard import read_clipboard_text
+            from doubao_typeless.platform.desktop import read_clipboard_text
 
             return read_clipboard_text()
         except Exception:
             return None
 
     def _read_focus(self):
-        from doubao_typeless.platform.windows.focus import read_target
+        from doubao_typeless.platform.desktop import read_target
 
         return read_target()
 
     def _paste(self) -> None:
-        from doubao_typeless.platform.windows.clipboard import send_paste
+        from doubao_typeless.platform.desktop import send_paste
 
         send_paste()
         # Diagnostic only: LastInputInfo also changes for our own injected keys.
@@ -721,7 +721,7 @@ class V3App:
 
     def _resume_after_image(self, expected):
         from doubao_typeless.platform.windows.automation_host import host
-        from doubao_typeless.platform.windows.focus import FocusSnapshot
+        from doubao_typeless.platform.desktop import FocusSnapshot
         # Only refocus, never replay a paste. Attachment callbacks can move focus
         # again while UIA is returning, so recheck the same scope at most 3 times.
         for retry in range(3):
@@ -753,18 +753,21 @@ class V3App:
         return None
 
     def _set_image(self, data: bytes) -> None:
-        from doubao_typeless.platform.windows.clipboard import set_clipboard_png
+        from doubao_typeless.platform.desktop import set_clipboard_png
 
         if not data:
             return
         set_clipboard_png(data)
 
     def _set_text(self, text: str) -> None:
-        from doubao_typeless.platform.windows.clipboard import set_clipboard_text
+        from doubao_typeless.platform.desktop import set_clipboard_text
 
         set_clipboard_text(text)
 
     def _prepare_image_observation(self) -> None:
+        if sys.platform != "win32":
+            self._image_baseline = None
+            return
         if self._observer is not None:
             return
         from doubao_typeless.adapters.cursor_windows import capture_image_baseline
@@ -778,6 +781,8 @@ class V3App:
     def _observe_image(self) -> str:
         if self._observer is not None:
             return self._observer.observe_image()
+        if sys.platform != "win32":
+            return "unknown"
         from doubao_typeless.adapters.cursor_windows import observe_image
 
         try:
@@ -1028,8 +1033,8 @@ class V3App:
                         attempt.steps.append(Step(len(attempt.steps), "image", old["asset_id"], "observed", old["evidence"]))
                 activity = None
                 if hydrated.get('assets'):
-                    from doubao_typeless.platform.windows.input_activity import InputActivityMonitor
-                    activity = InputActivityMonitor().start()
+                    from doubao_typeless.platform.desktop import start_input_activity
+                    activity = start_input_activity()
                 self._delivery_input_activity = activity
                 self._delivery_input_baseline = None
                 try:
@@ -1440,7 +1445,7 @@ class V3App:
         capture: str = "<alt>+<shift>+s",
     ) -> list[str]:
         self._stop_hotkeys()
-        from doubao_typeless.platform.windows.hotkeys import start_hotkeys
+        from doubao_typeless.platform.desktop import start_hotkeys
 
         start = start_hotkeys(
             on_insert=self.request_insert,

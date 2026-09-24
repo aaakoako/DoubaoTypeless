@@ -634,6 +634,10 @@ class ClientWindow:
         sl.addRow("截图给手机", self.hotkey_capture)
         self.autostart = QCheckBox("登录 Windows 时启动（到托盘）")
         self.autostart.setChecked(bool(stored.get("autostart")))
+        if sys.platform != 'win32':
+            self.autostart.setText('登录启动（此平台暂未提供）')
+            self.autostart.setChecked(False)
+            self.autostart.setEnabled(False)
         self.start_min = QCheckBox("启动后先到托盘")
         self.start_min.setChecked(bool(stored.get("start_minimized")))
         sl.addRow(self.autostart)
@@ -737,6 +741,12 @@ class ClientWindow:
             from PySide6.QtGui import QDesktopServices
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.app.data_dir.resolve())))
         data_folder.clicked.connect(open_data_folder)
+        from doubao_typeless.platform.desktop import platform_hint
+        hint = platform_hint()
+        if hint:
+            platform_note = QLabel(hint)
+            platform_note.setWordWrap(True)
+            sl.addRow(platform_note)
         self.update_status = QLabel("")
         self.update_status.setWordWrap(True)
         self.update_status.hide()
@@ -1194,7 +1204,7 @@ class ClientWindow:
             self.byok_status.setText(f"设置已保存。开机自启未写入：{err}")
             self.byok_status.setObjectName("error")
         elif failures:
-            self.byok_status.setText("已保存 · 热键冲突，请改键")
+            self.byok_status.setText("已保存 · " + str(failures[0]))
             self.byok_status.setObjectName("error")
         else:
             self.byok_status.setText("设置已保存")
@@ -1501,6 +1511,8 @@ def run_desktop(argv: list[str] | None = None) -> int:
         raise SystemExit(1) from exc
 
     qt = QApplication.instance() or QApplication(argv)
+    from doubao_typeless.platform.qt_bridge import initialize
+    initialize()
     qt.setQuitOnLastWindowClosed(False)
     qt.setStyleSheet(STYLESHEET)
     apply_ui_font(qt)
@@ -1552,7 +1564,7 @@ def run_desktop(argv: list[str] | None = None) -> int:
         loop = app.start_background(start_hud=False)
         app._loop = loop
         try:
-            from doubao_typeless.platform.windows.hotkeys import start_hotkeys
+            from doubao_typeless.platform.desktop import start_hotkeys
 
             stored = load_settings(app.data_dir)
             start = start_hotkeys(

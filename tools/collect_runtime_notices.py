@@ -4,18 +4,72 @@ import json
 from pathlib import Path
 import shutil
 import sys
+import re
+import subprocess
 
 
 def qt_binary_allowed(destination):
     name = Path(destination).name.lower()
     if name in {'qtvirtualkeyboardplugin.dll', 'qpdf.dll'}:
         return False
+    if 'virtualkeyboard' in name or name in {'libqpdf.so', 'libqpdf.dylib'}:
+        return False
+    allowed = {'core', 'gui', 'widgets', 'network', 'svg', 'opengl', 'dbus', 'xcbqpa',
+               'waylandclient', 'waylandeglclienthw'}
+    match = re.match(r'libqt6(\w+)\.so(?:\.|$)', name)
+    if match:
+        return match[1] in allowed
+    framework = re.search(r'/Qt(\w+)\.framework(?:/|$)', '/' + destination.replace('\\', '/'))
+    if framework:
+        return framework[1].lower() in allowed
+    alias = re.fullmatch(r'Qt([A-Z]\w+)', Path(destination).name)
+    if alias:
+        return alias[1].lower() in allowed
     if name.startswith('qt6') and name.endswith('.dll'):
         return name in {'qt6core.dll','qt6gui.dll','qt6widgets.dll','qt6network.dll','qt6svg.dll','qt6opengl.dll'}
     return True
 
 
-def collect(module_names, binary_destinations, root, output):
+def collect_linux_notices(binaries, output):
+    """Include distribution copyright/source records for copied system libraries."""
+    packages = {}
+    for destination, source, *_ in binaries:
+        path = Path(source)
+        if not str(path).startswith(('/lib/', '/usr/lib/')):
+            continue
+        owners = None
+        candidates = {str(path), str(path.resolve())}
+        candidates.update(p[4:] for p in list(candidates) if p.startswith('/usr/lib/'))
+        for candidate in sorted(candidates):
+            result = subprocess.run(['dpkg-query', '-S', candidate], capture_output=True, text=True)
+            if result.returncode == 0:
+                owners = result.stdout.splitlines()[0].rsplit(': ', 1)[0]
+                break
+        if not owners:
+            raise RuntimeError('Cannot identify bundled system library: ' + destination)
+        package = owners.split(', ')[0]
+        if package in packages:
+            continue
+        fields = subprocess.check_output(['dpkg-query', '-W', '-f',
+            '${binary:Package}\t${Version}\t${source:Package}\t${source:Version}', package], text=True).split('\t')
+        name = package.split(':')[0]
+        copyright_file = Path('/usr/share/doc') / name / 'copyright'
+        if not copyright_file.is_file():
+            raise RuntimeError('Missing upstream copyright for ' + package)
+        target = output / 'linux-system' / name
+        target.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(copyright_file, target / 'copyright')
+        from urllib.parse import quote
+        packages[package] = {'name': fields[0], 'version': fields[1],
+            'source_package': fields[2], 'source_version': fields[3],
+            'source_index': 'https://launchpad.net/ubuntu/+source/' + quote(fields[2]) + '/' + quote(fields[3]),
+            'copyright': f'linux-system/{name}/copyright'}
+    if packages:
+        shutil.copytree('/usr/share/common-licenses', output / 'linux-system/common-licenses', dirs_exist_ok=True)
+    (output / 'linux-system-components.json').write_text(json.dumps(list(packages.values()), indent=2), encoding='utf-8')
+
+
+def collect(module_names, binary_destinations, root, output, native_binaries=None):
     output.mkdir(parents=True, exist_ok=True)
     mapping = metadata.packages_distributions()
     packages = {'PySide6','PySide6_Essentials','PySide6_Addons','shiboken6','pyinstaller'}
@@ -52,8 +106,13 @@ def collect(module_names, binary_destinations, root, output):
         shutil.copy2(konva/'LICENSE',output/'konva/LICENSE')
         rows.append({'name':'konva','version':info['version'],'license':info['license'],
                      'source_index':'https://github.com/konvajs/konva','notices':['konva/LICENSE']})
-    python_license = Path(sys.base_prefix)/'LICENSE.txt'
-    if python_license.exists(): shutil.copy2(python_license,output/'PYTHON-LICENSE.txt')
+    import sysconfig
+    for python_license in (Path(sys.base_prefix)/'LICENSE.txt', Path(sysconfig.get_path('stdlib'))/'LICENSE.txt'):
+        if python_license.exists():
+            shutil.copy2(python_license,output/'PYTHON-LICENSE.txt')
+            break
+    if sys.platform == 'linux' and native_binaries is not None:
+        collect_linux_notices(native_binaries, output)
     shutil.copytree(root/'docs/legal/licenses',output/'Qt-open-source',dirs_exist_ok=True)
     shutil.copy2(root/'THIRD_PARTY_NOTICES.md',output/'THIRD_PARTY_NOTICES.md')
     (output/'components.json').write_text(json.dumps(rows,ensure_ascii=False,indent=2),encoding='utf-8')

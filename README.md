@@ -2,7 +2,7 @@
 
 # Pocket Composer
 ### 手机说清楚，圈出来，画明白。电脑接着做。
-**手机到 Windows 的图文输入工具**
+**手机到电脑的图文输入工具 · Windows 正式版 / macOS、Linux 体验版**
 
 [English](README.en.md) · [下载稳定版](https://github.com/aaakoako/Pocket-Composer/releases/latest) · [安装指南](docs/release/v3-installation.md) · [反馈](https://github.com/aaakoako/Pocket-Composer/issues)
 
@@ -50,6 +50,14 @@
 Jev 支持 TypeSafe、OpenRouter、Vercel 和兼容自定义接口；纠错/改写模型单独配置。自备 Key 和额度，费用由服务商收取。仅参考当前文字，**不读取目标 Agent 历史或执行结果**。应用动效可单独关闭。
 
 ## 下载、数据与兼容性
+
+| 电脑系统 | 下载与状态 |
+|---|---|
+| Windows 10 / 11 | [稳定版](https://github.com/aaakoako/Pocket-Composer/releases/latest) / [0.5.5 体验版](https://github.com/aaakoako/Pocket-Composer/releases/tag/preview-0.5.5) |
+| macOS · Apple Silicon / Intel | [DMG 体验包](https://github.com/aaakoako/Pocket-Composer/releases/tag/preview-0.5.5-posix)，需辅助功能权限；尚未 Apple 公证 |
+| Linux x64 · X11 | [DEB / tar.gz 体验包](https://github.com/aaakoako/Pocket-Composer/releases/tag/preview-0.5.5-posix)，Ubuntu 22.04+；Wayland 自动插入暂不支持 |
+
+[macOS / Linux 安装、权限与限制](docs/release/CROSS_PLATFORM.md)。跨平台体验包不代表已完成真实 Codex/Cursor 与实体手机验收。
 
 - [Releases](https://github.com/aaakoako/Pocket-Composer/releases)提供当前用户安装包和完整便携包；便携包须整体解压。仓库已更名为 Pocket-Composer，旧版内置自动更新不再维护，请从新仓库手动下载。安装文件和已有数据目录暂沿用 DoubaoTypeless 标识，保留现有草稿。
 - 手机使用浏览器，电脑面向 Windows 10/11。浏览器、输入法和目标应用的兼容性以实际体验为准。
