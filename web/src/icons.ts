@@ -1,4 +1,9 @@
 const paths: Record<string,string> = {
+ settingsBtn:'<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/>',
+ historyBtn:'<path d="M3 11a9 9 0 1 1 2 7M3 4v7h7M12 7v5l3 2"/>',
+ connectBtn:'<rect x="3" y="4" width="7" height="16" rx="2"/><path d="M14 7h7v10h-7M15 11h4M15 14h4"/>',
+ clearDraft:'<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/>',
+
  pen:'<path d="m4 17 1 3 3-1L20 7l-3-3L4 17Z M14 7l3 3"/>',
  marker:'<path d="m5 15 8-11 6 4-8 11-6-4Z M5 15l-2 5 6-1"/>',
  highlight:'<path d="m7 14 6-10 6 4-6 10-6-4Z M7 14l-3 5 6 1 3-2 M3 22h17"/>',
@@ -18,9 +23,9 @@ const paths: Record<string,string> = {
  boardBtn:'<path d="M14 3H5v18h14V8l-5-5Z M14 3v5h5 M8 16l2-4 3 4 3-4"/>',
 };
 export function decorateTools(root:HTMLElement) {
- for (const button of Array.from(root.querySelectorAll<HTMLButtonElement>('[data-tool],#captureBtn,#photoBtn,#boardBtn'))) {
+ for (const button of Array.from(root.querySelectorAll<HTMLButtonElement>('[data-tool],#captureBtn,#photoBtn,#boardBtn,#settingsBtn,#historyBtn,#connectBtn,#clearDraft'))) {
   const key=button.dataset.tool || button.id, label=button.textContent || '';
-  button.setAttribute('aria-label',label);button.title=label;
+  if(!button.hasAttribute('aria-label')) button.setAttribute('aria-label',label);button.title=label;
   button.classList.add('icon-tool');
   button.innerHTML=`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[key] || ''}</svg><span>${label}</span>`;
  }

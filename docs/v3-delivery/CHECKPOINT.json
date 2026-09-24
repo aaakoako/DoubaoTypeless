@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "product_goal": "0.5.4正式发行已交付，后续收集真实环境反馈。",
+  "product_goal": "0.5.4后的整体界面与交互重设计；保留情绪特色，增加非说教的独立输入参考。",
   "current_head": "USE_GIT_HEAD_FOR_METADATA_AND_BUILD_INFO_FOR_PRODUCT",
-  "working_tree": "0.5.4已合入master并公开；0.5.0保持撤回，0.5.1/0.5.2/0.5.3未发行，历史标签未重写。",
+  "working_tree": "design/reference-dimensions，基于82a8443的独立源码候选；正式0.5.4未变。",
   "source_base": "5198c5c888af9541e118d82dc1026655abb9dceb",
-  "last_completed_slice": "STABLE_0_5_4_PUBLISHED",
-  "active_slice": null,
-  "next_action": "从正式0.5.4收集实际设备反馈；Cursor、实体手机输入法、多屏仍未验收。",
+  "last_completed_slice": "REDESIGN_REFERENCE_CANDIDATE_IMPLEMENTED",
+  "active_slice": "REDESIGN_REFERENCE_CANDIDATE",
+  "next_action": "完成本候选回归与体验检查；实体手机软键盘、系统DPI和真实Composer尚待验收。",
   "accepted_requirements": [
     "MASTER_PLAN唯一入口；手机主稿、弱网本地保存与后台图片续传继续有效",
     "保留电脑改字、插入并复制、独立复制、图文恢复、手机下一段、截图/相册/白板/BYOK",
@@ -56,7 +56,7 @@
     "real_devices_reviewed": false
   },
   "published": true,
-  "task_complete": true,
+  "task_complete": false,
   "integration_20260922": {
     "branch": "v3/integrated-preview-20260922",
     "base": "b32d2d536937d0fcad2c0e2ea76742d60fa47c42",
@@ -415,5 +415,22 @@
       "physical_mobile_ime": "not verified"
     },
     "manual_release_decision": "User authorized stable publication; all required exact-source checks, native reports and downloaded artifact checks passed."
+  },
+  "redesign_reference": {
+    "status": "candidate_automated_checks_passed",
+    "scope": "current_text_only",
+    "history_results_connected": false,
+    "emotion_and_flame_preserved": true,
+    "release_ready": false,
+    "entry": "G:/AgentStorage/Deliveries/typeless-redesign-20260924/体验新版界面.lnk",
+    "details": "docs/v3-delivery/REDESIGN_REFERENCE_CANDIDATE.md",
+    "validation": {
+      "full_suite": "687 passed, 1 skipped; before final compact-height adjustment",
+      "final_hud_related_regression": "41 passed",
+      "web": "build and typecheck passed",
+      "live_model": "4 synthetic Chinese samples via OpenRouter",
+      "independent_review": "two layout findings fixed and rechecked"
+    },
+    "visual_evidence": "G:/AgentStorage/Deliveries/typeless-redesign-20260924"
   }
 }

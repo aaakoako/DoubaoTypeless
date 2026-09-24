@@ -57,3 +57,34 @@ button:active:not(:disabled)::after{content:"";position:absolute;inset:0;border-
 @keyframes asset-in{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
 @keyframes sync-sheen{to{background-position:-220% 0}}
 html.motion-off *,html.motion-off *::before,html.motion-off *::after{animation:none!important;transition:none!important}
+
+/* Composer surfaces: content remains in flow, including at text zoom. */
+.page{max-width:520px;background:var(--bg)}
+.head{gap:8px;flex-wrap:wrap;background:var(--surface);padding:16px;border-bottom:1px solid var(--line)}
+.head .pc-name{min-width:120px;overflow-wrap:anywhere;line-height:1.4}
+.head button{flex:none}
+.composer{padding:20px 16px;gap:12px}
+.composer-heading{font-weight:600;color:var(--ink)}
+#text{border-radius:16px;min-height:220px;line-height:1.65;padding:16px}
+.tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.tools button{height:auto;min-height:64px;background:var(--surface);border-color:var(--line);border-radius:14px}
+.tools .icon-tool{flex-direction:column;gap:6px;font-size:12px}
+#sendBtn{min-height:50px;border-radius:14px}
+.writehint{flex-wrap:wrap}.writehint>*{min-width:0;overflow-wrap:anywhere}
+#charCount{margin-left:auto;white-space:nowrap}
+#transferStatus{border:1px solid var(--line);padding:10px 12px;border-radius:12px;background:var(--surface)}
+.sheet .card{max-width:520px;max-height:calc(var(--visible-height,100dvh) - 16px);overscroll-behavior:contain;overflow-wrap:anywhere}
+.sheet input,.sheet select,.sheet textarea{max-width:100%;min-width:0}
+.sheet-toolbar{top:-16px;min-height:52px}
+.editor>.head{flex-wrap:wrap}.editor>.head b{min-width:64px;overflow-wrap:anywhere}
+.editor .head button{padding:6px 10px;height:auto}
+.attach-card label{overflow-wrap:anywhere}
+button{white-space:normal;overflow-wrap:anywhere}
+@media(min-width:600px){.page:not(:has(.editor.show)){margin:24px auto;min-height:calc(100dvh - 48px);border:1px solid var(--line);border-radius:24px;overflow:hidden}.sheet .card{border-radius:24px 24px 0 0}}
+@media(max-width:360px){.head{padding:10px;gap:4px}.head button{padding:8px}.composer{padding:12px}.editor>.head b{flex-basis:calc(100% - 70px)}.tools{gap:6px}}
+
+/* Low-height editing keeps every tool reachable without an overlaid footer. */
+.editor.show{overflow-y:auto;overscroll-behavior:contain}
+.editor>.head{position:sticky;top:0;z-index:6}
+#stage{flex:1 0 160px}
+@media(max-height:520px){#stage{flex-basis:80px;min-height:80px}.editor .caption-drawer{padding-bottom:12px}}

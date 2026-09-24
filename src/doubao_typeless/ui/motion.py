@@ -94,8 +94,14 @@ class SurfacePulse(QWidget):
         self.setFocusPolicy(Qt.NoFocus)
         self.started=time.monotonic();self.point=point
         self.duration=.42 if point is not None else .5
+        target.installEventFilter(self)
         self.setGeometry(target.rect());self.show();self.raise_()
         self.timer=QTimer(self);self.timer.setInterval(16);self.timer.timeout.connect(self.tick);self.timer.start()
+
+    def eventFilter(self, target, event):
+        if event.type() == QEvent.Resize:
+            self.setGeometry(target.rect())
+        return False
 
     def tick(self):
         if time.monotonic()-self.started>=self.duration or not self.isVisible():

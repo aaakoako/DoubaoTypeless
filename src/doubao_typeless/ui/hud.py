@@ -166,20 +166,21 @@ class HudController:
         interface_motion().configure(self._motion_enabled)
         self._feedback=InputFeedback(self._body);self._feedback.configure(self._motion_enabled)
         bar = QWidget()
-        bar.setFixedHeight(40)
+        bar.setMinimumHeight(32)
         bar.setObjectName("hudActions")
-        row = QHBoxLayout(bar)
+        from doubao_typeless.ui.flow_layout import FlowLayout
+        row = FlowLayout(bar)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(8)
         expand = QPushButton("展开")
         from doubao_typeless.ui.icons import icon, ToneBadge
         expand.setIcon(icon('expand'))
-        expand.setFixedHeight(32)
+        expand.setMinimumHeight(32)
         expand.clicked.connect(lambda: self._on_expand and self._on_expand())
         self._expand = expand
         copy = QPushButton("复制")
         copy.setIcon(icon('copy'))
-        copy.setFixedHeight(32)
+        copy.setMinimumHeight(32)
         copy.clicked.connect(lambda: self._on_copy and self._on_copy())
         self._copy = copy
         btn = QPushButton("插入并复制")
@@ -187,26 +188,25 @@ class HudController:
         btn.setObjectName("DTInsertAction")
         btn.setProperty("role", "primary")
         btn.setAccessibleName("插入并复制")
-        btn.setFixedHeight(32)
+        btn.setMinimumHeight(32)
         btn.clicked.connect(lambda: self._on_insert and self._on_insert())
         self._insert = btn
-        row.addWidget(expand, 0)
-        row.addWidget(copy, 0)
+        row.addWidget(expand)
+        row.addWidget(copy)
         self._recover = QPushButton("恢复")
         self._recover.setIcon(icon('back'))
         self._recover.setFocusPolicy(Qt.NoFocus)
         self._recover.setToolTip("查看已插入的部分，再决定如何继续")
         self._recover.clicked.connect(lambda: self._on_recover and self._on_recover())
         self._recover.hide()
-        row.addWidget(self._recover, 0)
-        row.addWidget(btn, 0)
-        row.addStretch(1)
+        header_recover = self._recover
+        row.addWidget(btn)
         dismiss = QPushButton("×")
         dismiss.setToolTip("收起，不清空草稿")
         dismiss.setFixedSize(24, 28)
         dismiss.setStyleSheet("QPushButton { padding:0; }")
         dismiss.clicked.connect(self.dismiss)
-        row.addWidget(dismiss)
+        header_dismiss = dismiss
         for action in (expand, copy, btn, dismiss):
             action.setFocusPolicy(Qt.NoFocus)
         header = QHBoxLayout()
@@ -217,6 +217,8 @@ class HudController:
         self._latest.clicked.connect(self._resume_tail)
         self._latest.hide()
         header.addWidget(self._latest)
+        header.addWidget(header_recover)
+        header.addWidget(header_dismiss)
         layout.addLayout(header)
         layout.addWidget(self._body, 1)
         thumbs = QWidget()
@@ -228,13 +230,13 @@ class HudController:
         self._thumbs = thumbs
         layout.addWidget(thumbs, 0)
         check_row = QWidget()
-        check_layout = QHBoxLayout(check_row)
+        check_layout = FlowLayout(check_row)
         check_layout.setContentsMargins(0, 0, 0, 0)
         self._check_button = QPushButton('输入检查')
         from PySide6.QtWidgets import QSizePolicy
-        self._check_button.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self._check_button.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self._check_button.setMinimumWidth(0)
-        self._check_button.setFixedHeight(32)
+        self._check_button.setMinimumHeight(32)
         self._check_button.setObjectName('DTInputCheck')
         self._check_button.setFocusPolicy(Qt.NoFocus)
         self._check_button.clicked.connect(lambda: self._on_expand and self._on_expand())
@@ -244,14 +246,17 @@ class HudController:
         self._note_button.setToolTip(VOICE_NOTE+'\n点击切换本段附注，不修改原稿。')
         self._note_button.setFocusPolicy(Qt.NoFocus)
         self._note_button.clicked.connect(lambda: self._on_toggle_note and self._on_toggle_note())
-        check_layout.addWidget(self._check_button, 1)
+        check_layout.addWidget(self._check_button)
         self._tone_badge = ToneBadge()
         check_layout.addWidget(self._tone_badge)
         check_layout.addWidget(self._note_button)
         self._check_row = check_row
         check_row.hide()
         layout.addWidget(check_row)
-        layout.addWidget(bar, 0)
+        from doubao_typeless.ui.input_check import ReferencePanel
+        self._references = ReferencePanel(card, compact=True)
+        layout.addWidget(self._references)
+        layout.addWidget(bar, 0, Qt.AlignBottom)
         self._bar = bar
         w.hide()
         self._widget = w
@@ -497,13 +502,14 @@ class HudController:
 
 
     def _max_height(self) -> int:
-        max_h = TOKENS["max_h"]
+        ceiling = 420 if getattr(self, "_references", None) is not None and not self._references.isHidden() else TOKENS["max_h"]
+        max_h = ceiling
         try:
             from PySide6.QtGui import QGuiApplication
 
             screen = QGuiApplication.primaryScreen()
             if screen is not None:
-                max_h = min(TOKENS["max_h"], int(screen.availableGeometry().height() * 0.35))
+                max_h = min(ceiling, max(300, int(screen.availableGeometry().height() * 0.55)))
         except Exception:
             pass
         return max(TOKENS["min_text_h"], max_h)
@@ -512,31 +518,35 @@ class HudController:
         if self._check_row is None:return
         from doubao_typeless.services.input_check import presentation
         summary, details = presentation(result)
-        signature = (summary, details, result.get('note'), result.get('suppressed'), result.get('tone'))
+        self._references.set_result(result)
+        signature = (repr(result.get('references')), summary, details, result.get('note'), result.get('suppressed'), result.get('tone'))
         if signature == self._check_signature:return
         self._check_signature = signature
         from PySide6.QtCore import Qt
         from doubao_typeless.ui.icons import icon, judgment_icon
-        available = 160 if result.get('note') or result.get('suppressed') else 240
         self._check_button.setIcon(icon(judgment_icon(result)))
         self._tone_badge.set_tone(result.get('tone',''))
         self._feedback.set_tone(result.get('tone_kind',''))
-        self._check_button.setText(self._check_button.fontMetrics().elidedText(summary, Qt.ElideRight, available))
+        self._check_button.setText(summary)
         import html
         self._check_button.setToolTip(html.escape(details).replace('\n', '<br>'))
         self._note_button.setVisible(bool(result.get('note') or result.get('suppressed')))
         self._note_button.setText('附注已关' if result.get('suppressed') else '附注已开')
         self._note_button.setChecked(bool(result.get('note')))
         self._note_button.setIcon(icon('note_off' if result.get('suppressed') else 'mic'))
-        was_visible = not self._check_row.isHidden()
         self._check_row.setVisible(bool(summary))
-        if self._widget.isVisible() and was_visible != bool(summary):
-            self._widget.resize(self._widget.width(), min(self._max_height(), self._widget.height()+(40 if summary else -40)))
+        if self._widget.isVisible():
+            chrome = self._chrome_height()
+            body_height = max(40, min(self._text_height(self._body.toPlainText()), self._max_height() - chrome))
+            self._body.setMaximumHeight(body_height)
+            self._widget.resize(self._widget.width(), min(self._max_height(), body_height + chrome))
+            self._place()
         # Never reopen, steal focus, reset idle or rewrite the body on response.
 
     def _chrome_height(self) -> int:
         status_h = self._status.sizeHint().height() if getattr(self, "_status", None) else 18
-        bar_h = self._bar.height() if getattr(self, "_bar", None) is not None else 40
+        available = max(1, self._widget.width() - 34)
+        bar_h = self._bar.layout().heightForWidth(available) if getattr(self, "_bar", None) is not None else 40
         margins = 18
         spacing = 12
         try:
@@ -547,8 +557,9 @@ class HudController:
                 spacing = max(layout.spacing(), 0) * 2
         except Exception:
             pass
-        check_h = 40 if self._check_row is not None and not self._check_row.isHidden() else 0
-        return status_h + bar_h + margins + spacing + (68 if self.assets else 0) + check_h
+        check_h = self._check_row.layout().heightForWidth(available) + 8 if self._check_row is not None and not self._check_row.isHidden() else 0
+        reference_h = self._references.sizeHint().height() + 8 if not self._references.isHidden() else 0
+        return status_h + bar_h + margins + spacing + (68 if self.assets else 0) + check_h + reference_h
 
     def _text_height(self, text: str) -> int:
         try:

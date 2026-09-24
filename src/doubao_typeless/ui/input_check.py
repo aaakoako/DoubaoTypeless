@@ -9,7 +9,7 @@ from doubao_typeless.ui.icons import icon, judgment_icon, ToneBadge
 
 class InputCheckSettings:
     def __init__(self, form, stored, parent):
-        self.enabled = QCheckBox('输入检查 · Jev')
+        self.enabled = QCheckBox('输入参考 · Jev')
         self.enabled.setIcon(icon('inspect'))
         self.enabled.setChecked(bool(stored.get('jev_enabled')))
         form.addRow(self.enabled)
@@ -141,6 +141,49 @@ class InputCheckSettings:
                 'jev_emotion': self.emotion.isChecked(), 'jev_voice_note': self.note.isChecked()}
 
 
+class ReferencePanel(QWidget):
+    """Four observations with equal visual weight; the rail is not a score."""
+    def __init__(self, parent=None, *, compact=False):
+        super().__init__(parent)
+        from PySide6.QtWidgets import QGridLayout
+        from doubao_typeless.services.input_check import REFERENCE_DIMENSIONS
+        self.setObjectName('referencePanel')
+        grid = QGridLayout(self)
+        grid.setContentsMargins(8, 6, 8, 6)
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(4)
+        self.labels = {}
+        for i, (key, (title, _)) in enumerate(REFERENCE_DIMENSIONS.items()):
+            label = QLabel(title + ' · 暂无法判断')
+            label.setTextFormat(Qt.PlainText)
+            label.setWordWrap(True)
+            label.setMinimumWidth(0)
+            label.setObjectName('referenceObservation')
+            grid.addWidget(label, i // 2, i % 2)
+            self.labels[key] = label
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
+        self.setToolTip('仅参考本段文字；未读取对话历史、图片或执行结果。各项独立，不代表成功率。')
+        scope = QLabel('本段参考 · 未读取上文')
+        scope.setObjectName('muted')
+        scope.setWordWrap(True)
+        grid.addWidget(scope, 2, 0, 1, 2)
+        self.hide()
+
+    def set_result(self, result):
+        from doubao_typeless.services.input_check import REFERENCE_DIMENSIONS, REFERENCE_STATES
+        from doubao_typeless.ui.theme_generated import COLORS
+        rows = {r['id']: r for r in result.get('references', []) if r.get('id') in self.labels}
+        self.setVisible(result.get('status') == 'ready' and bool(rows))
+        for key, label in self.labels.items():
+            state = rows.get(key, {}).get('state', 'unknown')
+            text = REFERENCE_STATES.get(state, REFERENCE_STATES['unknown'])
+            label.setText(REFERENCE_DIMENSIONS[key][0] + ' · ' + text)
+            color = COLORS['accent'] if state == 'clear' else COLORS['muted']
+            label.setStyleSheet('border-left: 3px solid ' + color + '; padding-left:6px;')
+            label.setAccessibleName(label.text())
+
+
 class InputCheckDetails(QWidget):
     def __init__(self, app, parent,feedback=None):
         super().__init__(parent)
@@ -157,7 +200,10 @@ class InputCheckDetails(QWidget):
         header=QHBoxLayout()
         self.symbol=QLabel();self.tone=ToneBadge()
         header.addWidget(self.symbol);header.addWidget(self.summary,1);header.addWidget(self.tone)
-        layout.addLayout(header); layout.addWidget(self.details)
+        layout.addLayout(header)
+        self.references = ReferencePanel(self)
+        layout.addWidget(self.references)
+        layout.addWidget(self.details)
         actions = QHBoxLayout(); actions.addWidget(self.note); actions.addWidget(self.retry)
         layout.addLayout(actions)
         self._timer = QTimer(self); self._timer.setInterval(250)
@@ -166,6 +212,7 @@ class InputCheckDetails(QWidget):
             if feedback is not None:
                 feedback.configure(app.input_check.options.get('ui_motion',True))
                 feedback.set_tone(result.get('tone_kind',''))
+            self.references.set_result(result)
             summary, details = presentation(result)
             self.setVisible(bool(summary))
             self.summary.setText(summary)

@@ -14,7 +14,7 @@ READY = {'status': 'ready', 'issues': [{'kind': 'transcription', 'label': 'ç–‘ä¼
 def response(request, choice='transcription', confidence=.95):
     answers = {}
     for name, question in request['questions'].items():
-        selected = 'urgent' if name == 'tone' else choice
+        selected = 'clear' if name.startswith('reference_') else ('urgent' if name == 'tone' else choice)
         probabilities = {k: 0. for k in question['criteria']}; probabilities[selected] = 1.
         answers[name] = {'type': 'choice', 'choice': selected, 'probabilities': probabilities, 'confidence': confidence}
     return {'model': 'jev-1.13.0', 'answers': answers}
