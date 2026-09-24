@@ -113,6 +113,7 @@ def test_same_runtime_other_process_is_not_remembered():
 
 def test_locate_ambiguous_does_not_focus_or_paste(app,monkeypatch):
     from doubao_typeless.platform import desktop as composer_locator, desktop as focus
+    platform(app)
     calls=[]
     monkeypatch.setattr(composer_locator,'locate_current',lambda _: {'status':'ambiguous','candidates':[candidate(1),candidate(2)]})
     monkeypatch.setattr(focus,'restore_target',lambda _:calls.append('focus'))
